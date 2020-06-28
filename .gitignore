@@ -1,0 +1,10 @@
+_Store
+*.swp
+*.swo
+*.swn
+*.bak
+.atom-build.json
+
+
+.build-tools.cson
+.vscode

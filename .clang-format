@@ -1,0 +1,10 @@
+﻿---
+BasedOnStyle: LLVM
+Standard: Cpp11
+
+AlignTrailingComments: true
+AlignOperands:   true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+SortIncludes: false
+...
