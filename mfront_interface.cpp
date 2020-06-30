@@ -15,6 +15,8 @@ using DomainEleOp = DomainEle::UserDataOperator;
 // #ifdef WITH_MFRONT
 #include <MGIS/Behaviour/Behaviour.hxx>
 #include <MGIS/Behaviour/BehaviourData.hxx>
+#include "MGIS/Behaviour/MaterialDataManager.h"
+#include "MGIS/Behaviour/Integrate.hxx"
 
 using namespace mgis;
 using namespace mgis::behaviour;
@@ -76,7 +78,7 @@ int main(int argc, char *argv[]) {
     CHKERR simple->buildProblem();
 
     boost::shared_ptr<CommonData> commonDataPtr;
-    boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe; 
+    boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
     // mofem boundary conditions
     boost::ptr_map<std::string, NeumannForcesSurface> neumann_forces;
     boost::ptr_map<std::string, NodalForce> nodal_forces;
@@ -140,7 +142,8 @@ int main(int argc, char *argv[]) {
 
     auto add_domain_ops_lhs = [&](auto &pipeline) {
       for (auto &sit : commonDataPtr->setOfBlocksData)
-        pipeline.push_back(new OpAssembleLhs("U", "U", commonDataPtr, sit.second));
+        pipeline.push_back(
+            new OpAssembleLhs("U", "U", commonDataPtr, sit.second));
     };
 
     auto add_domain_ops_rhs = [&](auto &pipeline) {
@@ -290,7 +293,8 @@ int main(int argc, char *argv[]) {
 
     auto create_post_process_element = [&]() {
       MoFEMFunctionBegin;
-      // postProcFe = boost::make_shared<PostProcFaceOnRefinedMeshFor2D>(m_field);
+      // postProcFe =
+      // boost::make_shared<PostProcFaceOnRefinedMeshFor2D>(m_field);
       postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(m_field);
       postProcFe->generateReferenceElementMesh();
 
@@ -326,30 +330,57 @@ int main(int argc, char *argv[]) {
     CHKERR VecGhostUpdateEnd(D, INSERT_VALUES, SCATTER_FORWARD);
     CHKERR DMoFEMMeshToLocalVector(dm, D, INSERT_VALUES, SCATTER_REVERSE);
 
-    const auto b =
+    const auto mgis_bv =
         load("src/libBehaviour.so", "IsotropicLinearHardeningPlasticity",
              Hypothesis::TRIDIMENSIONAL);
-    auto d = BehaviourData{b};
-    // wrong (EquivalentPlasticStrain is mispelled)
-    // const auto o = getVariableOffset(b.isvs, "EquivalentPasticStrain",
-    // b.hypothesis); // right
+    auto beh_data = BehaviourData{mgis_bv};
+
     auto odd = FiniteStrainBehaviourOptions{};
     odd.stress_measure = FiniteStrainBehaviourOptions::PK1;
     odd.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
-    b.mps;
-    d.K[0] = 4;
-    d.K[1] = 2;
-    d.K[2] = 2;
-    cerr << d.K << endl;
-    const auto o =
-        getVariableOffset(b.isvs, "EquivalentPlasticStrain", b.hypothesis);
-    int n = 15;
 
-    // MaterialDataManager m{b, n};
+    mgis_bv.mps; // material properties
+    beh_data.K[0] = 4;  // consistent tangent
+    beh_data.K[1] = 2; // first Piola stress
+    beh_data.K[2] = 2; // dP / dF derivative
+    cerr << beh_data.K << endl;
+    const auto offset1 = getVariableOffset(mgis_bv.isvs, "EquivalentPlasticStrain",
+                                     mgis_bv.hypothesis);
+    const auto offset2 = getVariableOffset(mgis_bv.isvs, "ElasticStrain",
+                                     mgis_bv.hypothesis);
+
+    MaterialDataManager mat{mgis_bv, 50};
+   
     // std::cout << "member s0 " << m.s0 << '\n';
-    const auto nb = getArraySize(b.isvs, b.hypothesis);
-    std::cout << "offset: " << o << '\n';
+    const auto nb = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
+    std::cout << "offset of EquivalentPlasticStrain: " << offset1 << '\n';
+    std::cout << "offset of ElasticStrain: " << offset2 << '\n';
     std::cout << "array size " << nb << '\n';
+    auto b_view = make_view(beh_data);
+    vector<double> my_material_parameters(5);
+    my_material_parameters[0] = 100;
+    my_material_parameters[1] = .3;
+    my_material_parameters[2] = 200;
+    // mgis_bv.params["YoungModulus"] = 200;
+    // auto check_params = beh_data.getParameters();
+    // beh_data.getMaterialProperties();
+    b_view.s0.material_properties = &*my_material_parameters.begin();
+    auto &my_params = mgis_bv.params;
+    cout << my_params[0] << endl;
+    int check = integrate(b_view, mgis_bv);
+
+    std::cout << "check " << check << '\n';
+    auto set_mat_props = [&](auto &s) {
+      setMaterialProperty(s, "YoungModulus", 100);
+      setMaterialProperty(s, "PoissonRatio", .3);
+      setMaterialProperty(s, "HardeningSlope", 50);
+      setMaterialProperty(s, "YieldStrength", 10);
+      setExternalStateVariable(s, "Temperature", 293.15);
+    };
+
+    // set_mat_props(b_view.s0);
+    // set_mat_props(mat.s0);
+    // set_mat_props(mat.s1);
   }
   CATCH_ERRORS;
 

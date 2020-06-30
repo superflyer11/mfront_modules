@@ -1,0 +1,8 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = git@bitbucket.org:karol41/um_mfront_interface.git
+	fetch = +refs/heads/*:refs/remotes/origin/*

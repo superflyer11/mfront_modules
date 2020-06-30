@@ -31,6 +31,7 @@ OpAssembleRhs::OpAssembleRhs(const std::string field_name,
     : DomainEleOp(field_name, DomainEleOp::OPROW),
       commonDataPtr(common_data_ptr), dAta(block_data) {}
 
+//FIXME: Implement OpStress and run only on VERTICES
 MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
   MoFEMFunctionBegin;
 
@@ -59,6 +60,10 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
     Tensor2_symmetric<double, 3> t_stress;
 
     auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
+
+    auto fe_ent = getFEEntityHandle();
+    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts);
+    MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
 
     auto &t_D = commonDataPtr->tD;
 
@@ -117,8 +122,8 @@ MoFEMErrorCode OpUpdateInternalVar::doWork(int side, EntityType type,
 
     auto fe_ent = getFEEntityHandle();
     CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts);
+    MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
     auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       // UPDATE INTERNAL VARIABLES HERE
       ++t_grad;
@@ -139,7 +144,8 @@ OpAssembleLhs::OpAssembleLhs(const std::string row_field_name,
   sYmm = false;
 }
 
-//! [Stiffness]
+
+//FIXME: Implement calculateTangent and run only on VERTICES
 MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
                                      EntityType row_type, EntityType col_type,
                                      EntData &row_data, EntData &col_data) {
@@ -157,14 +163,18 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
 
     locK.resize(nb_row_dofs, nb_col_dofs, false);
 
-    const size_t nb_integration_pts = row_data.getN().size1();
+    const size_t nb_gauss_pts = row_data.getN().size1();
     const size_t nb_row_base_funcs = row_data.getN().size2();
     auto t_row_diff_base = row_data.getFTensor1DiffN<3>();
     auto t_w = getFTensor0IntegrationWeight();
     auto &t_D = commonDataPtr->tD;
 
+    auto fe_ent = getFEEntityHandle();
+    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts);
+    MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
+
     locK.clear();
-    for (size_t gg = 0; gg != nb_integration_pts; ++gg) {
+    for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       double alpha = getMeasure() * t_w;
 
       size_t rr = 0;

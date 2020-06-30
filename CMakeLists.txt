@@ -18,23 +18,36 @@ include_directories(
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-add_library(MFrontGenericInterface SHARED IMPORTED)
-set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION /home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi/lib/libMFrontGenericInterface.so)
+if(NOT MGIS_DIR)
+  message( FATAL_ERROR "You need to define MGIS_DIR" )
+endif(NOT MGIS_DIR)
 
+
+if(MGIS_DIR)
+  # find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface PATHS ${MGIS_DIR}/lib)
+  find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include)
+  add_library(MFrontGenericInterface SHARED IMPORTED)
+  set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_DIR}/lib/libMFrontGenericInterface.so)
+  message(STATUS ${MGIS_LIBRARY})
+  message(STATUS ${MGIS_HEADER})
+  if(MGIS_LIBRARY AND MGIS_HEADER)
+    include_directories(${MGIS_HEADER})
+    add_definitions(-DWITH_MGIS)
+  endif(MGIS_LIBRARY AND MGIS_HEADER)
+endif(MGIS_DIR)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/../nonlinear_elastic_materials/src)
   
-  add_executable(mfront_interface
+add_executable(mfront_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
-  )
-  
-# link_directories(/home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi/lib)
-include_directories(/home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi/include)
-include_directories(/home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi/lib)
-# find_library(MFrontGenericInterface NAMES MFrontGenericInterface /home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi/lib)
-# find_package(MFrontGenericInterface REQUIRED)
+)
+
+include_directories(${MGIS_DIR}/include)
+include_directories(${MGIS_DIR}/lib)
+
+# /home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi
 
 add_dependencies(mfront_interface MFrontGenericInterface)
 target_link_libraries(mfront_interface
