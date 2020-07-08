@@ -94,8 +94,26 @@ int main(int argc, char *argv[]) {
     // commonDataPtr->mStrainPtr = boost::make_shared<MatrixDouble>();
     // commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->materialTangent = boost::make_shared<MatrixDouble>();
-
     commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
+
+    commonDataPtr->mGisBehaviour = boost::make_shared<Behaviour>(
+        load("src/libBehaviour.so", "IsotropicLinearHardeningPlasticity", Hypothesis::TRIDIMENSIONAL));
+
+    cout << "Parameters for this behaviour are: \n";
+    for (const auto &mp : commonDataPtr->mGisBehaviour->mps) {
+      cerr << mp.name << endl;
+    }
+
+    cout << "Parameters for this behaviour are: \n";
+    for (auto &p : commonDataPtr->mGisBehaviour->params)
+      cout << p << endl;
+    // FIXME: TODO: HARD CODE PARAMETERS 
+
+    commonDataPtr->setOfBlocksData.begin()->second.params[0] = 10;
+    commonDataPtr->setOfBlocksData.begin()->second.params[1] = 0.3;
+    commonDataPtr->setOfBlocksData.begin()->second.params[2] = 0.1;
+    commonDataPtr->setOfBlocksData.begin()->second.params[3] = 10000;
+    commonDataPtr->setOfBlocksData.begin()->second.params[4] = 100;
 
     update_int_variables =
         boost::make_shared<VolumeElementForcesAndSourcesCore>(m_field);
@@ -330,45 +348,63 @@ int main(int argc, char *argv[]) {
     CHKERR VecGhostUpdateEnd(D, INSERT_VALUES, SCATTER_FORWARD);
     CHKERR DMoFEMMeshToLocalVector(dm, D, INSERT_VALUES, SCATTER_REVERSE);
 
-    const auto mgis_bv =
-        load("src/libBehaviour.so", "IsotropicLinearHardeningPlasticity",
-             Hypothesis::TRIDIMENSIONAL);
-    auto beh_data = BehaviourData{mgis_bv};
-
     auto odd = FiniteStrainBehaviourOptions{};
     odd.stress_measure = FiniteStrainBehaviourOptions::PK1;
     odd.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
 
-    mgis_bv.mps; // material properties
-    beh_data.K[0] = 4;  // consistent tangent
+    // const auto mgis_bv =
+    //     // load("src/libBehaviour.so", "Plasticity",
+    //     load("src/libBehaviour.so", "Elasticity",
+    //          Hypothesis::TRIDIMENSIONAL);
+    auto &mgis_bv = *commonDataPtr->mGisBehaviour;
+    auto beh_data = BehaviourData{mgis_bv};
+
+    auto check_this = mgis_bv.gradients.size();
+    vector<Variable> test_params;
+    // mgis_bv.mps = &*test_params.begin();
+    mgis_bv.mps;
+    for (const auto &mp : mgis_bv.mps) {
+      cerr << mp.name << endl;
+    }
+    beh_data.K[0] = 4; // consistent tangent
     beh_data.K[1] = 2; // first Piola stress
     beh_data.K[2] = 2; // dP / dF derivative
     cerr << beh_data.K << endl;
-    const auto offset1 = getVariableOffset(mgis_bv.isvs, "EquivalentPlasticStrain",
-                                     mgis_bv.hypothesis);
-    const auto offset2 = getVariableOffset(mgis_bv.isvs, "ElasticStrain",
-                                     mgis_bv.hypothesis);
+    // const auto offset1 = getVariableOffset(mgis_bv.isvs, "EquivalentPlasticStrain",
+    //                                  mgis_bv.hypothesis);
+    // const auto offset2 = getVariableOffset(mgis_bv.isvs, "ElasticStrain",
+    //                                  mgis_bv.hypothesis);
 
-    MaterialDataManager mat{mgis_bv, 50};
+    // MaterialDataManager mat{mgis_bv, 50};
    
     // std::cout << "member s0 " << m.s0 << '\n';
-    const auto nb = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-    std::cout << "offset of EquivalentPlasticStrain: " << offset1 << '\n';
-    std::cout << "offset of ElasticStrain: " << offset2 << '\n';
-    std::cout << "array size " << nb << '\n';
+    // const auto nb = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
+    // std::cout << "offset of EquivalentPlasticStrain: " << offset1 << '\n';
+    // std::cout << "offset of ElasticStrain: " << offset2 << '\n';
+    // // get these sizes to initialize the size of internal and external variables
+    // std::cout << "array size " << nb << '\n';
     auto b_view = make_view(beh_data);
     vector<double> my_material_parameters(5);
     my_material_parameters[0] = 100;
-    my_material_parameters[1] = .3;
-    my_material_parameters[2] = 200;
+    my_material_parameters[1] = 0.2;
+    my_material_parameters[2] = .2;
     // mgis_bv.params["YoungModulus"] = 200;
     // auto check_params = beh_data.getParameters();
     // beh_data.getMaterialProperties();
-    b_view.s0.material_properties = &*my_material_parameters.begin();
-    auto &my_params = mgis_bv.params;
-    cout << my_params[0] << endl;
+    vector<double> my_test_gradients(14, 0.);
+    // for (auto &it : my_test_gradients)
+    //   it = (double)rand() * 0.2 / (double)RAND_MAX;
+    
+    b_view.s0.gradients = &*my_test_gradients.begin();
+    b_view.s0.material_properties = my_material_parameters.data();
+    b_view.s1.material_properties = my_material_parameters.data();
+
+    cout << "Parameters for this behaviour are: \n";
+    for (auto &p : mgis_bv.params)
+      cout << p << endl;
     int check = integrate(b_view, mgis_bv);
 
+    cerr << beh_data.K << endl;
     std::cout << "check " << check << '\n';
     auto set_mat_props = [&](auto &s) {
       setMaterialProperty(s, "YoungModulus", 100);

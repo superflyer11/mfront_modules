@@ -13,6 +13,7 @@ using DomainEleOp = DomainEle::UserDataOperator;
 // #ifdef WITH_MFRONT
 #include <MGIS/Behaviour/Behaviour.hxx>
 #include <MGIS/Behaviour/BehaviourData.hxx>
+#include "MGIS/Behaviour/Integrate.hxx"
 using namespace mgis;
 using namespace mgis::behaviour;
 
@@ -24,6 +25,24 @@ Index<'k', 3> k;
 Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
+constexpr double sqr2 = boost::math::constants::root_two<double>();
+constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
+
+#define TTENSOR4_MAT_PTR(MAT)                                                  \
+  &MAT[0], &MAT[1], &MAT[2], &MAT[3], &MAT[4], &MAT[5], &MAT[6], &MAT[7],      \
+      &MAT[8], &MAT[9], &MAT[10], &MAT[11], &MAT[12], &MAT[13], &MAT[14],      \
+      &MAT[15], &MAT[16], &MAT[17], &MAT[18], &MAT[19], &MAT[20], &MAT[21],    \
+      &MAT[22], &MAT[23], &MAT[24], &MAT[25], &MAT[26], &MAT[27], &MAT[28],    \
+      &MAT[29], &MAT[30], &MAT[31], &MAT[32], &MAT[33], &MAT[34], &MAT[35]
+
+// #define VOIGHT_VEC_SYMM(VEC) VEC[0], VEC[1], VEC[2], VEC[3], VEC[4], VEC[5]
+// #define VOIGHT_VEC_SYMM(VEC) VEC[0], VEC[3], VEC[5], VEC[1], VEC[2], VEC[4]
+#define VOIGHT_VEC_SYMM(VEC)                                                   \
+  VEC[0], inv_sqr2 *VEC[3], inv_sqr2 *VEC[4], VEC[1], inv_sqr2 *VEC[5], VEC[2]
+
+// #define VOIGHT_VEC_SYMM(VEC) \
+//   VEC[0], VEC[3] / sqrt(2), VEC[1], VEC[5] / sqrt(2), VEC[4] / sqrt(2),
+//   VEC[2]
 
 OpAssembleRhs::OpAssembleRhs(const std::string field_name,
                              boost::shared_ptr<CommonData> common_data_ptr,
@@ -31,7 +50,7 @@ OpAssembleRhs::OpAssembleRhs(const std::string field_name,
     : DomainEleOp(field_name, DomainEleOp::OPROW),
       commonDataPtr(common_data_ptr), dAta(block_data) {}
 
-//FIXME: Implement OpStress and run only on VERTICES
+// FIXME: Implement OpStress and run only on VERTICES
 MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
   MoFEMFunctionBegin;
 
@@ -39,9 +58,25 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
   if (nb_dofs) {
 
     if (dAta.tEts.find(getNumeredEntFiniteElementPtr()->getEnt()) ==
-        dAta.tEts.end()) 
+        dAta.tEts.end())
       MoFEMFunctionReturnHot(0);
     CHKERR commonDataPtr->getBlockData(dAta);
+
+    // make separate material for each block
+    auto &mgis_bv = *commonDataPtr->mGisBehaviour;
+    // get size of internal and external variables
+    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
+
+    // local behaviour data
+    auto beh_data = BehaviourData{mgis_bv};
+    // beh_data.K[0] = 4; // consistent tangent
+    // beh_data.K[1] = 2; // first Piola stress
+    // beh_data.K[2] = 2; // dP / dF derivative
+    beh_data.K[1] = 0; // cauchy
+    auto b_view = make_view(beh_data);
+
+    b_view.s0.material_properties = dAta.params.data();
+    b_view.s1.material_properties = dAta.params.data();
 
     const size_t nb_base_functions = data.getN().size2();
     if (3 * nb_base_functions < nb_dofs)
@@ -66,18 +101,52 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
     MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
 
     auto &t_D = commonDataPtr->tD;
-
+ 
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
       t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
-      t_stress(i, j) = t_D(i, j, k, l) * t_strain(k, l);
 
+      auto testing3 = sqrt(abs(t_grad(i, j) * t_grad(i, j)));
+
+      vector<double> vec_sym{t_strain(0, 0),        t_strain(1, 1),
+                             t_strain(2, 2),        sqr2 * t_strain(0, 1),
+                             sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
+      // vector<double> vec_sym{t_strain(0, 0), t_strain(1, 1), t_strain(2, 2),
+      //                        t_strain(0, 1), t_strain(0, 2), t_strain(1, 2)};
+
+      b_view.s0.gradients = vec_sym.data();
+      // b_view.s0.gradients = &t_strain(0, 0);
+
+      int check = integrate(b_view, mgis_bv);
+
+      // if (abs(testing3) > 1e-7) {
+
+      //   for (int n : {0, 1, 2, 3, 4, 5}) {
+      //     cout << b_view.s0.thermodynamic_forces[n] << " ";
+      //   }
+      //   cout << "\n";
+      //   for (int n : {0, 1, 2, 3, 4, 5}) {
+      //     cout << b_view.s1.thermodynamic_forces[n] << " ";
+      //   }
+      //   cout << "\n";
+      // }
+
+      auto &st2 = b_view.s1.thermodynamic_forces;
+      Tensor2_symmetric<double, 3> t_forces(VOIGHT_VEC_SYMM(st2));
+      // Tensor2_symmetric<double, 3> t_forces_test(0., 1., 2., 3., 4., 5.);
+      // cout << "t_forces_test(0, 0) " << " 0 " << t_forces_test(0, 0) << endl;
+      // cout << "t_forces_test(0, 1) " << " 1 " << t_forces_test(0, 1) << endl;
+      // cout << "t_forces_test(0, 2) " << " 2 " << t_forces_test(0, 2) << endl;
+      // cout << "t_forces_test(1, 1) " << " 3 " << t_forces_test(1, 1) << endl;
+      // cout << "t_forces_test(2, 1) " << " 4 " << t_forces_test(2, 1) << endl;
+      // cout << "t_forces_test(2, 2) " << " 5 " << t_forces_test(2, 2) << endl;
       double alpha = getMeasure() * t_w;
       Tensor1<PackPtr<double *, 3>, 3> t_nf{&nf[0], &nf[1], &nf[2]};
 
       size_t bb = 0;
       for (; bb != nb_dofs / 3; ++bb) {
-        t_nf(i) += alpha * t_diff_base(j) * t_stress(i, j);
+        t_nf(i) += alpha * t_diff_base(j) * t_forces(i, j);
+        // t_nf(i) += alpha * t_diff_base(j) * t_stress(i, j);
         ++t_diff_base;
         ++t_nf;
       }
@@ -108,7 +177,7 @@ MoFEMErrorCode OpUpdateInternalVar::doWork(int side, EntityType type,
   if (nb_dofs) {
 
     if (dAta.tEts.find(getNumeredEntFiniteElementPtr()->getEnt()) ==
-        dAta.tEts.end()) 
+        dAta.tEts.end())
       MoFEMFunctionReturnHot(0);
     CHKERR commonDataPtr->getBlockData(dAta);
 
@@ -144,8 +213,7 @@ OpAssembleLhs::OpAssembleLhs(const std::string row_field_name,
   sYmm = false;
 }
 
-
-//FIXME: Implement calculateTangent and run only on VERTICES
+// FIXME: Implement calculateTangent and run only on VERTICES
 MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
                                      EntityType row_type, EntityType col_type,
                                      EntData &row_data, EntData &col_data) {
@@ -161,12 +229,25 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
       MoFEMFunctionReturnHot(0);
     CHKERR commonDataPtr->getBlockData(dAta);
 
+    auto &mgis_bv = *commonDataPtr->mGisBehaviour;
+    // local behaviour data
+    auto beh_data = BehaviourData{mgis_bv};
+    beh_data.K[0] = 5; // consistent tangent
+    // beh_data.K[1] = 2; // first Piola stress
+    // beh_data.K[2] = 2; // dP / dF derivative
+    beh_data.K[1] = 0; // cauchy
+    auto b_view = make_view(beh_data);
+
+    b_view.s0.material_properties = dAta.params.data();
+    b_view.s1.material_properties = dAta.params.data();
+
     locK.resize(nb_row_dofs, nb_col_dofs, false);
 
     const size_t nb_gauss_pts = row_data.getN().size1();
     const size_t nb_row_base_funcs = row_data.getN().size2();
     auto t_row_diff_base = row_data.getFTensor1DiffN<3>();
     auto t_w = getFTensor0IntegrationWeight();
+    auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
     auto &t_D = commonDataPtr->tD;
 
     auto fe_ent = getFEEntityHandle();
@@ -176,6 +257,16 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
     locK.clear();
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       double alpha = getMeasure() * t_w;
+
+      Tensor2_symmetric<double, 3> t_strain;
+      t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+
+      vector<double> vec_sym{t_strain(0, 0), t_strain(1, 1), t_strain(2, 2),
+                             t_strain(0, 1), t_strain(0, 2), t_strain(1, 2)};
+      b_view.s0.gradients = vec_sym.data();
+
+      int check = integrate(b_view, mgis_bv);
+      Ddg<double *, 3, 3> tangent(TTENSOR4_MAT_PTR(beh_data.K));
 
       size_t rr = 0;
       for (; rr != nb_row_dofs / 3; ++rr) {
@@ -189,7 +280,7 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
         auto t_col_diff_base = col_data.getFTensor1DiffN<3>(gg, 0);
 
         for (size_t cc = 0; cc != nb_col_dofs / 3; ++cc) {
-          t_a(i, k) += alpha * (t_D(i, j, k, l) *
+          t_a(i, k) += alpha * (tangent(i, j, k, l) *
                                 (t_row_diff_base(j) * t_col_diff_base(l)));
           ++t_col_diff_base;
           ++t_a;
@@ -200,6 +291,7 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
       for (; rr != nb_row_base_funcs; ++rr)
         ++t_row_diff_base;
 
+      ++t_grad;
       ++t_w;
     }
 
@@ -280,13 +372,13 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
   Tensor2_symmetric<double, 3> stress;
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
-    
-      strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
-      stress(i, j) = t_D(i, j, k, l) * strain(k, l);
+
+    strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+    // stress(i, j) = t_D(i, j, k, l) * strain(k, l);
 
     CHKERR set_tag(th_grad, gg, set_matrix(t_grad));
     CHKERR set_tag(th_strain, gg, set_matrix_symm(strain));
-    CHKERR set_tag(th_stress, gg, set_matrix_symm(stress));
+    // CHKERR set_tag(th_stress, gg, set_matrix_symm(stress));
 
     ++t_grad;
   }

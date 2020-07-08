@@ -21,7 +21,7 @@ struct CommonData {
   Ddg<double, 3, 3> tD;
 
   MoFEM::Interface &mField;
-
+  boost::shared_ptr<Behaviour> mGisBehaviour;
   boost::shared_ptr<MatrixDouble> mGradPtr;
   // boost::shared_ptr<MatrixDouble> mStrainPtr;
   // boost::shared_ptr<MatrixDouble> mStressPtr;
