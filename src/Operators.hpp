@@ -1,4 +1,8 @@
-#define MAX_INTERNAL_VAR 9
+
+namespace MFrontInterface {
+
+constexpr double sqr2 = boost::math::constants::root_two<double>();
+constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
 
 struct BlockData {
   int iD;
@@ -10,12 +14,71 @@ struct BlockData {
   BlockData() : oRder(-1), yOung(params[0]), pOisson(params[1]) {}
 };
 
-// Index<'i', 2> i;
-// Index<'j', 2> j;
-// Index<'k', 2> k;
-// Index<'l', 2> l;
-// Index<'m', 2> m;
-// Index<'n', 2> n;
+template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
+  Tensor2_symmetric<double, 3> t_strain;
+  Index<'i', 3> i;
+  Index<'j', 3> j;
+  t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+
+  vector<double> vec_sym{t_strain(0, 0),        t_strain(1, 1),
+                         t_strain(2, 2),        sqr2 * t_strain(0, 1),
+                         sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
+  return vec_sym;
+};
+
+template <typename T> Ddg<double, 3, 3> inline get_ddg_from_voigt(const T &K) {
+  Ddg<double, 3, 3> D;
+
+  D(0, 0, 0, 0) = K[0];
+  D(0, 0, 1, 1) = K[1];
+  D(0, 0, 2, 2) = K[2];
+
+  D(0, 0, 0, 1) = inv_sqr2 * K[3];
+  D(0, 0, 0, 2) = inv_sqr2 * K[4];
+  D(0, 0, 1, 2) = inv_sqr2 * K[5];
+
+  D(1, 1, 0, 0) = K[6];
+  D(1, 1, 1, 1) = K[7];
+  D(1, 1, 2, 2) = K[8];
+
+  D(1, 1, 0, 1) = inv_sqr2 * K[9];
+  D(1, 1, 0, 2) = inv_sqr2 * K[10];
+  D(1, 1, 1, 2) = inv_sqr2 * K[11];
+
+  D(2, 2, 0, 0) = K[12];
+  D(2, 2, 1, 1) = K[13];
+  D(2, 2, 2, 2) = K[14];
+
+  D(2, 2, 0, 1) = inv_sqr2 * K[15];
+  D(2, 2, 0, 2) = inv_sqr2 * K[16];
+  D(2, 2, 1, 2) = inv_sqr2 * K[17];
+
+  D(0, 1, 0, 0) = inv_sqr2 * K[18];
+  D(0, 1, 1, 1) = inv_sqr2 * K[19];
+  D(0, 1, 2, 2) = inv_sqr2 * K[20];
+
+  D(0, 1, 0, 1) = 0.5 * K[21];
+  D(0, 1, 0, 2) = 0.5 * K[22];
+  D(0, 1, 1, 2) = 0.5 * K[23];
+
+  D(0, 2, 0, 0) = inv_sqr2 * K[24];
+  D(0, 2, 1, 1) = inv_sqr2 * K[25];
+  D(0, 2, 2, 2) = inv_sqr2 * K[26];
+
+  D(0, 2, 0, 1) = 0.5 * K[27];
+  D(0, 2, 0, 2) = 0.5 * K[28];
+  D(0, 2, 1, 2) = 0.5 * K[29];
+
+  D(1, 2, 0, 0) = inv_sqr2 * K[30];
+  D(1, 2, 1, 1) = inv_sqr2 * K[31];
+  D(1, 2, 2, 2) = inv_sqr2 * K[32];
+
+  D(1, 2, 0, 1) = 0.5 * K[33];
+  D(1, 2, 0, 2) = 0.5 * K[34];
+  D(1, 2, 1, 2) = 0.5 * K[35];
+
+  return D;
+};
 
 struct CommonData {
   Ddg<double, 3, 3> tD;
@@ -61,6 +124,8 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
+  // FIXME: this should properly assign the behaviour and internal variables
+  // instead
   MoFEMErrorCode getBlockData(BlockData &data) {
     MoFEMFunctionBegin;
 
@@ -92,15 +157,15 @@ struct CommonData {
   }
 
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
-                                const int nb_gauss_pts) {
+                                const int nb_gauss_pts, const int var_size) {
     MoFEMFunctionBegin;
     double *tag_data;
     int tag_size;
     rval = mField.get_moab().tag_get_by_ptr(
         internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
 
-    if (rval != MB_SUCCESS || tag_size != MAX_INTERNAL_VAR * nb_gauss_pts) {
-      internalVariablePtr->resize(MAX_INTERNAL_VAR, nb_gauss_pts);
+    if (rval != MB_SUCCESS || tag_size != var_size * nb_gauss_pts) {
+      internalVariablePtr->resize(var_size, nb_gauss_pts);
       internalVariablePtr->clear();
       void const *tag_data[] = {&*internalVariablePtr->data().begin()};
       const int tag_size = internalVariablePtr->data().size();
@@ -109,7 +174,7 @@ struct CommonData {
 
     } else {
       MatrixAdaptor tag_vec = MatrixAdaptor(
-          MAX_INTERNAL_VAR, nb_gauss_pts,
+          var_size, nb_gauss_pts,
           ublas::shallow_array_adaptor<double>(tag_size, tag_data));
 
       *internalVariablePtr = tag_vec;
@@ -118,8 +183,7 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent,
-                                const int nb_gauss_pts) {
+  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent) {
     MoFEMFunctionBegin;
     void const *tag_data[] = {&*internalVariablePtr->data().begin()};
     const int tag_size = internalVariablePtr->data().size();
@@ -268,3 +332,5 @@ struct FePrePostProcess : public FEMethod {
 
   MoFEMErrorCode postProcess() { return 0; }
 };
+
+} // namespace MFrontInterface

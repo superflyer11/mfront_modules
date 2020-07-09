@@ -10,7 +10,6 @@ using DomainEleOp = DomainEle::UserDataOperator;
 
 #include <BasicFiniteElements.hpp>
 
-// #ifdef WITH_MFRONT
 #include <MGIS/Behaviour/Behaviour.hxx>
 #include <MGIS/Behaviour/BehaviourData.hxx>
 #include "MGIS/Behaviour/Integrate.hxx"
@@ -19,30 +18,17 @@ using namespace mgis::behaviour;
 
 #include <Operators.hpp>
 
+namespace MFrontInterface {
+
+#define VOIGHT_VEC_SYMM(VEC)                                                   \
+  VEC[0], inv_sqr2 *VEC[3], inv_sqr2 *VEC[4], VEC[1], inv_sqr2 *VEC[5], VEC[2]
+
 Index<'i', 3> i;
 Index<'j', 3> j;
 Index<'k', 3> k;
 Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
-constexpr double sqr2 = boost::math::constants::root_two<double>();
-constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
-
-#define TTENSOR4_MAT_PTR(MAT)                                                  \
-  &MAT[0], &MAT[1], &MAT[2], &MAT[3], &MAT[4], &MAT[5], &MAT[6], &MAT[7],      \
-      &MAT[8], &MAT[9], &MAT[10], &MAT[11], &MAT[12], &MAT[13], &MAT[14],      \
-      &MAT[15], &MAT[16], &MAT[17], &MAT[18], &MAT[19], &MAT[20], &MAT[21],    \
-      &MAT[22], &MAT[23], &MAT[24], &MAT[25], &MAT[26], &MAT[27], &MAT[28],    \
-      &MAT[29], &MAT[30], &MAT[31], &MAT[32], &MAT[33], &MAT[34], &MAT[35]
-
-// #define VOIGHT_VEC_SYMM(VEC) VEC[0], VEC[1], VEC[2], VEC[3], VEC[4], VEC[5]
-// #define VOIGHT_VEC_SYMM(VEC) VEC[0], VEC[3], VEC[5], VEC[1], VEC[2], VEC[4]
-#define VOIGHT_VEC_SYMM(VEC)                                                   \
-  VEC[0], inv_sqr2 *VEC[3], inv_sqr2 *VEC[4], VEC[1], inv_sqr2 *VEC[5], VEC[2]
-
-// #define VOIGHT_VEC_SYMM(VEC) \
-//   VEC[0], VEC[3] / sqrt(2), VEC[1], VEC[5] / sqrt(2), VEC[4] / sqrt(2),
-//   VEC[2]
 
 OpAssembleRhs::OpAssembleRhs(const std::string field_name,
                              boost::shared_ptr<CommonData> common_data_ptr,
@@ -64,8 +50,6 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
 
     // make separate material for each block
     auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-    // get size of internal and external variables
-    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
 
     // local behaviour data
     auto beh_data = BehaviourData{mgis_bv};
@@ -95,30 +79,27 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
     Tensor2_symmetric<double, 3> t_stress;
 
     auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-
     auto fe_ent = getFEEntityHandle();
-    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts);
+
+    // get size of internal and external variables
+    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
+
+    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
     MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
 
     auto &t_D = commonDataPtr->tD;
- 
+
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-      t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+      auto vec_sym = get_voigt_vec_symm(t_grad);
+      VectorDouble internal_var = column(mat, gg); //FIXME: copy
 
-      auto testing3 = sqrt(abs(t_grad(i, j) * t_grad(i, j)));
-
-      vector<double> vec_sym{t_strain(0, 0),        t_strain(1, 1),
-                             t_strain(2, 2),        sqr2 * t_strain(0, 1),
-                             sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
-      // vector<double> vec_sym{t_strain(0, 0), t_strain(1, 1), t_strain(2, 2),
-      //                        t_strain(0, 1), t_strain(0, 2), t_strain(1, 2)};
-
+      // b_view.s0.internal_state_variables = internal_var.data().data();
       b_view.s0.gradients = vec_sym.data();
-      // b_view.s0.gradients = &t_strain(0, 0);
 
       int check = integrate(b_view, mgis_bv);
 
+      // auto testing3 = sqrt(abs(t_grad(i, j) * t_grad(i, j)));
       // if (abs(testing3) > 1e-7) {
 
       //   for (int n : {0, 1, 2, 3, 4, 5}) {
@@ -131,8 +112,9 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
       //   cout << "\n";
       // }
 
-      auto &st2 = b_view.s1.thermodynamic_forces;
-      Tensor2_symmetric<double, 3> t_forces(VOIGHT_VEC_SYMM(st2));
+      auto &st1 = b_view.s1.thermodynamic_forces;
+      Tensor2_symmetric<double, 3> t_forces(VOIGHT_VEC_SYMM(st1));
+      t_forces(i, j) *= -1;
       // Tensor2_symmetric<double, 3> t_forces_test(0., 1., 2., 3., 4., 5.);
       // cout << "t_forces_test(0, 0) " << " 0 " << t_forces_test(0, 0) << endl;
       // cout << "t_forces_test(0, 1) " << " 1 " << t_forces_test(0, 1) << endl;
@@ -146,7 +128,6 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
       size_t bb = 0;
       for (; bb != nb_dofs / 3; ++bb) {
         t_nf(i) += alpha * t_diff_base(j) * t_forces(i, j);
-        // t_nf(i) += alpha * t_diff_base(j) * t_stress(i, j);
         ++t_diff_base;
         ++t_nf;
       }
@@ -180,6 +161,10 @@ MoFEMErrorCode OpUpdateInternalVar::doWork(int side, EntityType type,
         dAta.tEts.end())
       MoFEMFunctionReturnHot(0);
     CHKERR commonDataPtr->getBlockData(dAta);
+    // make separate material for each block
+    auto &mgis_bv = *commonDataPtr->mGisBehaviour;
+    // get size of internal and external variables
+    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
 
     const size_t nb_base_functions = data.getN().size2();
     if (3 * nb_base_functions < nb_dofs)
@@ -190,15 +175,19 @@ MoFEMErrorCode OpUpdateInternalVar::doWork(int side, EntityType type,
     const size_t nb_gauss_pts = data.getN().size1();
 
     auto fe_ent = getFEEntityHandle();
-    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts);
+    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
     MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
+
     auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       // UPDATE INTERNAL VARIABLES HERE
+
+      auto vec_sym = get_voigt_vec_symm(t_grad);
+
       ++t_grad;
     }
 
-    CHKERR commonDataPtr->setInternalVar(fe_ent, nb_gauss_pts);
+    CHKERR commonDataPtr->setInternalVar(fe_ent);
   }
 
   MoFEMFunctionReturn(0);
@@ -241,6 +230,9 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
     b_view.s0.material_properties = dAta.params.data();
     b_view.s1.material_properties = dAta.params.data();
 
+    // get size of internal and external variables
+    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
+
     locK.resize(nb_row_dofs, nb_col_dofs, false);
 
     const size_t nb_gauss_pts = row_data.getN().size1();
@@ -251,22 +243,20 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
     auto &t_D = commonDataPtr->tD;
 
     auto fe_ent = getFEEntityHandle();
-    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts);
+    CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
     MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
 
     locK.clear();
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       double alpha = getMeasure() * t_w;
 
-      Tensor2_symmetric<double, 3> t_strain;
-      t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+      auto vec_sym = get_voigt_vec_symm(t_grad);
 
-      vector<double> vec_sym{t_strain(0, 0), t_strain(1, 1), t_strain(2, 2),
-                             t_strain(0, 1), t_strain(0, 2), t_strain(1, 2)};
       b_view.s0.gradients = vec_sym.data();
 
       int check = integrate(b_view, mgis_bv);
-      Ddg<double *, 3, 3> tangent(TTENSOR4_MAT_PTR(beh_data.K));
+
+      auto tangent = get_ddg_from_voigt(beh_data.K);
 
       size_t rr = 0;
       for (; rr != nb_row_dofs / 3; ++rr) {
@@ -385,3 +375,4 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
 
   MoFEMFunctionReturn(0);
 }
+} // namespace MFrontInterface

@@ -23,6 +23,8 @@ using namespace mgis::behaviour;
 
 #include <Operators.hpp>
 
+using namespace MFrontInterface;
+
 int main(int argc, char *argv[]) {
   MoFEM::Core::Initialize(&argc, &argv, (char *)0, help);
 
@@ -97,7 +99,8 @@ int main(int argc, char *argv[]) {
     commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
 
     commonDataPtr->mGisBehaviour = boost::make_shared<Behaviour>(
-        load("src/libBehaviour.so", "IsotropicLinearHardeningPlasticity", Hypothesis::TRIDIMENSIONAL));
+        load("src/libBehaviour.so", "IsotropicLinearHardeningPlasticity",
+             Hypothesis::TRIDIMENSIONAL));
 
     cout << "Parameters for this behaviour are: \n";
     for (const auto &mp : commonDataPtr->mGisBehaviour->mps) {
@@ -107,7 +110,7 @@ int main(int argc, char *argv[]) {
     cout << "Parameters for this behaviour are: \n";
     for (auto &p : commonDataPtr->mGisBehaviour->params)
       cout << p << endl;
-    // FIXME: TODO: HARD CODE PARAMETERS 
+    // FIXME: TODO: HARD CODE PARAMETERS
 
     commonDataPtr->setOfBlocksData.begin()->second.params[0] = 10;
     commonDataPtr->setOfBlocksData.begin()->second.params[1] = 0.3;
@@ -370,19 +373,20 @@ int main(int argc, char *argv[]) {
     beh_data.K[1] = 2; // first Piola stress
     beh_data.K[2] = 2; // dP / dF derivative
     cerr << beh_data.K << endl;
-    // const auto offset1 = getVariableOffset(mgis_bv.isvs, "EquivalentPlasticStrain",
+    // const auto offset1 = getVariableOffset(mgis_bv.isvs,
+    // "EquivalentPlasticStrain",
     //                                  mgis_bv.hypothesis);
     // const auto offset2 = getVariableOffset(mgis_bv.isvs, "ElasticStrain",
     //                                  mgis_bv.hypothesis);
 
     // MaterialDataManager mat{mgis_bv, 50};
-   
+
     // std::cout << "member s0 " << m.s0 << '\n';
     // const auto nb = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
     // std::cout << "offset of EquivalentPlasticStrain: " << offset1 << '\n';
     // std::cout << "offset of ElasticStrain: " << offset2 << '\n';
-    // // get these sizes to initialize the size of internal and external variables
-    // std::cout << "array size " << nb << '\n';
+    // // get these sizes to initialize the size of internal and external
+    // variables std::cout << "array size " << nb << '\n';
     auto b_view = make_view(beh_data);
     vector<double> my_material_parameters(5);
     my_material_parameters[0] = 100;
@@ -394,7 +398,7 @@ int main(int argc, char *argv[]) {
     vector<double> my_test_gradients(14, 0.);
     // for (auto &it : my_test_gradients)
     //   it = (double)rand() * 0.2 / (double)RAND_MAX;
-    
+
     b_view.s0.gradients = &*my_test_gradients.begin();
     b_view.s0.material_properties = my_material_parameters.data();
     b_view.s1.material_properties = my_material_parameters.data();
