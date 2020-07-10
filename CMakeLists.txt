@@ -24,10 +24,10 @@ endif(NOT MGIS_DIR)
 
 
 if(MGIS_DIR)
-  # find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface PATHS ${MGIS_DIR}/lib)
-  # find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include)
+  find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.so libMFrontGenericInterface.dylib PATHS ${MGIS_DIR}/lib)
+  find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include/MGIS/)
   add_library(MFrontGenericInterface SHARED IMPORTED)
-  set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_DIR}/lib/libMFrontGenericInterface.so)
+  set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_LIBRARY})
   message(STATUS ${MGIS_LIBRARY})
   if(MGIS_LIBRARY)
     # include_directories(${MGIS_HEADER})
