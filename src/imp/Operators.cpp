@@ -82,19 +82,19 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
     auto fe_ent = getFEEntityHandle();
 
     // get size of internal and external variables
-    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
+    int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
 
     CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
-    MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
+    MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
 
     auto &t_D = commonDataPtr->tD;
 
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
       auto vec_sym = get_voigt_vec_symm(t_grad);
-      VectorDouble internal_var = column(mat, gg); //FIXME: copy
 
-      // b_view.s0.internal_state_variables = internal_var.data().data();
+      VectorDouble internal_var = column(mat_int, gg); // FIXME: copyß
+      b_view.s0.internal_state_variables = internal_var.data().data();
       b_view.s0.gradients = vec_sym.data();
 
       int check = integrate(b_view, mgis_bv);
@@ -164,7 +164,11 @@ MoFEMErrorCode OpUpdateInternalVar::doWork(int side, EntityType type,
     // make separate material for each block
     auto &mgis_bv = *commonDataPtr->mGisBehaviour;
     // get size of internal and external variables
-    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
+    int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
+    // local behaviour data
+    auto beh_data = BehaviourData{mgis_bv};
+    beh_data.K[0] = 0;
+    auto b_view = make_view(beh_data);
 
     const size_t nb_base_functions = data.getN().size2();
     if (3 * nb_base_functions < nb_dofs)
@@ -176,18 +180,25 @@ MoFEMErrorCode OpUpdateInternalVar::doWork(int side, EntityType type,
 
     auto fe_ent = getFEEntityHandle();
     CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
-    MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
+    MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
 
     auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       // UPDATE INTERNAL VARIABLES HERE
 
       auto vec_sym = get_voigt_vec_symm(t_grad);
+      VectorDouble internal_var = column(mat_int, gg); // FIXME: copyß
+      b_view.s0.internal_state_variables = internal_var.data().data();
+      b_view.s0.gradients = vec_sym.data();
+      int check = integrate(b_view, mgis_bv);
+
+      for (int dd = 0; dd != size_of_vars; ++dd)
+        mat_int(dd, gg) = b_view.s1.internal_state_variables[dd];
 
       ++t_grad;
     }
 
-    CHKERR commonDataPtr->setInternalVar(fe_ent);
+    CHKERR commonDataPtr->setInternalVar(fe_ent, size_of_vars, nb_gauss_pts);
   }
 
   MoFEMFunctionReturn(0);
@@ -231,7 +242,7 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
     b_view.s1.material_properties = dAta.params.data();
 
     // get size of internal and external variables
-    int size_of_vars = mgis_bv.isvs.size() + mgis_bv.esvs.size();
+    int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
 
     locK.resize(nb_row_dofs, nb_col_dofs, false);
 
@@ -244,14 +255,15 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
 
     auto fe_ent = getFEEntityHandle();
     CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
-    MatrixDouble &mat = *commonDataPtr->internalVariablePtr;
+    MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
 
     locK.clear();
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       double alpha = getMeasure() * t_w;
 
       auto vec_sym = get_voigt_vec_symm(t_grad);
-
+      VectorDouble internal_var = column(mat_int, gg); // FIXME: copyß
+      b_view.s0.internal_state_variables = internal_var.data().data();
       b_view.s0.gradients = vec_sym.data();
 
       int check = integrate(b_view, mgis_bv);
@@ -312,6 +324,14 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
     MoFEMFunctionReturnHot(0);
   CHKERR commonDataPtr->getBlockData(dAta);
 
+  auto &mgis_bv = *commonDataPtr->mGisBehaviour;
+  // get size of internal and external variables
+  int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
+  // local behaviour data
+  auto beh_data = BehaviourData{mgis_bv};
+  beh_data.K[0] = 0;
+  auto b_view = make_view(beh_data);
+
   auto get_tag = [&](const std::string name, size_t size = 9) {
     std::array<double, 9> def;
     std::fill(def.begin(), def.end(), 0);
@@ -360,15 +380,26 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
   Tensor2_symmetric<double, 3> strain;
   Tensor2_symmetric<double, 3> stress;
+  
+  auto fe_ent = getFEEntityHandle();
+  CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
+  MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
     strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
     // stress(i, j) = t_D(i, j, k, l) * strain(k, l);
-
+    auto vec_sym = get_voigt_vec_symm(t_grad);
+    VectorDouble internal_var = column(mat_int, gg); // FIXME: copyß
+    b_view.s0.internal_state_variables = internal_var.data().data();
+    b_view.s0.gradients = vec_sym.data();
+    int check = integrate(b_view, mgis_bv);
+    auto &st1 = b_view.s1.thermodynamic_forces;
+    Tensor2_symmetric<double, 3> stress(VOIGHT_VEC_SYMM(st1));
     CHKERR set_tag(th_grad, gg, set_matrix(t_grad));
     CHKERR set_tag(th_strain, gg, set_matrix_symm(strain));
-    // CHKERR set_tag(th_stress, gg, set_matrix_symm(stress));
+
+    CHKERR set_tag(th_stress, gg, set_matrix(stress));
 
     ++t_grad;
   }

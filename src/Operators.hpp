@@ -183,13 +183,25 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent) {
+  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent, int var_size, int nb_gauss_pts) {
     MoFEMFunctionBegin;
     void const *tag_data[] = {&*internalVariablePtr->data().begin()};
     const int tag_size = internalVariablePtr->data().size();
     CHKERR mField.get_moab().tag_set_by_ptr(internalVariableTag, &fe_ent, 1,
                                             tag_data, &tag_size);
-
+    // TODO: FIXME: this is just for debug
+    MatrixDouble test_mat;
+    {
+      double *tag_data;
+      int tag_size;
+      rval = mField.get_moab().tag_get_by_ptr(
+          internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
+      MatrixAdaptor tag_vec = MatrixAdaptor(
+          var_size, nb_gauss_pts,
+          ublas::shallow_array_adaptor<double>(tag_size, tag_data));
+      test_mat = tag_vec;
+    }
+    // cout << test_mat << endl;
     MoFEMFunctionReturn(0);
   }
 

@@ -25,15 +25,14 @@ endif(NOT MGIS_DIR)
 
 if(MGIS_DIR)
   # find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface PATHS ${MGIS_DIR}/lib)
-  find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include)
+  # find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include)
   add_library(MFrontGenericInterface SHARED IMPORTED)
   set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_DIR}/lib/libMFrontGenericInterface.so)
   message(STATUS ${MGIS_LIBRARY})
-  message(STATUS ${MGIS_HEADER})
-  if(MGIS_LIBRARY AND MGIS_HEADER)
-    include_directories(${MGIS_HEADER})
+  if(MGIS_LIBRARY)
+    # include_directories(${MGIS_HEADER})
     add_definitions(-DWITH_MGIS)
-  endif(MGIS_LIBRARY AND MGIS_HEADER)
+  endif(MGIS_LIBRARY)
 endif(MGIS_DIR)
 
 include_directories(
@@ -63,3 +62,14 @@ target_link_libraries(mfront_interface
   ${MoFEM_PROJECT_LIBS}
 )
 
+
+function(mp_copy_file target)
+file(
+  COPY ${target}
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
+endfunction(mp_copy_file)
+
+
+mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/README)
+mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/load_history.in)
