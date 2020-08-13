@@ -14,6 +14,25 @@ struct BlockData {
   BlockData() : oRder(-1), yOung(params[0]), pOisson(params[1]) {}
 };
 
+template <typename T>
+inline auto integrateMGIS(BehaviourDataView &b_view,
+                          mgis::behaviour::Behaviour &mgis_bv, T &t_grad,
+                          MatrixDouble &mat_int, int gg) {
+  MoFEMFunctionBeginHot;
+
+  auto vec_sym = get_voigt_vec_symm(t_grad);
+
+  VectorDouble internal_var = row(mat_int, gg); // FIXME: copyß
+  ublas::matrix_row<MatrixDouble> int_var_at_gauss(mat_int, gg);
+
+  b_view.s0.internal_state_variables = internal_var.data().data();
+  b_view.s0.gradients = vec_sym.data();
+
+  int check = integrate(b_view, mgis_bv);
+
+  MoFEMFunctionReturnHot(0);
+};
+
 template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
   Tensor2_symmetric<double, 3> t_strain;
   Index<'i', 3> i;
@@ -24,6 +43,21 @@ template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
                          t_strain(2, 2),        sqr2 * t_strain(0, 1),
                          sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
   return vec_sym;
+};
+
+template <typename T>
+inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
+  Tensor2<double, 3, 3> non_symm;
+  Number<0> N0;
+  Number<1> N1;
+  Number<2> N2;
+  non_symm(N0, N0) = symm(N0, N0);
+  non_symm(N1, N1) = symm(N1, N1);
+  non_symm(N2, N2) = symm(N2, N2);
+  non_symm(N0, N1) = non_symm(N1, N0) = symm(N0, N1);
+  non_symm(N0, N2) = non_symm(N2, N0) = symm(N0, N2);
+  non_symm(N1, N2) = non_symm(N2, N1) = symm(N1, N2);
+  return non_symm;
 };
 
 template <typename T> Ddg<double, 3, 3> inline get_ddg_from_voigt(const T &K) {
@@ -86,8 +120,7 @@ struct CommonData {
   MoFEM::Interface &mField;
   boost::shared_ptr<Behaviour> mGisBehaviour;
   boost::shared_ptr<MatrixDouble> mGradPtr;
-  // boost::shared_ptr<MatrixDouble> mStrainPtr;
-  // boost::shared_ptr<MatrixDouble> mStressPtr;
+  boost::shared_ptr<MatrixDouble> mStressPtr;
   boost::shared_ptr<MatrixDouble> materialTangent;
   std::map<int, BlockData> setOfBlocksData;
   boost::shared_ptr<MatrixDouble> internalVariablePtr;
@@ -165,7 +198,7 @@ struct CommonData {
         internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
 
     if (rval != MB_SUCCESS || tag_size != var_size * nb_gauss_pts) {
-      internalVariablePtr->resize(var_size, nb_gauss_pts);
+      internalVariablePtr->resize(nb_gauss_pts, var_size, false);
       internalVariablePtr->clear();
       void const *tag_data[] = {&*internalVariablePtr->data().begin()};
       const int tag_size = internalVariablePtr->data().size();
@@ -174,7 +207,7 @@ struct CommonData {
 
     } else {
       MatrixAdaptor tag_vec = MatrixAdaptor(
-          var_size, nb_gauss_pts,
+          nb_gauss_pts, var_size, 
           ublas::shallow_array_adaptor<double>(tag_size, tag_data));
 
       *internalVariablePtr = tag_vec;
@@ -183,24 +216,27 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent, int var_size, int nb_gauss_pts) {
+  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent, int nb_gauss_pts, int var_size) {
     MoFEMFunctionBegin;
     void const *tag_data[] = {&*internalVariablePtr->data().begin()};
     const int tag_size = internalVariablePtr->data().size();
     CHKERR mField.get_moab().tag_set_by_ptr(internalVariableTag, &fe_ent, 1,
                                             tag_data, &tag_size);
     // TODO: FIXME: this is just for debug
-    MatrixDouble test_mat;
-    {
-      double *tag_data;
-      int tag_size;
-      rval = mField.get_moab().tag_get_by_ptr(
-          internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
-      MatrixAdaptor tag_vec = MatrixAdaptor(
-          var_size, nb_gauss_pts,
-          ublas::shallow_array_adaptor<double>(tag_size, tag_data));
-      test_mat = tag_vec;
-    }
+    // MatrixDouble test_mat;
+    // {
+    //   double *tag_data;
+    //   int tag_size;
+    //   rval = mField.get_moab().tag_get_by_ptr(
+    //       internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
+    //   MatrixAdaptor tag_vec = MatrixAdaptor(
+    //       nb_gauss_pts, var_size, 
+    //       ublas::shallow_array_adaptor<double>(tag_size, tag_data));
+    //   test_mat = tag_vec;
+    //   double test500 = test_mat(0, 0);
+    //   double test501 = test_mat(1, 0);
+    //   double test502 = test_mat(2, 0);
+    // }
     // cout << test_mat << endl;
     MoFEMFunctionReturn(0);
   }
@@ -221,7 +257,7 @@ struct Monitor : public FEMethod {
 
   Monitor(SmartPetscObj<DM> &dm,
           boost::shared_ptr<PostProcVolumeOnRefinedMesh> post_proc_fe,
-          boost::shared_ptr<VolumeElementForcesAndSourcesCore> update_history)
+          boost::shared_ptr<DomainEle> update_history)
       : dM(dm), postProcFe(post_proc_fe), updateHist(update_history){};
 
   MoFEMErrorCode preProcess() { return 0; }
@@ -260,13 +296,13 @@ struct Monitor : public FEMethod {
 private:
   SmartPetscObj<DM> dM;
   boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
-  boost::shared_ptr<VolumeElementForcesAndSourcesCore> updateHist;
+  boost::shared_ptr<DomainEle> updateHist;
 };
-
-struct OpAssembleRhs : public DomainEleOp {
-  OpAssembleRhs(const std::string field_name,
-                boost::shared_ptr<CommonData> common_data_ptr,
-                BlockData &block_data);
+template <bool UPDATE>
+struct OpStress : public DomainEleOp {
+  OpStress(const std::string field_name,
+           boost::shared_ptr<CommonData> common_data_ptr,
+           BlockData &block_data);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -274,10 +310,19 @@ private:
   BlockData &dAta;
 };
 
-struct OpUpdateInternalVar : public DomainEleOp {
-  OpUpdateInternalVar(const std::string field_name,
-                      boost::shared_ptr<CommonData> common_data_ptr,
-                      BlockData &block_data);
+struct OpAssembleRhs : public DomainEleOp {
+  OpAssembleRhs(const std::string field_name,
+                boost::shared_ptr<CommonData> common_data_ptr);
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+};
+
+struct OpTangent : public DomainEleOp {
+  OpTangent(const std::string field_name,
+           boost::shared_ptr<CommonData> common_data_ptr,
+           BlockData &block_data);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:

@@ -87,15 +87,14 @@ int main(int argc, char *argv[]) {
     boost::ptr_map<std::string, NodalForce> nodal_forces;
     boost::ptr_map<std::string, EdgeForce> edge_forces;
     boost::shared_ptr<DirichletDisplacementBc> dirichlet_bc_ptr;
-    boost::shared_ptr<VolumeElementForcesAndSourcesCore> update_int_variables;
+    boost::shared_ptr<DomainEle> update_int_variables;
 
     commonDataPtr = boost::make_shared<CommonData>(m_field);
     commonDataPtr->setBlocks();
     commonDataPtr->createTags();
 
     commonDataPtr->mGradPtr = boost::make_shared<MatrixDouble>();
-    // commonDataPtr->mStrainPtr = boost::make_shared<MatrixDouble>();
-    // commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
+    commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->materialTangent = boost::make_shared<MatrixDouble>();
     commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
 
@@ -120,12 +119,16 @@ int main(int argc, char *argv[]) {
     commonDataPtr->setOfBlocksData.begin()->second.params[4] = 100;
 
     update_int_variables =
-        boost::make_shared<VolumeElementForcesAndSourcesCore>(m_field);
+        boost::make_shared<DomainEle>(m_field);
+    auto integration_rule = [&](int, int, int approx_order) {
+      return 2 * order + 1;
+    };
+    update_int_variables->getRuleHook = integration_rule;
     update_int_variables->getOpPtrVector().push_back(
         new OpCalculateVectorFieldGradient<3, 3>("U", commonDataPtr->mGradPtr));
     for (auto &sit : commonDataPtr->setOfBlocksData)
       update_int_variables->getOpPtrVector().push_back(
-          new OpUpdateInternalVar("U", commonDataPtr, sit.second));
+          new OpStress<true>("U", commonDataPtr, sit.second));
 
     // forces and pressures on surface
     CHKERR MetaNeumannForces::setMomentumFluxOperators(m_field, neumann_forces,
@@ -170,17 +173,14 @@ int main(int argc, char *argv[]) {
 
     auto add_domain_ops_rhs = [&](auto &pipeline) {
       for (auto &sit : commonDataPtr->setOfBlocksData)
-        pipeline.push_back(new OpAssembleRhs("U", commonDataPtr, sit.second));
+        pipeline.push_back(new OpStress<false>("U", commonDataPtr, sit.second));
+      pipeline.push_back(new OpAssembleRhs("U", commonDataPtr));
     };
 
     add_domain_base_ops(pipeline_mng->getOpDomainLhsPipeline());
     add_domain_base_ops(pipeline_mng->getOpDomainRhsPipeline());
     add_domain_ops_lhs(pipeline_mng->getOpDomainLhsPipeline());
     add_domain_ops_rhs(pipeline_mng->getOpDomainRhsPipeline());
-
-    auto integration_rule = [&](int, int, int approx_order) {
-      return 2 * order + 1;
-    };
 
     CHKERR pipeline_mng->setDomainRhsIntegrationRule(integration_rule);
     CHKERR pipeline_mng->setDomainLhsIntegrationRule(integration_rule);

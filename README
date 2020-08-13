@@ -1,0 +1,20 @@
+
+tensor convention http://tfel.sourceforge.net/tensors.html
+
+COMMANDS
+
+```
+export MGIS_PATH=$(spack find -l --path mgis | awk 'END{print}' | awk 'NF{ print $NF }')"/lib"
+```
+mfront-query --material-properties Plasticity.mfront
+
+
+
+DOWNLOAD BEHAVIOUR
+
+wget http://tfel.sourceforge.net/gallery/plasticity/IsotropicLinearHardeningPlasticity.mfront
+
+
+BUILD BEHAVIOUR
+
+mfront --obuild --interface=generic IsotropicLinearHardeningPlasticity.mfront

@@ -1,0 +1,18 @@
+@DSL IsotropicPlasticMisesFlow;
+@Behaviour Plasticity;
+@Author Helfer Thomas;
+@Date 23/11/06;
+
+@StrainMeasure Hencky;
+
+@ElasticMaterialProperties {150e9, 0.3};
+
+@Parameter stress s0 = 150e6;
+@Parameter stress H = 10e6;
+
+@FlowRule{
+  f = seq - H * p - s0;
+  df_dseq = 1;
+  df_dp = -H;
+}
+
