@@ -23,6 +23,15 @@ namespace MFrontInterface {
 #define VOIGHT_VEC_SYMM(VEC)                                                   \
   VEC[0], inv_sqr2 *VEC[3], inv_sqr2 *VEC[4], VEC[1], inv_sqr2 *VEC[5], VEC[2]
 
+#define DDG_MAT_PTR(MAT)                                                       \
+  &MAT(0, 0), &MAT(1, 0), &MAT(2, 0), &MAT(3, 0), &MAT(4, 0), &MAT(5, 0),      \
+      &MAT(6, 0), &MAT(7, 0), &MAT(8, 0), &MAT(9, 0), &MAT(10, 0),             \
+      &MAT(11, 0), &MAT(12, 0), &MAT(13, 0), &MAT(14, 0), &MAT(15, 0),         \
+      &MAT(16, 0), &MAT(17, 0), &MAT(18, 0), &MAT(19, 0), &MAT(20, 0),         \
+      &MAT(21, 0), &MAT(22, 0), &MAT(23, 0), &MAT(24, 0), &MAT(25, 0),         \
+      &MAT(26, 0), &MAT(27, 0), &MAT(28, 0), &MAT(29, 0), &MAT(30, 0),         \
+      &MAT(31, 0), &MAT(32, 0), &MAT(33, 0), &MAT(34, 0), &MAT(35, 0)
+
 Index<'i', 3> i;
 Index<'j', 3> j;
 Index<'k', 3> k;
@@ -58,6 +67,7 @@ MoFEMErrorCode OpStress<UPDATE>::doWork(int side, EntityType type, EntData &data
 
   // local behaviour data
   auto beh_data = BehaviourData{mgis_bv};
+  beh_data.K[0] = 0; // consistent tangent
   // beh_data.K[0] = 4; // consistent tangent
   // beh_data.K[1] = 2; // first Piola stress
   // beh_data.K[2] = 2; // dP / dF derivative
@@ -73,9 +83,7 @@ MoFEMErrorCode OpStress<UPDATE>::doWork(int side, EntityType type, EntData &data
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
-
-  MatrixDouble test_mat_int = mat_int;
-  // cout << mat_int << endl;
+ 
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
   commonDataPtr->mStressPtr->resize(9, nb_gauss_pts);
   auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
@@ -83,34 +91,17 @@ MoFEMErrorCode OpStress<UPDATE>::doWork(int side, EntityType type, EntData &data
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
     auto vec_sym = get_voigt_vec_symm(t_grad);
+    b_view.s0.gradients = vec_sym.data();
 
     VectorDouble internal_var = row(mat_int, gg); 
-    // ublas::matrix_row<MatrixDouble> int_var_at_gauss(mat_int, gg);
-
     b_view.s0.internal_state_variables = internal_var.data().data();
-    // b_view.s0.internal_state_variables = &*int_var_at_gauss.begin();
-    b_view.s0.gradients = vec_sym.data();
 
     int check = integrate(b_view, mgis_bv);
 
-    // auto testing3 = sqrt(abs(t_grad(i, j) * t_grad(i, j)));
-    // if (abs(testing3) > 1e-7) {
-
-    //   for (int n : {0, 1, 2, 3, 4, 5}) {
-    //     cout << b_view.s0.thermodynamic_forces[n] << " ";
-    //   }
-    //   cout << "\n";
-    //   for (int n : {0, 1, 2, 3, 4, 5}) {
-    //     cout << b_view.s1.thermodynamic_forces[n] << " ";
-    //   }
-    //   cout << "\n";
-    // }
-
     auto &st1 = b_view.s1.thermodynamic_forces;
     Tensor2_symmetric<double, 3> forces(VOIGHT_VEC_SYMM(st1));
-    forces(i, j) *= -1; //FIXME
     auto my_stress = to_non_symm(forces);
-    t_stress(i, j) = my_stress(i, j);
+    t_stress(i, j) = -my_stress(i, j);
 
     if (UPDATE) //template
       for (int dd = 0; dd != size_of_vars; ++dd)
@@ -119,9 +110,9 @@ MoFEMErrorCode OpStress<UPDATE>::doWork(int side, EntityType type, EntData &data
     ++t_stress;
     ++t_grad;
   }
-
+ 
   if (UPDATE) //template
-    CHKERR commonDataPtr->setInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
+    CHKERR commonDataPtr->setInternalVar(fe_ent);
 
   MoFEMFunctionReturn(0);
 }
@@ -185,19 +176,62 @@ OpTangent::OpTangent(const std::string field_name,
 MoFEMErrorCode OpTangent::doWork(int side, EntityType type, EntData &data) {
   MoFEMFunctionBegin;
 
+  const size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
+
+  auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
+  if (dAta.tEts.find(fe_ent) == dAta.tEts.end())
+    MoFEMFunctionReturnHot(0);
+  CHKERR commonDataPtr->getBlockData(dAta);
+  auto &mgis_bv = *commonDataPtr->mGisBehaviour;
+  auto beh_data = BehaviourData{mgis_bv};
+  beh_data.K[0] = 5;
+  beh_data.K[1] = 0; 
+  auto b_view = make_view(beh_data);
+
+  // for (auto c : mgis_bv.isvs) {
+  //   auto siz = getVariableSize(c, mgis_bv.hypothesis);
+  //   const auto off =
+  //       getVariableOffset(mgis_bv.isvs, c.name, mgis_bv.hypothesis);
+  //   cout << c.name << " " << siz << " " << off << endl;
+  // }
+  //   VectorAdaptor tag_vec = VectorAdaptor(
+  //           tag_size, ublas::shallow_array_adaptor<double>(tag_size, tag_data));
+
+  int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
+  int size_of_evars = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
+
+  CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
+  MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
+
+  MatrixDouble &S_E = *(commonDataPtr->materialTangent);
+  S_E.resize(36, nb_gauss_pts, false);
+  Ddg<PackPtr<double *, 1>, 3, 3> D1(DDG_MAT_PTR(S_E));
+  auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
+
+   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
+     auto vec_sym = get_voigt_vec_symm(t_grad);
+     b_view.s0.gradients = vec_sym.data();
+     VectorDouble internal_var = row(mat_int, gg); 
+     b_view.s0.internal_state_variables = internal_var.data().data();
+
+     int check = integrate(b_view, mgis_bv);
+
+     CHKERR get_ddg_from_voigt(beh_data.K, D1);
+
+     ++D1;
+     ++t_grad;
+   }
   MoFEMFunctionReturn(0);
 };
 
 OpAssembleLhs::OpAssembleLhs(const std::string row_field_name,
                              const std::string col_field_name,
-                             boost::shared_ptr<CommonData> common_data_ptr,
-                             BlockData &block_data)
+                             boost::shared_ptr<CommonData> common_data_ptr)
     : DomainEleOp(row_field_name, col_field_name, DomainEleOp::OPROWCOL),
-      commonDataPtr(common_data_ptr), dAta(block_data) {
-  sYmm = false; //FIXME: use symmetry
+      commonDataPtr(common_data_ptr) {
+  sYmm = true; // use symmetry
 }
 
-// FIXME: Implement calculateTangent and run only on VERTICES
 MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
                                      EntityType row_type, EntityType col_type,
                                      EntData &row_data, EntData &col_data) {
@@ -208,55 +242,19 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
 
   if (nb_row_dofs && nb_col_dofs) {
 
-    if (dAta.tEts.find(getNumeredEntFiniteElementPtr()->getEnt()) ==
-        dAta.tEts.end())
-      MoFEMFunctionReturnHot(0);
-    CHKERR commonDataPtr->getBlockData(dAta);
-
-    auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-    // local behaviour data
-    auto beh_data = BehaviourData{mgis_bv};
-    beh_data.K[0] = 5; // consistent tangent
-    // beh_data.K[1] = 2; // first Piola stress
-    // beh_data.K[2] = 2; // dP / dF derivative
-    beh_data.K[1] = 0; // cauchy
-    auto b_view = make_view(beh_data);
-
-    b_view.s0.material_properties = dAta.params.data();
-    b_view.s1.material_properties = dAta.params.data();
-
-    // get size of internal and external variables
-    int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-
     locK.resize(nb_row_dofs, nb_col_dofs, false);
 
     const size_t nb_gauss_pts = row_data.getN().size1();
     const size_t nb_row_base_funcs = row_data.getN().size2();
     auto t_row_diff_base = row_data.getFTensor1DiffN<3>();
     auto t_w = getFTensor0IntegrationWeight();
-    auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-    auto &t_D = commonDataPtr->tD;
 
-    auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
-    // CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
-    MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
+    MatrixDouble &S_E = *(commonDataPtr->materialTangent);
+    Ddg<PackPtr<double *, 1>, 3, 3> tangent(DDG_MAT_PTR(S_E));
 
     locK.clear();
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       double alpha = getMeasure() * t_w;
-
-      auto vec_sym = get_voigt_vec_symm(t_grad);
-
-      VectorDouble internal_var = row(mat_int, gg);
-      // ublas::matrix_row<MatrixDouble> int_var_at_gauss(mat_int, gg);
-
-      b_view.s0.internal_state_variables = internal_var.data().data();
-      // b_view.s0.internal_state_variables = &*int_var_at_gauss.begin();
-      b_view.s0.gradients = vec_sym.data();
-
-      int check = integrate(b_view, mgis_bv);
-
-      auto tangent = get_ddg_from_voigt(beh_data.K);
 
       size_t rr = 0;
       for (; rr != nb_row_dofs / 3; ++rr) {
@@ -281,13 +279,21 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
       for (; rr != nb_row_base_funcs; ++rr)
         ++t_row_diff_base;
 
-      ++t_grad;
+      ++tangent;
       ++t_w;
     }
-    //FIXME: use symmetry
-    CHKERR MatSetValues(getKSPB(), row_data, col_data, &locK(0, 0), ADD_VALUES);
-  }
 
+    // use symmetry
+    CHKERR MatSetValues(getKSPB(), row_data, col_data, &locK(0, 0), ADD_VALUES);
+
+    if (row_side != col_side || row_type != col_type) {
+      MatrixDouble locK_trans;
+      locK_trans.resize(nb_col_dofs, nb_row_dofs, false);
+      noalias(locK_trans) = trans(locK);
+      CHKERR MatSetValues(getKSPB(), col_data, row_data, &locK_trans(0, 0),
+                          ADD_VALUES);
+    }
+  }
   MoFEMFunctionReturn(0);
 }
 
@@ -371,7 +377,7 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
   Tensor2_symmetric<double, 3> stress;
   
   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
-  CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
+  // CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
@@ -379,8 +385,8 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
     strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
     // stress(i, j) = t_D(i, j, k, l) * strain(k, l);
     auto vec_sym = get_voigt_vec_symm(t_grad);
-    VectorDouble internal_var = row(mat_int, gg);
-    b_view.s0.internal_state_variables = internal_var.data().data();
+    // VectorDouble internal_var = row(mat_int, gg);
+    // b_view.s0.internal_state_variables = internal_var.data().data();
     b_view.s0.gradients = vec_sym.data();
     int check = integrate(b_view, mgis_bv);
     auto &st1 = b_view.s1.thermodynamic_forces;

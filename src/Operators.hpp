@@ -60,8 +60,11 @@ inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
   return non_symm;
 };
 
-template <typename T> Ddg<double, 3, 3> inline get_ddg_from_voigt(const T &K) {
-  Ddg<double, 3, 3> D;
+
+template <typename T1, typename T2>
+inline MoFEMErrorCode get_ddg_from_voigt(const T1 &K, Ddg<T2, 3, 3> &D) {
+  // Ddg<double, 3, 3> D;
+  MoFEMFunctionBeginHot;
 
   D(0, 0, 0, 0) = K[0];
   D(0, 0, 1, 1) = K[1];
@@ -110,8 +113,8 @@ template <typename T> Ddg<double, 3, 3> inline get_ddg_from_voigt(const T &K) {
   D(1, 2, 0, 1) = 0.5 * K[33];
   D(1, 2, 0, 2) = 0.5 * K[34];
   D(1, 2, 1, 2) = 0.5 * K[35];
-
-  return D;
+  MoFEMFunctionReturnHot(0);
+  // return D;
 };
 
 struct CommonData {
@@ -216,7 +219,7 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent, int nb_gauss_pts, int var_size) {
+  MoFEMErrorCode setInternalVar(const EntityHandle fe_ent) {
     MoFEMFunctionBegin;
     void const *tag_data[] = {&*internalVariablePtr->data().begin()};
     const int tag_size = internalVariablePtr->data().size();
@@ -239,6 +242,15 @@ struct CommonData {
     // }
     // cout << test_mat << endl;
     MoFEMFunctionReturn(0);
+  }
+
+  inline double getInternalValAvg(size_t gg) {
+    double avg = 0.;
+    auto &mat = *internalVariablePtr;
+    VectorDouble internal_var = row(mat, gg);
+    for (double val : internal_var)
+      avg += val;
+    return avg;
   }
 
   MoFEMErrorCode createTags() {
@@ -333,8 +345,7 @@ private:
 struct OpAssembleLhs : public DomainEleOp {
   OpAssembleLhs(const std::string row_field_name,
                 const std::string col_field_name,
-                boost::shared_ptr<CommonData> common_data_ptr,
-                BlockData &block_data);
+                boost::shared_ptr<CommonData> common_data_ptr);
   MoFEMErrorCode doWork(int row_side, int col_side, EntityType row_type,
                         EntityType col_type, EntData &row_data,
                         EntData &col_data);
@@ -342,7 +353,6 @@ struct OpAssembleLhs : public DomainEleOp {
 private:
   MatrixDouble locK;
   boost::shared_ptr<CommonData> commonDataPtr;
-  BlockData &dAta;
 };
 
 struct OpPostProcElastic : public DomainEleOp {

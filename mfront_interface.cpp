@@ -167,8 +167,9 @@ int main(int argc, char *argv[]) {
 
     auto add_domain_ops_lhs = [&](auto &pipeline) {
       for (auto &sit : commonDataPtr->setOfBlocksData)
-        pipeline.push_back(
-            new OpAssembleLhs("U", "U", commonDataPtr, sit.second));
+        pipeline.push_back(new OpTangent("U", commonDataPtr, sit.second));
+      pipeline.push_back(
+          new OpAssembleLhs("U", "U", commonDataPtr));
     };
 
     auto add_domain_ops_rhs = [&](auto &pipeline) {
