@@ -44,12 +44,20 @@ int main(int argc, char *argv[]) {
     CHKERR simple->getOptions();
     CHKERR simple->loadFile("");
     int order = 2;
+    PetscBool print_gauss = PETSC_FALSE;
+
+    moab::Core mb_post_gauss;
+    moab::Interface &moab_gauss = mb_post_gauss;
 
     auto get_options_from_command_line = [&]() {
       MoFEMFunctionBeginHot;
       CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, "", "", "none");
       CHKERR PetscOptionsInt("-order", "approximation order", "", order, &order,
                              PETSC_NULL);
+
+      CHKERR PetscOptionsBool("-print_gauss",
+                              "print gauss pts (internal variables)", "",
+                              print_gauss, &print_gauss, PETSC_NULL);
       ierr = PetscOptionsEnd();
       CHKERRQ(ierr);
       MoFEMFunctionReturnHot(0);
@@ -95,41 +103,75 @@ int main(int argc, char *argv[]) {
 
     commonDataPtr->mGradPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->materialTangent = boost::make_shared<MatrixDouble>();
+    commonDataPtr->mDispPtr = boost::make_shared<MatrixDouble>();
+    commonDataPtr->materialTangentPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
 
-    commonDataPtr->mGisBehaviour = boost::make_shared<Behaviour>(
-        load("src/libBehaviour.so", "IsotropicLinearHardeningPlasticity",
-             Hypothesis::TRIDIMENSIONAL));
+    CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, "", "", "none");
 
-    cout << "Parameters for this behaviour are: \n";
-    for (const auto &mp : commonDataPtr->mGisBehaviour->mps) {
-      cerr << mp.name << endl;
+    if (commonDataPtr->setOfBlocksData.empty())
+      SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+              "No blocksets on the mesh has been provided (e.g. MATERIAL1)");
+
+    for (auto &sit : commonDataPtr->setOfBlocksData) {
+      const int &id = sit.first;
+      auto &lib_path = sit.second.behaviourPath;
+      auto &name = sit.second.behaviourName;
+      const string param_name = "-block_" + to_string(id);
+      const string param_path = "-lib_path_" + to_string(id);
+      char char_name[255];
+      PetscBool is_param;
+      CHKERR PetscOptionsString(param_name.c_str(), "name of the behaviour", "",
+                                "IsotropicLinearHardeningPlasticity", char_name,
+                                255, &is_param);
+      if (is_param)
+        name = string(char_name);
+      CHKERR PetscOptionsString(
+          param_path.c_str(), "path to the behaviour library", "",
+          "src/libBehaviour.so", char_name, 255, &is_param);
+      if (is_param)
+        lib_path = string(char_name);
+
+      commonDataPtr->mGisBehavioursVec.emplace_back(
+          boost::make_shared<Behaviour>(
+              load(lib_path, name, Hypothesis::TRIDIMENSIONAL)));
     }
 
-    cout << "Parameters for this behaviour are: \n";
-    for (auto &p : commonDataPtr->mGisBehaviour->params)
-      cout << p << endl;
-    // FIXME: TODO: HARD CODE PARAMETERS
+    ierr = PetscOptionsEnd();
+    CHKERRQ(ierr);
 
-    commonDataPtr->setOfBlocksData.begin()->second.params[0] = 10;
-    commonDataPtr->setOfBlocksData.begin()->second.params[1] = 0.3;
-    commonDataPtr->setOfBlocksData.begin()->second.params[2] = 0.1;
-    commonDataPtr->setOfBlocksData.begin()->second.params[3] = 10000;
-    commonDataPtr->setOfBlocksData.begin()->second.params[4] = 100;
+    for (auto &it : commonDataPtr->mGisBehavioursVec) {
+      auto &beh = *it;
 
-    update_int_variables =
-        boost::make_shared<DomainEle>(m_field);
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "%s behaviour loaded. \n",
+                         beh.behaviour.c_str());
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Material properties: \n");
+      for (const auto &mp : beh.mps)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%s\n", mp.name.c_str());
+
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Parameters: \n");
+      for (auto &p : beh.params)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%s\n", p.c_str());
+    }
+
+    update_int_variables = boost::make_shared<DomainEle>(m_field);
     auto integration_rule = [&](int, int, int approx_order) {
       return 2 * order + 1;
     };
     update_int_variables->getRuleHook = integration_rule;
     update_int_variables->getOpPtrVector().push_back(
         new OpCalculateVectorFieldGradient<3, 3>("U", commonDataPtr->mGradPtr));
-    for (auto &sit : commonDataPtr->setOfBlocksData)
+    if (print_gauss)
+      update_int_variables->getOpPtrVector().push_back(
+          new OpCalculateVectorFieldValues<3>("U", commonDataPtr->mDispPtr));
+    for (auto &sit : commonDataPtr->setOfBlocksData) {
+
       update_int_variables->getOpPtrVector().push_back(
           new OpStress<true>("U", commonDataPtr, sit.second));
-
+      if (print_gauss)
+        update_int_variables->getOpPtrVector().push_back(
+            new OpSaveGaussPts("U", moab_gauss, commonDataPtr, sit.second));
+    }
     // forces and pressures on surface
     CHKERR MetaNeumannForces::setMomentumFluxOperators(m_field, neumann_forces,
                                                        PETSC_NULL, "U");
@@ -335,8 +377,8 @@ int main(int argc, char *argv[]) {
 
     auto set_time_monitor = [&]() {
       MoFEMFunctionBegin;
-      boost::shared_ptr<Monitor> monitor_ptr(
-          new Monitor(dm, postProcFe, update_int_variables));
+      boost::shared_ptr<Monitor> monitor_ptr(new Monitor(
+          dm, postProcFe, update_int_variables, moab_gauss, print_gauss));
       boost::shared_ptr<ForcesAndSourcesCore> null;
       CHKERR DMMoFEMTSSetMonitor(dm, solver, simple->getDomainFEName(),
                                  monitor_ptr, null, null);

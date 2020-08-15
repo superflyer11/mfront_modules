@@ -18,3 +18,9 @@ wget http://tfel.sourceforge.net/gallery/plasticity/IsotropicLinearHardeningPlas
 BUILD BEHAVIOUR
 
 mfront --obuild --interface=generic IsotropicLinearHardeningPlasticity.mfront
+mfront --obuild --interface=generic LogarithmicStrainPlasticity.mfront
+
+mfront --obuild --interface=generic --install-path ./src2/ IsotropicLinearHardeningPlasticity.mfront
+
+
+LogarithmicStrainPlasticity
