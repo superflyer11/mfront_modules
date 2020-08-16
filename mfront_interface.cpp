@@ -132,6 +132,14 @@ int main(int argc, char *argv[]) {
       if (is_param)
         lib_path = string(char_name);
 
+      auto op = FiniteStrainBehaviourOptions{};
+      op.stress_measure = FiniteStrainBehaviourOptions::PK1;
+      op.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
+
+      // commonDataPtr->mGisBehavioursVec.emplace_back(
+      //     boost::make_shared<Behaviour>(
+      //         load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL)));
+      // if(is_small_strain)
       commonDataPtr->mGisBehavioursVec.emplace_back(
           boost::make_shared<Behaviour>(
               load(lib_path, name, Hypothesis::TRIDIMENSIONAL)));

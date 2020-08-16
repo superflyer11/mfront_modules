@@ -38,7 +38,7 @@ endif(MGIS_DIR)
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/../nonlinear_elastic_materials/src)
   
-add_executable(mfront_interface_3D
+add_executable(mfront_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
 )
@@ -48,8 +48,8 @@ include_directories(${MGIS_DIR}/lib)
 
 # /home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi
 
-add_dependencies(mfront_interface_3D MFrontGenericInterface)
-target_link_libraries(mfront_interface_3D
+add_dependencies(mfront_interface MFrontGenericInterface)
+target_link_libraries(mfront_interface
   MFrontGenericInterface
   users_modules
   mofem_finite_elements
