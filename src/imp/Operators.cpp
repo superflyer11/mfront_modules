@@ -23,6 +23,9 @@ namespace MFrontInterface {
 #define VOIGHT_VEC_SYMM(VEC)                                                   \
   VEC[0], inv_sqr2 *VEC[3], inv_sqr2 *VEC[4], VEC[1], inv_sqr2 *VEC[5], VEC[2]
 
+#define VOIGHT_VEC_FULL(VEC)                                                   \
+  VEC[0], VEC[4], VEC[8], VEC[1], VEC[3], VEC[2], VEC[6], VEC[5], VEC[7]
+
 #define DDG_MAT_PTR(MAT)                                                       \
   &MAT(0, 0), &MAT(1, 0), &MAT(2, 0), &MAT(3, 0), &MAT(4, 0), &MAT(5, 0),      \
       &MAT(6, 0), &MAT(7, 0), &MAT(8, 0), &MAT(9, 0), &MAT(10, 0),             \
@@ -32,6 +35,26 @@ namespace MFrontInterface {
       &MAT(26, 0), &MAT(27, 0), &MAT(28, 0), &MAT(29, 0), &MAT(30, 0),         \
       &MAT(31, 0), &MAT(32, 0), &MAT(33, 0), &MAT(34, 0), &MAT(35, 0)
 
+#define TENSOR4_MAT_PTR2(MAT)                                                  \
+  &MAT(0, 0), &MAT(1, 0), &MAT(2, 0), &MAT(3, 0), &MAT(4, 0), &MAT(5, 0),      \
+      &MAT(6, 0), &MAT(7, 0), &MAT(8, 0), &MAT(9, 0), &MAT(10, 0),             \
+      &MAT(11, 0), &MAT(12, 0), &MAT(13, 0), &MAT(14, 0), &MAT(15, 0),         \
+      &MAT(16, 0), &MAT(17, 0), &MAT(18, 0), &MAT(19, 0), &MAT(20, 0),         \
+      &MAT(21, 0), &MAT(22, 0), &MAT(23, 0), &MAT(24, 0), &MAT(25, 0),         \
+      &MAT(26, 0), &MAT(27, 0), &MAT(28, 0), &MAT(29, 0), &MAT(30, 0),         \
+      &MAT(31, 0), &MAT(32, 0), &MAT(33, 0), &MAT(34, 0), &MAT(35, 0),         \
+      &MAT(36, 0), &MAT(37, 0), &MAT(38, 0), &MAT(39, 0), &MAT(40, 0),         \
+      &MAT(41, 0), &MAT(42, 0), &MAT(43, 0), &MAT(44, 0), &MAT(45, 0),         \
+      &MAT(46, 0), &MAT(47, 0), &MAT(48, 0), &MAT(49, 0), &MAT(50, 0),         \
+      &MAT(51, 0), &MAT(52, 0), &MAT(53, 0), &MAT(54, 0), &MAT(55, 0),         \
+      &MAT(56, 0), &MAT(57, 0), &MAT(58, 0), &MAT(59, 0), &MAT(60, 0),         \
+      &MAT(61, 0), &MAT(62, 0), &MAT(63, 0), &MAT(64, 0), &MAT(65, 0),         \
+      &MAT(66, 0), &MAT(67, 0), &MAT(68, 0), &MAT(69, 0), &MAT(70, 0),         \
+      &MAT(71, 0), &MAT(72, 0), &MAT(73, 0), &MAT(74, 0), &MAT(75, 0),         \
+      &MAT(76, 0), &MAT(77, 0), &MAT(78, 0), &MAT(79, 0), &MAT(80, 0)
+
+// #define TENSOR4_MAT_PTR2(MAT) &MAT(0, 0), MAT.size2()
+
 Index<'i', 3> i;
 Index<'j', 3> j;
 Index<'k', 3> k;
@@ -39,77 +62,86 @@ Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
 
-template struct OpStress<true>;
-template struct OpStress<false>;
+template <> Tensor4Pack get_tangent_tensor<Tensor4Pack>(MatrixDouble &mat) {
+  return Tensor4Pack(TENSOR4_MAT_PTR2(mat));
+}
 
-template <bool UPDATE>
-OpStress<UPDATE>::OpStress(const std::string field_name,
-                   boost::shared_ptr<CommonData> common_data_ptr,
-                   BlockData &block_data)
+template <> DdgPack get_tangent_tensor<DdgPack>(MatrixDouble &mat) {
+  return DdgPack(DDG_MAT_PTR(mat));
+}
+
+template <bool UPDATE, bool IS_LARGE_STRAIN>
+OpStressTmp<UPDATE, IS_LARGE_STRAIN>::OpStressTmp(
+    const std::string field_name, boost::shared_ptr<CommonData> common_data_ptr,
+    BlockData &block_data)
     : DomainEleOp(field_name, DomainEleOp::OPROW),
       commonDataPtr(common_data_ptr), dAta(block_data) {
   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
 }
-template <bool UPDATE>
-MoFEMErrorCode OpStress<UPDATE>::doWork(int side, EntityType type, EntData &data) {
+template <bool UPDATE, bool IS_LARGE_STRAIN>
+MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
+                                                            EntityType type,
+                                                            EntData &data) {
   MoFEMFunctionBegin;
 
   const size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
-
+  int check_integration = 0;
   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
   if (dAta.tEts.find(fe_ent) == dAta.tEts.end())
     MoFEMFunctionReturnHot(0);
-  CHKERR commonDataPtr->getBlockData(dAta);
-
-  // make separate material for each block
-  // here we should read behaviour from dAta
-  auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-
-  // local behaviour data
-  auto beh_data = BehaviourData{mgis_bv};
-  beh_data.K[0] = 0; // consistent tangent
-  // beh_data.K[0] = 4; // consistent tangent
-  // beh_data.K[1] = 2; // first Piola stress
-  // beh_data.K[2] = 2; // dP / dF derivative
-  beh_data.K[1] = 0; // cauchy
-  auto b_view = make_view(beh_data);
-
-  // get size of internal and external variables
-  int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-  int size_of_evars = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
+  auto &mgis_bv = *dAta.mGisBehaviour;
+  auto b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+  int &size_of_vars = dAta.sizeIntVar;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
- 
+
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
   commonDataPtr->mStressPtr->resize(9, nb_gauss_pts);
   auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    auto vec_sym = get_voigt_vec_symm(t_grad);
-    b_view.s0.gradients = vec_sym.data();
+    if (IS_LARGE_STRAIN) {
+      auto vec = get_voigt_vec(t_grad);
+      b_view.s0.gradients = vec.data();
+    } else {
+      auto vec = get_voigt_vec_symm(t_grad);
+      b_view.s0.gradients = vec.data();
+    }
 
-    auto internal_var =
-         getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars); 
-    b_view.s0.internal_state_variables = &*internal_var.begin();
-    int check = integrate(b_view, mgis_bv);
-
+    if (size_of_vars) {
+      auto internal_var =
+          getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
+      b_view.s0.internal_state_variables = &*internal_var.begin();
+    }
+ 
+    check_integration = integrate(b_view, mgis_bv);
     auto &st1 = b_view.s1.thermodynamic_forces;
-    Tensor2_symmetric<double, 3> forces(VOIGHT_VEC_SYMM(st1));
-    auto my_stress = to_non_symm(forces);
-    t_stress(i, j) = -my_stress(i, j);
 
-    if (UPDATE) //template
+    if (IS_LARGE_STRAIN) {
+      Tensor2<double, 3, 3> forces(VOIGHT_VEC_FULL(st1));
+      t_stress(i, j) = -forces(i, j);
+    } else {
+      Tensor2_symmetric<double, 3> nstress(VOIGHT_VEC_SYMM(st1));
+      auto forces = to_non_symm(nstress);
+      t_stress(i, j) = -forces(i, j);
+    }
+
+    if (UPDATE) // template
       for (int dd = 0; dd != size_of_vars; ++dd)
         mat_int(gg, dd) = b_view.s1.internal_state_variables[dd];
 
     ++t_stress;
     ++t_grad;
   }
- 
-  if (UPDATE) //template
+
+  if (UPDATE) // template
     CHKERR commonDataPtr->setInternalVar(fe_ent);
+
+  if (check_integration < 0)
+    SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+            "Something went wrong with MGIS integration.");
 
   MoFEMFunctionReturn(0);
 }
@@ -151,7 +183,7 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
       }
       for (; bb < nb_base_functions; ++bb)
         ++t_diff_base;
-      
+
       ++t_stress;
       ++t_w;
     }
@@ -162,68 +194,83 @@ MoFEMErrorCode OpAssembleRhs::doWork(int side, EntityType type, EntData &data) {
   MoFEMFunctionReturn(0);
 }
 
-OpTangent::OpTangent(const std::string field_name,
-                     boost::shared_ptr<CommonData> common_data_ptr,
-                     BlockData &block_data)
+template <typename T>
+OpTangent<T>::OpTangent(const std::string field_name,
+                        boost::shared_ptr<CommonData> common_data_ptr,
+                        BlockData &block_data)
     : DomainEleOp(field_name, DomainEleOp::OPROW),
       commonDataPtr(common_data_ptr), dAta(block_data) {
   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
 }
-
-MoFEMErrorCode OpTangent::doWork(int side, EntityType type, EntData &data) {
+template <typename T>
+MoFEMErrorCode OpTangent<T>::doWork(int side, EntityType type, EntData &data) {
   MoFEMFunctionBegin;
 
   const size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
-
+  int check_integration = 0;
   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
   if (dAta.tEts.find(fe_ent) == dAta.tEts.end())
     MoFEMFunctionReturnHot(0);
-  CHKERR commonDataPtr->getBlockData(dAta);
-  auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-  auto beh_data = BehaviourData{mgis_bv};
-  beh_data.K[0] = 5;
-  beh_data.K[1] = 0; 
-  auto b_view = make_view(beh_data);
-
-  int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-  int size_of_evars = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
+  auto &mgis_bv = *dAta.mGisBehaviour;
+  auto b_view = commonDataPtr->getBlockDataView(dAta, LHS);
+  int &size_of_vars = dAta.sizeIntVar;
+  int &size_of_evars = dAta.sizeExtVar;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, size_of_vars);
   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
-
   MatrixDouble &S_E = *(commonDataPtr->materialTangentPtr);
-  S_E.resize(36, nb_gauss_pts, false);
-  Ddg<PackPtr<double *, 1>, 3, 3> D1(DDG_MAT_PTR(S_E));
+
+  size_t tens_size = 36;
+  if (std::is_same<T, Tensor4Pack>::value) // for finite strains
+    tens_size = 81;
+  S_E.resize(tens_size, nb_gauss_pts, false);
+  auto D1 = get_tangent_tensor<T>(S_E);
+
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
 
-   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
-     auto vec_sym = get_voigt_vec_symm(t_grad);
-     b_view.s0.gradients = vec_sym.data();
-     auto internal_var =
-         getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
-     b_view.s0.internal_state_variables = &*internal_var.begin();
+  for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-     int check = integrate(b_view, mgis_bv);
+    if (std::is_same<T, Tensor4Pack>::value) {
+      auto vec = get_voigt_vec(t_grad);
+      b_view.s0.gradients = vec.data();
+    } else {
+      auto vec = get_voigt_vec_symm(t_grad);
+      b_view.s0.gradients = vec.data();
+    }
 
-     CHKERR get_ddg_from_voigt(beh_data.K, D1);
+    if (size_of_vars) {
+      auto internal_var =
+          getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
+      b_view.s0.internal_state_variables = &*internal_var.begin();
+    }
+    check_integration = integrate(b_view, mgis_bv);
 
-     ++D1;
-     ++t_grad;
-   }
+    CHKERR get_tensor4_from_voigt(b_view.K, D1);
+
+    ++D1;
+    ++t_grad;
+  }
+
+  if (check_integration < 0)
+    SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+            "Something went wrong with MGIS integration.");
+
   MoFEMFunctionReturn(0);
 };
 
-OpAssembleLhs::OpAssembleLhs(const std::string row_field_name,
-                             const std::string col_field_name,
-                             boost::shared_ptr<CommonData> common_data_ptr)
+template <typename T>
+OpAssembleLhs<T>::OpAssembleLhs(const std::string row_field_name,
+                                const std::string col_field_name,
+                                boost::shared_ptr<CommonData> common_data_ptr)
     : DomainEleOp(row_field_name, col_field_name, DomainEleOp::OPROWCOL),
       commonDataPtr(common_data_ptr) {
   sYmm = true; // use symmetry
 }
-
-MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
-                                     EntityType row_type, EntityType col_type,
-                                     EntData &row_data, EntData &col_data) {
+template <typename T>
+MoFEMErrorCode OpAssembleLhs<T>::doWork(int row_side, int col_side,
+                                        EntityType row_type,
+                                        EntityType col_type, EntData &row_data,
+                                        EntData &col_data) {
   MoFEMFunctionBegin;
 
   const size_t nb_row_dofs = row_data.getIndices().size();
@@ -239,7 +286,7 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
     auto t_w = getFTensor0IntegrationWeight();
 
     MatrixDouble &S_E = *(commonDataPtr->materialTangentPtr);
-    Ddg<PackPtr<double *, 1>, 3, 3> tangent(DDG_MAT_PTR(S_E));
+    auto D1 = get_tangent_tensor<T>(S_E);
 
     locK.clear();
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
@@ -257,7 +304,7 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
         auto t_col_diff_base = col_data.getFTensor1DiffN<3>(gg, 0);
 
         for (size_t cc = 0; cc != nb_col_dofs / 3; ++cc) {
-          t_a(i, k) += alpha * (tangent(i, j, k, l) *
+          t_a(i, k) += alpha * (D1(i, j, k, l) *
                                 (t_row_diff_base(j) * t_col_diff_base(l)));
           ++t_col_diff_base;
           ++t_a;
@@ -268,7 +315,7 @@ MoFEMErrorCode OpAssembleLhs::doWork(int row_side, int col_side,
       for (; rr != nb_row_base_funcs; ++rr)
         ++t_row_diff_base;
 
-      ++tangent;
+      ++D1;
       ++t_w;
     }
 
@@ -304,15 +351,10 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
   if (dAta.tEts.find(fe_ent) == dAta.tEts.end())
     MoFEMFunctionReturnHot(0);
-  CHKERR commonDataPtr->getBlockData(dAta);
 
-  auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-  // get size of internal and external variables
-  int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-  // local behaviour data
-  auto beh_data = BehaviourData{mgis_bv};
-  beh_data.K[0] = 0;
-  auto b_view = make_view(beh_data);
+  auto &mgis_bv = *dAta.mGisBehaviour;
+  auto b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+  int &size_of_vars = dAta.sizeIntVar;
 
   auto get_tag = [&](std::string name, size_t size) {
     std::array<double, 9> def;
@@ -334,51 +376,27 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
     return mat;
   };
 
-  auto set_scalar = [&](auto t) -> MatrixDouble3by3 & {
-    mat.clear();
-    mat(0, 0) = t;
-    return mat;
-  };
-
-  auto set_vector = [&](auto t) -> MatrixDouble3by3 & {
-    mat.clear();
-    mat(0, 0) = t(0);
-    mat(0, 1) = t(1);
-    mat(0, 2) = t(2);
-    return mat;
-  };
-
-  auto set_matrix_symm = [&](auto &t) -> MatrixDouble3by3 & {
-    mat.clear();
-    for (size_t r = 0; r != 3; ++r)
-      for (size_t c = 0; c != 3; ++c)
-        mat(r, c) = t(r, c);
-    return mat;
-  };
-
   auto set_tag = [&](auto th, auto gg, auto &mat) {
     return postProcMesh.tag_set_data(th, &mapGaussPts[gg], 1,
                                      &*mat.data().begin());
   };
 
-  auto th_strain = get_tag("STRAIN", 9);
-  auto th_grad = get_tag("GRAD", 9);
-  auto th_stress = get_tag("STRESS", 9);
+  auto th_grad = get_tag(mgis_bv.gradients[0].name, 9);
+  auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
 
   size_t nb_gauss_pts1 = data.getN().size1();
   size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-  Tensor2_symmetric<double, 3> strain;
-  Tensor2_symmetric<double, 3> stress;
-  
+  Tensor2<double, 3, 3> stress;
+
   auto get_internal_val_avg = [&]() {
     MoFEMFunctionBeginHot;
 
     MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
     auto nbg = mat_int.size1();
     CHKERR commonDataPtr->getInternalVar(fe_ent, nbg, size_of_vars);
+    int &size_of_vars = dAta.sizeIntVar;
 
-    int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
     for (auto c : mgis_bv.isvs) {
       auto vsize = getVariableSize(c, mgis_bv.hypothesis);
       // for paraview we can only use 1 3 or 9
@@ -407,15 +425,25 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
-    auto vec_sym = get_voigt_vec_symm(t_grad);
+    if (dAta.isFiniteStrain) { // TODO: make it template
+      auto vec = get_voigt_vec(t_grad);
+      b_view.s0.gradients = vec.data();
+    } else {
+      auto vec = get_voigt_vec_symm(t_grad);
+      b_view.s0.gradients = vec.data();
+    }
 
-    b_view.s0.gradients = vec_sym.data();
     int check = integrate(b_view, mgis_bv);
     auto &st1 = b_view.s1.thermodynamic_forces;
-    Tensor2_symmetric<double, 3> stress(VOIGHT_VEC_SYMM(st1));
+    if (dAta.isFiniteStrain) {
+      Tensor2<double, 3, 3> forces(VOIGHT_VEC_FULL(st1));
+      stress(i, j) = -forces(i, j);
+    } else {
+      Tensor2_symmetric<double, 3> nstress(VOIGHT_VEC_SYMM(st1));
+      auto forces = to_non_symm(nstress);
+      stress(i, j) = -forces(i, j);
+    }
     CHKERR set_tag(th_grad, gg, set_matrix(t_grad));
-    CHKERR set_tag(th_strain, gg, set_matrix_symm(strain));
     CHKERR set_tag(th_stress, gg, set_matrix(stress));
 
     ++t_grad;
@@ -436,18 +464,16 @@ OpSaveGaussPts::OpSaveGaussPts(const std::string field_name,
 
 //! [Postprocessing]
 MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
-                                         EntData &data) {
+                                      EntData &data) {
   MoFEMFunctionBegin;
 
   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
   if (dAta.tEts.find(fe_ent) == dAta.tEts.end())
     MoFEMFunctionReturnHot(0);
-  CHKERR commonDataPtr->getBlockData(dAta);
+  auto &mgis_bv = *dAta.mGisBehaviour;
+  auto b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+  int &size_of_vars = dAta.sizeIntVar;
 
-  auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-  int size_of_vars = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-  auto beh_data = BehaviourData{mgis_bv};
-  auto b_view = make_view(beh_data);
   auto get_tag = [&](std::string name, size_t size) {
     std::array<double, 9> def;
     std::fill(def.begin(), def.end(), 0);
@@ -458,15 +484,19 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
     return th;
   };
 
+  auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
+
   MatrixDouble3by3 mat(3, 3);
   auto th_disp = get_tag("DISPLACEMENT", 3);
-  // auto set_matrix = [&](auto &t) -> MatrixDouble3by3 & {
-  //   mat.clear();
-  //   for (size_t r = 0; r != 3; ++r)
-  //     for (size_t c = 0; c != 3; ++c)
-  //       mat(r, c) = t(r, c);
-  //   return mat;
-  // };
+  auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
+
+  auto set_matrix = [&](auto &t) -> MatrixDouble3by3 & {
+    mat.clear();
+    for (size_t r = 0; r != 3; ++r)
+      for (size_t c = 0; c != 3; ++c)
+        mat(r, c) = t(r, c);
+    return mat;
+  };
 
   auto set_tag = [&](Tag th, EntityHandle vertex, auto &mat) {
     return internalVarMesh.tag_set_data(th, &vertex, 1, &*mat.data().begin());
@@ -512,12 +542,25 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
     }
 
     CHKERR set_tag(th_disp, vertex, disps);
+    CHKERR set_tag(th_stress, vertex, set_matrix(t_stress));
 
     ++t_grad;
+    ++t_stress;
     ++t_disp;
   }
 
   MoFEMFunctionReturn(0);
 }
+
+template struct OpStressTmp<true, true>;
+template struct OpStressTmp<true, false>;
+template struct OpStressTmp<false, false>;
+template struct OpStressTmp<false, true>;
+
+template struct OpTangent<Tensor4Pack>;
+template struct OpTangent<DdgPack>;
+
+template struct OpAssembleLhs<Tensor4Pack>;
+template struct OpAssembleLhs<DdgPack>;
 
 } // namespace MFrontInterface

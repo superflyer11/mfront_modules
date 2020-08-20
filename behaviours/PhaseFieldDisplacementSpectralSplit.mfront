@@ -3,11 +3,12 @@
 @Date 05/02/2016;
 @Behaviour PhaseFieldDisplacementSpectralSplit;
 
-@MaterialProperty stress Yg;
+@MaterialProperty stress Yg = 70e9;
 Yg.setGlossaryName("YoungModulus") ;
-@MaterialProperty real nu ;
+@MaterialProperty real nu = 0.31;
 nu.setGlossaryName("PoissonRatio") ;
 @Parameter real kres = 1e-6 ; // residual stiffness
+@Parameter real Yg = 1e9 ; // 
 
 @StateVariable real H;
 H.setEntryName("HistoryFunction");

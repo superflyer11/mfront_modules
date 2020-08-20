@@ -18,6 +18,7 @@ using DomainEleOp = DomainEle::UserDataOperator;
 #include <MGIS/Behaviour/BehaviourData.hxx>
 #include "MGIS/Behaviour/MaterialDataManager.h"
 #include "MGIS/Behaviour/Integrate.hxx"
+#include "MGIS/LibrariesManager.hxx"
 
 using namespace mgis;
 using namespace mgis::behaviour;
@@ -113,14 +114,32 @@ int main(int argc, char *argv[]) {
       SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
               "No blocksets on the mesh has been provided (e.g. MATERIAL1)");
 
-    for (auto &sit : commonDataPtr->setOfBlocksData) {
-      const int &id = sit.first;
-      auto &lib_path = sit.second.behaviourPath;
-      auto &name = sit.second.behaviourName;
+    auto is_lib_finite_strain = [&](const std::string &lib,
+                                    const std::string &beh_name) {
+      auto &lm = LibrariesManager::get();
+      return (lm.getBehaviourType(lib, beh_name) == 2) &&
+             (lm.getBehaviourKinematic(lib, beh_name) == 3);
+    };
+
+    auto op = FiniteStrainBehaviourOptions{};
+    op.stress_measure = FiniteStrainBehaviourOptions::PK1;
+    op.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
+
+    for (auto &block : commonDataPtr->setOfBlocksData) {
+      const int &id = block.first;
+      auto &lib_path = block.second.behaviourPath;
+      auto &name = block.second.behaviourName;
       const string param_name = "-block_" + to_string(id);
       const string param_path = "-lib_path_" + to_string(id);
+      const string param_from_blocks = "-my_params_" + to_string(id);
+      PetscBool set_from_blocks = PETSC_FALSE;
       char char_name[255];
       PetscBool is_param;
+
+      CHKERR PetscOptionsBool(param_from_blocks.c_str(),
+                              "set parameters from blocks", "", set_from_blocks,
+                              &set_from_blocks, PETSC_NULL);
+
       CHKERR PetscOptionsString(param_name.c_str(), "name of the behaviour", "",
                                 "IsotropicLinearHardeningPlasticity", char_name,
                                 255, &is_param);
@@ -132,35 +151,57 @@ int main(int argc, char *argv[]) {
       if (is_param)
         lib_path = string(char_name);
 
-      auto op = FiniteStrainBehaviourOptions{};
-      op.stress_measure = FiniteStrainBehaviourOptions::PK1;
-      op.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
+      auto &mgis_bv_ptr = block.second.mGisBehaviour;
+      auto is_finite_strain = is_lib_finite_strain(lib_path, name);
+      if (is_finite_strain) {
+        mgis_bv_ptr = boost::make_shared<Behaviour>(
+            load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL));
+        block.second.isFiniteStrain = true;
+      } else
+        mgis_bv_ptr = boost::make_shared<Behaviour>(
+            load(lib_path, name, Hypothesis::TRIDIMENSIONAL));
 
-      // commonDataPtr->mGisBehavioursVec.emplace_back(
-      //     boost::make_shared<Behaviour>(
-      //         load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL)));
-      // if(is_small_strain)
-      commonDataPtr->mGisBehavioursVec.emplace_back(
-          boost::make_shared<Behaviour>(
-              load(lib_path, name, Hypothesis::TRIDIMENSIONAL)));
+      CHKERR block.second.setBlockBehaviourData(set_from_blocks);
+      for (size_t dd = 0; dd < mgis_bv_ptr->mps.size(); ++dd) {
+        double my_param = 0;
+        PetscBool is_set = PETSC_FALSE;
+        string param_cmd = "-param_" + to_string(id) + "_" + to_string(dd);
+        CHKERR PetscOptionsScalar(param_cmd.c_str(), "parameter from cmd", "",
+                                  my_param, &my_param, &is_set);
+        if (!is_set)
+          continue;
+
+        block.second.behDataLHS->s0.material_properties[dd] = my_param;
+        block.second.behDataLHS->s1.material_properties[dd] = my_param;
+        block.second.behDataRHS->s0.material_properties[dd] = my_param;
+        block.second.behDataRHS->s1.material_properties[dd] = my_param;
+      }
+
+      int nb = 0;
+
+      // FIXME: PRINT PROPERLY WITH SHOWING WHAT WAS ASSIGNED BY THE USER!!!
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "%s behaviour loaded on block %d. \n",
+                         mgis_bv_ptr->behaviour.c_str(), block.first);
+      auto it = block.second.behDataRHS->s1.material_properties.begin();
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Material properties: \n");
+      for (const auto &mp : mgis_bv_ptr->mps)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s = %g\n", nb++,
+                           mp.name.c_str(), *it++);
+
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Real parameters: \n");
+      for (auto &p : mgis_bv_ptr->params)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Integer parameters: \n");
+      for (auto &p : mgis_bv_ptr->iparams)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Unsigned short parameters: \n");
+      for (auto &p : mgis_bv_ptr->usparams)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
     }
 
     ierr = PetscOptionsEnd();
     CHKERRQ(ierr);
-
-    for (auto &it : commonDataPtr->mGisBehavioursVec) {
-      auto &beh = *it;
-
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "%s behaviour loaded. \n",
-                         beh.behaviour.c_str());
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Material properties: \n");
-      for (const auto &mp : beh.mps)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%s\n", mp.name.c_str());
-
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Parameters: \n");
-      for (auto &p : beh.params)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%s\n", p.c_str());
-    }
 
     update_int_variables = boost::make_shared<DomainEle>(m_field);
     auto integration_rule = [&](int, int, int approx_order) {
@@ -173,9 +214,12 @@ int main(int argc, char *argv[]) {
       update_int_variables->getOpPtrVector().push_back(
           new OpCalculateVectorFieldValues<3>("U", commonDataPtr->mDispPtr));
     for (auto &sit : commonDataPtr->setOfBlocksData) {
-
-      update_int_variables->getOpPtrVector().push_back(
-          new OpStress<true>("U", commonDataPtr, sit.second));
+      if (sit.second.isFiniteStrain)
+        update_int_variables->getOpPtrVector().push_back(
+            new OpUpdateVariablesFiniteStrains("U", commonDataPtr, sit.second));
+      else
+        update_int_variables->getOpPtrVector().push_back(
+            new OpUpdateVariablesSmallStrains("U", commonDataPtr, sit.second));
       if (print_gauss)
         update_int_variables->getOpPtrVector().push_back(
             new OpSaveGaussPts("U", moab_gauss, commonDataPtr, sit.second));
@@ -216,15 +260,33 @@ int main(int argc, char *argv[]) {
     };
 
     auto add_domain_ops_lhs = [&](auto &pipeline) {
-      for (auto &sit : commonDataPtr->setOfBlocksData)
-        pipeline.push_back(new OpTangent("U", commonDataPtr, sit.second));
-      pipeline.push_back(
-          new OpAssembleLhs("U", "U", commonDataPtr));
+      for (auto &sit : commonDataPtr->setOfBlocksData) {
+        if (sit.second.isFiniteStrain) {
+
+          pipeline.push_back(
+              new OpTangentFiniteStrains("U", commonDataPtr, sit.second));
+          pipeline.push_back(
+              new OpAssembleLhsFiniteStrains("U", "U", commonDataPtr));
+        } else {
+
+          pipeline.push_back(
+              new OpTangentSmallStrains("U", commonDataPtr, sit.second));
+          pipeline.push_back(
+              new OpAssembleLhsSmallStrains("U", "U", commonDataPtr));
+        }
+      }
     };
 
     auto add_domain_ops_rhs = [&](auto &pipeline) {
       for (auto &sit : commonDataPtr->setOfBlocksData)
-        pipeline.push_back(new OpStress<false>("U", commonDataPtr, sit.second));
+        if (sit.second.isFiniteStrain)
+          pipeline.push_back(
+              new OpStressFiniteStrains("U", commonDataPtr, sit.second));
+
+        else
+          pipeline.push_back(
+              new OpStressSmallStrains("U", commonDataPtr, sit.second));
+
       pipeline.push_back(new OpAssembleRhs("U", commonDataPtr));
     };
 
@@ -403,76 +465,6 @@ int main(int argc, char *argv[]) {
     CHKERR VecGhostUpdateEnd(D, INSERT_VALUES, SCATTER_FORWARD);
     CHKERR DMoFEMMeshToLocalVector(dm, D, INSERT_VALUES, SCATTER_REVERSE);
 
-    // auto odd = FiniteStrainBehaviourOptions{};
-    // odd.stress_measure = FiniteStrainBehaviourOptions::PK1;
-    // odd.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
-
-    // const auto mgis_bv =
-    //     // load("src/libBehaviour.so", "Plasticity",
-    //     load("src/libBehaviour.so", "Elasticity",
-    // //          Hypothesis::TRIDIMENSIONAL);
-    // auto &mgis_bv = *commonDataPtr->mGisBehaviour;
-    // auto beh_data = BehaviourData{mgis_bv};
-
-    // auto check_this = mgis_bv.gradients.size();
-    // vector<Variable> test_params;
-    // // mgis_bv.mps = &*test_params.begin();
-    // mgis_bv.mps;
-    // for (const auto &mp : mgis_bv.mps) {
-    //   cerr << mp.name << endl;
-    // }
-    // beh_data.K[0] = 4; // consistent tangent
-    // beh_data.K[1] = 2; // first Piola stress
-    // beh_data.K[2] = 2; // dP / dF derivative
-    // cerr << beh_data.K << endl;
-    // // const auto offset1 = getVariableOffset(mgis_bv.isvs,
-    // // "EquivalentPlasticStrain",
-    // //                                  mgis_bv.hypothesis);
-    // // const auto offset2 = getVariableOffset(mgis_bv.isvs, "ElasticStrain",
-    // //                                  mgis_bv.hypothesis);
-
-    // // MaterialDataManager mat{mgis_bv, 50};
-
-    // // std::cout << "member s0 " << m.s0 << '\n';
-    // // const auto nb = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
-    // // std::cout << "offset of EquivalentPlasticStrain: " << offset1 << '\n';
-    // // std::cout << "offset of ElasticStrain: " << offset2 << '\n';
-    // // // get these sizes to initialize the size of internal and external
-    // // variables std::cout << "array size " << nb << '\n';
-    // auto b_view = make_view(beh_data);
-    // vector<double> my_material_parameters(5);
-    // my_material_parameters[0] = 100;
-    // my_material_parameters[1] = 0.2;
-    // my_material_parameters[2] = .2;
-    // // mgis_bv.params["YoungModulus"] = 200;
-    // // auto check_params = beh_data.getParameters();
-    // // beh_data.getMaterialProperties();
-    // vector<double> my_test_gradients(14, 0.);
-    // // for (auto &it : my_test_gradients)
-    // //   it = (double)rand() * 0.2 / (double)RAND_MAX;
-
-    // b_view.s0.gradients = &*my_test_gradients.begin();
-    // b_view.s0.material_properties = my_material_parameters.data();
-    // b_view.s1.material_properties = my_material_parameters.data();
-
-    // cout << "Parameters for this behaviour are: \n";
-    // for (auto &p : mgis_bv.params)
-    //   cout << p << endl;
-    // int check = integrate(b_view, mgis_bv);
-
-    // cerr << beh_data.K << endl;
-    // std::cout << "check " << check << '\n';
-    // auto set_mat_props = [&](auto &s) {
-    //   setMaterialProperty(s, "YoungModulus", 100);
-    //   setMaterialProperty(s, "PoissonRatio", .3);
-    //   setMaterialProperty(s, "HardeningSlope", 50);
-    //   setMaterialProperty(s, "YieldStrength", 10);
-    //   setExternalStateVariable(s, "Temperature", 293.15);
-    // };
-
-    // set_mat_props(b_view.s0);
-    // set_mat_props(mat.s0);
-    // set_mat_props(mat.s1);
   }
   CATCH_ERRORS;
 

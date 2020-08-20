@@ -4,41 +4,118 @@ namespace MFrontInterface {
 constexpr double sqr2 = boost::math::constants::root_two<double>();
 constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
 
+// using Tensor4Pack = Tensor4< double*, 3, 3, 3, 3>;
+using Tensor4Pack = Tensor4<PackPtr<double *, 1>, 3, 3, 3, 3>;
+using DdgPack = Ddg<PackPtr<double *, 1>, 3, 3>;
+
+#define TENSOR4_K_PTR2(K)                                                      \
+  &K[0], &K[1], &K[2], &K[3], &K[4], &K[5], &K[6], &K[7], &K[8], &K[9],        \
+      &K[10], &K[11], &K[12], &K[13], &K[14], &K[15], &K[16], &K[17], &K[18],  \
+      &K[19], &K[20], &K[21], &K[22], &K[23], &K[24], &K[25], &K[26], &K[27],  \
+      &K[28], &K[29], &K[30], &K[31], &K[32], &K[33], &K[34], &K[35], &K[36],  \
+      &K[37], &K[38], &K[39], &K[40], &K[41], &K[42], &K[43], &K[44], &K[45],  \
+      &K[46], &K[47], &K[48], &K[49], &K[50], &K[51], &K[52], &K[53], &K[54],  \
+      &K[55], &K[56], &K[57], &K[58], &K[59], &K[60], &K[61], &K[62], &K[63],  \
+      &K[64], &K[65], &K[66], &K[67], &K[68], &K[69], &K[70], &K[71], &K[72],  \
+      &K[73], &K[74], &K[75], &K[76], &K[77], &K[78], &K[79], &K[80]
+
+enum DataTags { RHS = 0, LHS };
+
 struct BlockData {
   int iD;
-  int locID;
   int oRder;
+
+  bool isFiniteStrain;
   string behaviourPath;
   string behaviourName;
-  array<double, 15> params;
+
+  boost::shared_ptr<Behaviour> mGisBehaviour;
+
+  boost::shared_ptr<BehaviourData> behDataRHS;
+  boost::shared_ptr<BehaviourData> behDataLHS;
+
+  int sizeIntVar;
+  int sizeExtVar;
+
+  vector<double> params;
+
   Range tEts;
+
   BlockData()
-      : oRder(-1), behaviourPath("src/libBehaviour.so"),
+      : oRder(-1), isFiniteStrain(false), behaviourPath("src/libBehaviour.so"),
         behaviourName("IsotropicLinearHardeningPlasticity") {}
+
+  MoFEMErrorCode setBlockBehaviourData(bool set_params_from_blocks) {
+    MoFEMFunctionBeginHot;
+    if (mGisBehaviour) {
+
+      auto &mgis_bv = *mGisBehaviour;
+
+      sizeIntVar = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
+      sizeExtVar = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
+
+      behDataRHS = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
+      behDataLHS = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
+
+      const int total_number_of_params = mgis_bv.mps.size();
+      // const int total_number_of_params = mgis_bv.mps.size() +
+      // mgis_bv.params.size() + mgis_bv.iparams.size() +
+      // mgis_bv.usparams.size();
+
+      if (set_params_from_blocks) {
+
+        // SETERRQ(PETSC_COMM_SELF, MOFEM_NOT_IMPLEMENTED,
+        //         "Not implemented (FIXME please)");
+        if (params.size() < total_number_of_params)
+          SETERRQ2(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+                   "Not enough parameters supplied for this block. We have %d "
+                   "provided where %d are necessary for this block",
+                   params.size(), total_number_of_params);
+        // auto it = params.begin();
+        // for (auto &p : beh_data.s0.material_properties)
+        //   p = *it++;
+        for (int dd = 0; dd < params.size(); + dd) {
+          behDataLHS->s0.material_properties[dd] = params[dd];
+          behDataLHS->s1.material_properties[dd] = params[dd];
+          behDataRHS->s0.material_properties[dd] = params[dd];
+          behDataRHS->s1.material_properties[dd] = params[dd];
+        }
+      }
+
+      if (isFiniteStrain) {
+        // rhs
+        behDataRHS->K[0] = 0; // no  tangent
+        behDataRHS->K[1] = 2; // PK1
+        // lhs
+        behDataLHS->K[0] = 5;
+        behDataLHS->K[1] = 2; // PK1 ??FIXME:
+        behDataLHS->K[2] = 2; // PK1
+      } else {
+        // rhs
+        behDataRHS->K[0] = 0; // no tangent
+        behDataRHS->K[1] = 0; // cauchy
+        // lhs
+        behDataLHS->K[0] = 5;
+        behDataLHS->K[1] = 0; // cauchy
+      }
+
+      //  auto it = data.params.begin();
+      //  for (auto &p : beh_data.s0.material_properties)
+      //    p = *it++;
+
+      // for (auto &p : mgis_bv.params)
+      //   p = *it++;
+      // for (auto &p : mgis_bv.iparams)
+      //   p = *it++;
+      // for (auto &p : mgis_bv.usparams)
+    }
+
+    MoFEMFunctionReturnHot(0);
+  }
 };
 
-template <typename T>
-inline size_t get_paraview_size(T &vsize) {
+template <typename T> inline size_t get_paraview_size(T &vsize) {
   return vsize > 1 ? (vsize > 3 ? 9 : 3) : 1;
-};
-
-template <typename T>
-inline auto integrateMGIS(BehaviourDataView &b_view,
-                          mgis::behaviour::Behaviour &mgis_bv, T &t_grad,
-                          MatrixDouble &mat_int, int gg) {
-  MoFEMFunctionBeginHot;
-
-  auto vec_sym = get_voigt_vec_symm(t_grad);
-
-  VectorDouble internal_var = row(mat_int, gg); // FIXME: copyß
-  ublas::matrix_row<MatrixDouble> int_var_at_gauss(mat_int, gg);
-
-  b_view.s0.internal_state_variables = internal_var.data().data();
-  b_view.s0.gradients = vec_sym.data();
-
-  int check = integrate(b_view, mgis_bv);
-
-  MoFEMFunctionReturnHot(0);
 };
 
 template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
@@ -47,10 +124,24 @@ template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
   Index<'j', 3> j;
   t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
 
-  vector<double> vec_sym{t_strain(0, 0),        t_strain(1, 1),
-                         t_strain(2, 2),        sqr2 * t_strain(0, 1),
-                         sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
+  array<double, 6> vec_sym{t_strain(0, 0),        t_strain(1, 1),
+                           t_strain(2, 2),        sqr2 * t_strain(0, 1),
+                           sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
   return vec_sym;
+};
+
+template <typename T> inline auto get_voigt_vec(T &t_grad) {
+  Tensor2<double, 3, 3> F;
+  Index<'i', 3> i;
+  Index<'j', 3> j;
+  F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
+
+  array<double, 9> vec{F(0, 0), F(1, 1), F(2, 2), F(0, 1), F(1, 0),
+                       F(0, 2), F(2, 0), F(1, 2), F(2, 1)};
+  // array<double, 9> vec{F(0, 0), F(0, 1), F(0, 2), F(1, 0), F(1, 1),
+  //                      F(1, 2), F(2, 0), F(2, 1), F(2, 2)};
+
+  return vec;
 };
 
 template <typename T>
@@ -70,67 +161,177 @@ inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
 
 
 template <typename T1, typename T2>
-inline MoFEMErrorCode get_ddg_from_voigt(const T1 &K, Ddg<T2, 3, 3> &D) {
+inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
   // Ddg<double, 3, 3> D;
   MoFEMFunctionBeginHot;
 
-  D(0, 0, 0, 0) = K[0];
-  D(0, 0, 1, 1) = K[1];
-  D(0, 0, 2, 2) = K[2];
+  if (std::is_same<T2, Tensor4Pack>::value) // for finite strains
+  {
+    // for (int i = 0; i != 3; i++)
+    //   for (int j = 0; j != 3; j++)
+    //     for (int k = 0; k != 3; k++)
+    //       for (int l = 0; l != 3; l++)
+    //         D(i, j, k, l) = K[3 * (3 * ((3 * i) + j) + k) + l];
 
-  D(0, 0, 0, 1) = inv_sqr2 * K[3];
-  D(0, 0, 0, 2) = inv_sqr2 * K[4];
-  D(0, 0, 1, 2) = inv_sqr2 * K[5];
+    Index<'i', 3> i;
+    Index<'j', 3> j;
+    Index<'k', 3> k;
+    Index<'l', 3> l;
 
-  D(1, 1, 0, 0) = K[6];
-  D(1, 1, 1, 1) = K[7];
-  D(1, 1, 2, 2) = K[8];
+    Number<0> N0;
+    Number<1> N1;
+    Number<2> N2;
+    // Tensor4<double *, 3, 3, 3, 3> tmp_tens(TENSOR4_K_PTR2(K));
+    // T2 tmp_tens(TENSOR4_K_PTR2(K));
+    // Tensor4<double *, 3, 3, 3, 3> tmp_tens( TENSOR4_K_PTR2(K) );
+    // Tensor4<double, 3, 3, 3, 3> wtf;
+    // wtf(i, j, k, l) = tmp_tens(i, j, k, l);
+    // D(i, j, k, l) = tmp_tens(i, j, k, l);
+  
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    D(N0, N0, N2, N2) = K[2];
+    D(N0, N0, N0, N1) = K[3];
+    D(N0, N0, N1, N0) = K[4];
+    D(N0, N0, N0, N2) = K[5];
+    D(N0, N0, N2, N0) = K[6];
+    D(N0, N0, N1, N2) = K[7];
+    D(N0, N0, N2, N1) = K[8];
+    D(N1, N1, N0, N0) = K[9];
+    D(N1, N1, N1, N1) = K[10];
+    D(N1, N1, N2, N2) = K[11];
+    D(N1, N1, N0, N1) = K[12];
+    D(N1, N1, N1, N0) = K[13];
+    D(N1, N1, N0, N2) = K[14];
+    D(N1, N1, N2, N0) = K[15];
+    D(N1, N1, N1, N2) = K[16];
+    D(N1, N1, N2, N1) = K[17];
+    D(N2, N2, N0, N0) = K[18];
+    D(N2, N2, N1, N1) = K[19];
+    D(N2, N2, N2, N2) = K[20];
+    D(N2, N2, N0, N1) = K[21];
+    D(N2, N2, N1, N0) = K[22];
+    D(N2, N2, N0, N2) = K[23];
+    D(N2, N2, N2, N0) = K[24];
+    D(N2, N2, N1, N2) = K[25];
+    D(N2, N2, N2, N1) = K[26];
+    D(N0, N1, N0, N0) = K[27];
+    D(N0, N1, N1, N1) = K[28];
+    D(N0, N1, N2, N2) = K[29];
+    D(N0, N1, N0, N1) = K[30];
+    D(N0, N1, N1, N0) = K[31];
+    D(N0, N1, N0, N2) = K[32];
+    D(N0, N1, N2, N0) = K[33];
+    D(N0, N1, N1, N2) = K[34];
+    D(N0, N1, N2, N1) = K[35];
+    D(N1, N0, N0, N0) = K[36];
+    D(N1, N0, N1, N1) = K[37];
+    D(N1, N0, N2, N2) = K[38];
+    D(N1, N0, N0, N1) = K[39];
+    D(N1, N0, N1, N0) = K[40];
+    D(N1, N0, N0, N2) = K[41];
+    D(N1, N0, N2, N0) = K[42];
+    D(N1, N0, N1, N2) = K[43];
+    D(N1, N0, N2, N1) = K[44];
+    D(N0, N2, N0, N0) = K[45];
+    D(N0, N2, N1, N1) = K[46];
+    D(N0, N2, N2, N2) = K[47];
+    D(N0, N2, N0, N1) = K[48];
+    D(N0, N2, N1, N0) = K[49];
+    D(N0, N2, N0, N2) = K[50];
+    D(N0, N2, N2, N0) = K[51];
+    D(N0, N2, N1, N2) = K[52];
+    D(N0, N2, N2, N1) = K[53];
+    D(N2, N0, N0, N0) = K[54];
+    D(N2, N0, N1, N1) = K[55];
+    D(N2, N0, N2, N2) = K[56];
+    D(N2, N0, N0, N1) = K[57];
+    D(N2, N0, N1, N0) = K[58];
+    D(N2, N0, N0, N2) = K[59];
+    D(N2, N0, N2, N0) = K[60];
+    D(N2, N0, N1, N2) = K[61];
+    D(N2, N0, N2, N1) = K[62];
+    D(N1, N2, N0, N0) = K[63];
+    D(N1, N2, N1, N1) = K[64];
+    D(N1, N2, N2, N2) = K[65];
+    D(N1, N2, N0, N1) = K[66];
+    D(N1, N2, N1, N0) = K[67];
+    D(N1, N2, N0, N2) = K[68];
+    D(N1, N2, N2, N0) = K[69];
+    D(N1, N2, N1, N2) = K[70];
+    D(N1, N2, N2, N1) = K[71];
+    D(N2, N1, N0, N0) = K[72];
+    D(N2, N1, N1, N1) = K[73];
+    D(N2, N1, N2, N2) = K[74];
+    D(N2, N1, N0, N1) = K[75];
+    D(N2, N1, N1, N0) = K[76];
+    D(N2, N1, N0, N2) = K[77];
+    D(N2, N1, N2, N0) = K[78];
+    D(N2, N1, N1, N2) = K[79];
+    D(N2, N1, N2, N1) = K[80];
 
-  D(1, 1, 0, 1) = inv_sqr2 * K[9];
-  D(1, 1, 0, 2) = inv_sqr2 * K[10];
-  D(1, 1, 1, 2) = inv_sqr2 * K[11];
+  } else {
 
-  D(2, 2, 0, 0) = K[12];
-  D(2, 2, 1, 1) = K[13];
-  D(2, 2, 2, 2) = K[14];
+    Number<0> N0;
+    Number<1> N1;
+    Number<2> N2;
 
-  D(2, 2, 0, 1) = inv_sqr2 * K[15];
-  D(2, 2, 0, 2) = inv_sqr2 * K[16];
-  D(2, 2, 1, 2) = inv_sqr2 * K[17];
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    D(N0, N0, N2, N2) = K[2];
 
-  D(0, 1, 0, 0) = inv_sqr2 * K[18];
-  D(0, 1, 1, 1) = inv_sqr2 * K[19];
-  D(0, 1, 2, 2) = inv_sqr2 * K[20];
+    D(N0, N0, N0, N1) = inv_sqr2 * K[3];
+    D(N0, N0, N0, N2) = inv_sqr2 * K[4];
+    D(N0, N0, N1, N2) = inv_sqr2 * K[5];
 
-  D(0, 1, 0, 1) = 0.5 * K[21];
-  D(0, 1, 0, 2) = 0.5 * K[22];
-  D(0, 1, 1, 2) = 0.5 * K[23];
+    D(N1, N1, N0, N0) = K[6];
+    D(N1, N1, N1, N1) = K[7];
+    D(N1, N1, N2, N2) = K[8];
 
-  D(0, 2, 0, 0) = inv_sqr2 * K[24];
-  D(0, 2, 1, 1) = inv_sqr2 * K[25];
-  D(0, 2, 2, 2) = inv_sqr2 * K[26];
+    D(N1, N1, N0, N1) = inv_sqr2 * K[9];
+    D(N1, N1, N0, N2) = inv_sqr2 * K[10];
+    D(N1, N1, N1, N2) = inv_sqr2 * K[11];
 
-  D(0, 2, 0, 1) = 0.5 * K[27];
-  D(0, 2, 0, 2) = 0.5 * K[28];
-  D(0, 2, 1, 2) = 0.5 * K[29];
+    D(N2, N2, N0, N0) = K[12];
+    D(N2, N2, N1, N1) = K[13];
+    D(N2, N2, N2, N2) = K[14];
 
-  D(1, 2, 0, 0) = inv_sqr2 * K[30];
-  D(1, 2, 1, 1) = inv_sqr2 * K[31];
-  D(1, 2, 2, 2) = inv_sqr2 * K[32];
+    D(N2, N2, N0, N1) = inv_sqr2 * K[15];
+    D(N2, N2, N0, N2) = inv_sqr2 * K[16];
+    D(N2, N2, N1, N2) = inv_sqr2 * K[17];
 
-  D(1, 2, 0, 1) = 0.5 * K[33];
-  D(1, 2, 0, 2) = 0.5 * K[34];
-  D(1, 2, 1, 2) = 0.5 * K[35];
+    D(N0, N1, N0, N0) = inv_sqr2 * K[18];
+    D(N0, N1, N1, N1) = inv_sqr2 * K[19];
+    D(N0, N1, N2, N2) = inv_sqr2 * K[20];
+
+    D(N0, N1, N0, N1) = 0.5 * K[21];
+    D(N0, N1, N0, N2) = 0.5 * K[22];
+    D(N0, N1, N1, N2) = 0.5 * K[23];
+
+    D(N0, N2, N0, N0) = inv_sqr2 * K[24];
+    D(N0, N2, N1, N1) = inv_sqr2 * K[25];
+    D(N0, N2, N2, N2) = inv_sqr2 * K[26];
+
+    D(N0, N2, N0, N1) = 0.5 * K[27];
+    D(N0, N2, N0, N2) = 0.5 * K[28];
+    D(N0, N2, N1, N2) = 0.5 * K[29];
+
+    D(N1, N2, N0, N0) = inv_sqr2 * K[30];
+    D(N1, N2, N1, N1) = inv_sqr2 * K[31];
+    D(N1, N2, N2, N2) = inv_sqr2 * K[32];
+
+    D(N1, N2, N0, N1) = 0.5 * K[33];
+    D(N1, N2, N0, N2) = 0.5 * K[34];
+    D(N1, N2, N1, N2) = 0.5 * K[35];
+  }
+
   MoFEMFunctionReturnHot(0);
-  // return D;
 };
 
 struct CommonData {
   // Ddg<double, 3, 3> tD;
 
   MoFEM::Interface &mField;
-  vector<boost::shared_ptr<Behaviour>> mGisBehavioursVec;
-  Behaviour *mGisBehaviour;
   boost::shared_ptr<MatrixDouble> mGradPtr;
   boost::shared_ptr<MatrixDouble> mStressPtr;
   boost::shared_ptr<MatrixDouble> mDispPtr;
@@ -144,7 +345,6 @@ struct CommonData {
   MoFEMErrorCode setBlocks() {
     MoFEMFunctionBegin;
     string block_name = "MAT";
-    int loc_id = 0;
     for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(mField, BLOCKSET, it)) {
       // FIXME: set up a proper name
       if (it->getName().compare(0, 3, block_name) == 0) {
@@ -154,8 +354,10 @@ struct CommonData {
         EntityHandle meshset = it->getMeshset();
         CHKERR mField.get_moab().get_entities_by_type(
             meshset, MBTET, setOfBlocksData[id].tEts, true);
+
         setOfBlocksData[id].iD = id;
-        setOfBlocksData[id].locID = loc_id++;
+        setOfBlocksData[id].params.resize(block_data.size());
+
         for (int n = 0; n != block_data.size(); n++)
           setOfBlocksData[id].params[n] = block_data[n];
       }
@@ -164,18 +366,16 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  // FIXME: this should properly assign the behaviour and internal variables
-  // instead
-  MoFEMErrorCode getBlockData(BlockData &data) {
-    MoFEMFunctionBegin;
-    mGisBehaviour = mGisBehavioursVec[data.locID].get();
-    // auto yOung = data.yOung;
-    // auto pOisson = data.pOisson;
-    // auto lAmbda = (yOung * pOisson) / ((1. + pOisson) * (1. - 2. * pOisson));
-    // auto mU = yOung / (2. * (1. + pOisson));
+  inline auto getBlockDataView(BlockData &data, DataTags tag) {
+    auto &mgis_bv = *data.mGisBehaviour;
+    if (tag == RHS) {
+      return make_view(*data.behDataRHS);
 
-    MoFEMFunctionReturn(0);
-  }
+    } else {
+
+      return make_view(*data.behDataLHS);
+    }
+  };
 
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
                                 const int nb_gauss_pts, const int var_size) {
@@ -195,7 +395,7 @@ struct CommonData {
 
     } else {
       MatrixAdaptor tag_vec = MatrixAdaptor(
-          nb_gauss_pts, var_size, 
+          nb_gauss_pts, var_size,
           ublas::shallow_array_adaptor<double>(tag_size, tag_data));
 
       *internalVariablePtr = tag_vec;
@@ -210,32 +410,8 @@ struct CommonData {
     const int tag_size = internalVariablePtr->data().size();
     CHKERR mField.get_moab().tag_set_by_ptr(internalVariableTag, &fe_ent, 1,
                                             tag_data, &tag_size);
-    // TODO: FIXME: this is just for debug
-    // MatrixDouble test_mat;
-    // {
-    //   double *tag_data;
-    //   int tag_size;
-    //   rval = mField.get_moab().tag_get_by_ptr(
-    //       internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
-    //   MatrixAdaptor tag_vec = MatrixAdaptor(
-    //       nb_gauss_pts, var_size, 
-    //       ublas::shallow_array_adaptor<double>(tag_size, tag_data));
-    //   test_mat = tag_vec;
-    //   double test500 = test_mat(0, 0);
-    //   double test501 = test_mat(1, 0);
-    //   double test502 = test_mat(2, 0);
-    // }
-    // cout << test_mat << endl;
-    MoFEMFunctionReturn(0);
-  }
 
-  inline double getInternalValAvg(size_t gg) {
-    double avg = 0.;
-    auto &mat = *internalVariablePtr;
-    VectorDouble internal_var = row(mat, gg);
-    for (double val : internal_var)
-      avg += val;
-    return avg;
+    MoFEMFunctionReturn(0);
   }
 
   MoFEMErrorCode createTags() {
@@ -310,11 +486,11 @@ private:
   bool printGauss;
 };
 
-template <bool UPDATE>
-struct OpStress : public DomainEleOp {
-  OpStress(const std::string field_name,
-           boost::shared_ptr<CommonData> common_data_ptr,
-           BlockData &block_data);
+template <bool UPDATE, bool IS_LARGE_STRAIN>
+struct OpStressTmp : public DomainEleOp {
+  OpStressTmp(const std::string field_name,
+              boost::shared_ptr<CommonData> common_data_ptr,
+              BlockData &block_data);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -331,10 +507,10 @@ private:
   boost::shared_ptr<CommonData> commonDataPtr;
 };
 
-struct OpTangent : public DomainEleOp {
+template <typename T> struct OpTangent : public DomainEleOp {
   OpTangent(const std::string field_name,
-           boost::shared_ptr<CommonData> common_data_ptr,
-           BlockData &block_data);
+            boost::shared_ptr<CommonData> common_data_ptr,
+            BlockData &block_data);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -342,7 +518,7 @@ private:
   BlockData &dAta;
 };
 
-struct OpAssembleLhs : public DomainEleOp {
+template <typename T> struct OpAssembleLhs : public DomainEleOp {
   OpAssembleLhs(const std::string row_field_name,
                 const std::string col_field_name,
                 boost::shared_ptr<CommonData> common_data_ptr);
@@ -370,10 +546,12 @@ private:
   BlockData &dAta;
 };
 
+template <typename T> T get_tangent_tensor(MatrixDouble &mat);
+
 struct OpSaveGaussPts : public DomainEleOp {
   OpSaveGaussPts(const std::string field_name, moab::Interface &moab_mesh,
-           boost::shared_ptr<CommonData> common_data_ptr, 
-           BlockData &block_data);
+                 boost::shared_ptr<CommonData> common_data_ptr,
+                 BlockData &block_data);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -411,5 +589,16 @@ struct FePrePostProcess : public FEMethod {
 
   MoFEMErrorCode postProcess() { return 0; }
 };
+
+typedef struct OpAssembleLhs<Tensor4Pack> OpAssembleLhsFiniteStrains;
+typedef struct OpAssembleLhs<DdgPack> OpAssembleLhsSmallStrains;
+
+typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;
+typedef struct OpTangent<DdgPack> OpTangentSmallStrains;
+
+typedef struct OpStressTmp<true, true> OpUpdateVariablesFiniteStrains;
+typedef struct OpStressTmp<true, false> OpUpdateVariablesSmallStrains;
+typedef struct OpStressTmp<false, true> OpStressFiniteStrains;
+typedef struct OpStressTmp<false, false> OpStressSmallStrains;
 
 } // namespace MFrontInterface

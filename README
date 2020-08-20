@@ -29,3 +29,8 @@ LogarithmicStrainPlasticity
 export TFELHOME=/home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/tfel-3.3.0-yax7x4igwpfz7y4hqlyx7fkcqofhhd2i/lib
 
 export LD_LIBRARY_PATH=$TFELHOME:$LD_LIBRARY_PATH
+
+
+export LD_LIBRARY_PATH=$TFELHOME/lib:$LD_LIBRARY_PATH
+
+ldd src/libBehaviour.so 
