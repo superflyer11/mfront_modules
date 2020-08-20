@@ -159,19 +159,12 @@ inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
   return non_symm;
 };
 
-
 template <typename T1, typename T2>
 inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
-  // Ddg<double, 3, 3> D;
   MoFEMFunctionBeginHot;
 
   if (std::is_same<T2, Tensor4Pack>::value) // for finite strains
   {
-    // for (int i = 0; i != 3; i++)
-    //   for (int j = 0; j != 3; j++)
-    //     for (int k = 0; k != 3; k++)
-    //       for (int l = 0; l != 3; l++)
-    //         D(i, j, k, l) = K[3 * (3 * ((3 * i) + j) + k) + l];
 
     Index<'i', 3> i;
     Index<'j', 3> j;
@@ -181,13 +174,7 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
     Number<0> N0;
     Number<1> N1;
     Number<2> N2;
-    // Tensor4<double *, 3, 3, 3, 3> tmp_tens(TENSOR4_K_PTR2(K));
-    // T2 tmp_tens(TENSOR4_K_PTR2(K));
-    // Tensor4<double *, 3, 3, 3, 3> tmp_tens( TENSOR4_K_PTR2(K) );
-    // Tensor4<double, 3, 3, 3, 3> wtf;
-    // wtf(i, j, k, l) = tmp_tens(i, j, k, l);
-    // D(i, j, k, l) = tmp_tens(i, j, k, l);
-  
+
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -329,7 +316,6 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
 };
 
 struct CommonData {
-  // Ddg<double, 3, 3> tD;
 
   MoFEM::Interface &mField;
   boost::shared_ptr<MatrixDouble> mGradPtr;

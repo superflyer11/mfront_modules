@@ -20,11 +20,12 @@ using namespace mgis::behaviour;
 
 namespace MFrontInterface {
 
-#define VOIGHT_VEC_SYMM(VEC)                                                   \
+#define VOIGT_VEC_SYMM(VEC)                                                    \
   VEC[0], inv_sqr2 *VEC[3], inv_sqr2 *VEC[4], VEC[1], inv_sqr2 *VEC[5], VEC[2]
 
-#define VOIGHT_VEC_FULL(VEC)                                                   \
-  VEC[0], VEC[4], VEC[8], VEC[1], VEC[3], VEC[2], VEC[6], VEC[5], VEC[7]
+#define VOIGT_VEC_FULL(VEC)                                                    \
+  VEC[0], VEC[3], VEC[5], VEC[4], VEC[1], VEC[7], VEC[6], VEC[8], VEC[2]
+  // VEC[0], VEC[4], VEC[8], VEC[1], VEC[3], VEC[2], VEC[6], VEC[5], VEC[7]
 
 #define DDG_MAT_PTR(MAT)                                                       \
   &MAT(0, 0), &MAT(1, 0), &MAT(2, 0), &MAT(3, 0), &MAT(4, 0), &MAT(5, 0),      \
@@ -115,15 +116,15 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
           getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
       b_view.s0.internal_state_variables = &*internal_var.begin();
     }
- 
+
     check_integration = integrate(b_view, mgis_bv);
     auto &st1 = b_view.s1.thermodynamic_forces;
 
     if (IS_LARGE_STRAIN) {
-      Tensor2<double, 3, 3> forces(VOIGHT_VEC_FULL(st1));
+      Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(st1));
       t_stress(i, j) = -forces(i, j);
     } else {
-      Tensor2_symmetric<double, 3> nstress(VOIGHT_VEC_SYMM(st1));
+      Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(st1));
       auto forces = to_non_symm(nstress);
       t_stress(i, j) = -forces(i, j);
     }
@@ -436,10 +437,10 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
     int check = integrate(b_view, mgis_bv);
     auto &st1 = b_view.s1.thermodynamic_forces;
     if (dAta.isFiniteStrain) {
-      Tensor2<double, 3, 3> forces(VOIGHT_VEC_FULL(st1));
+      Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(st1));
       stress(i, j) = -forces(i, j);
     } else {
-      Tensor2_symmetric<double, 3> nstress(VOIGHT_VEC_SYMM(st1));
+      Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(st1));
       auto forces = to_non_symm(nstress);
       stress(i, j) = -forces(i, j);
     }
