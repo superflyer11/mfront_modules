@@ -25,7 +25,6 @@ namespace MFrontInterface {
 
 #define VOIGT_VEC_FULL(VEC)                                                    \
   VEC[0], VEC[3], VEC[5], VEC[4], VEC[1], VEC[7], VEC[6], VEC[8], VEC[2]
-  // VEC[0], VEC[4], VEC[8], VEC[1], VEC[3], VEC[2], VEC[6], VEC[5], VEC[7]
 
 #define DDG_MAT_PTR(MAT)                                                       \
   &MAT(0, 0), &MAT(1, 0), &MAT(2, 0), &MAT(3, 0), &MAT(4, 0), &MAT(5, 0),      \
@@ -62,6 +61,10 @@ Index<'k', 3> k;
 Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
+
+vector<shared_ptr<BodyForceData>> body_force_vec;
+double t_dt = 0;
+double t_dt_prop = 0;
 
 template <> Tensor4Pack get_tangent_tensor<Tensor4Pack>(MatrixDouble &mat) {
   return Tensor4Pack(TENSOR4_MAT_PTR2(mat));
@@ -103,36 +106,57 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    if (IS_LARGE_STRAIN) {
-      auto vec = get_voigt_vec(t_grad);
-      b_view.s0.gradients = vec.data();
-    } else {
-      auto vec = get_voigt_vec_symm(t_grad);
-      b_view.s0.gradients = vec.data();
-    }
+    auto mgis_integration = [&] {
+      MoFEMFunctionBeginHot;
 
-    if (size_of_vars) {
-      auto internal_var =
-          getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
-      b_view.s0.internal_state_variables = &*internal_var.begin();
-    }
+      array<double, 9> vec;
+      if (IS_LARGE_STRAIN) {
+        vec = get_voigt_vec(t_grad);
+        b_view.s0.gradients = vec.data();
+      } else {
+        vec = get_voigt_vec_symm(t_grad);
+        b_view.s0.gradients = vec.data();
+      }
 
-    check_integration = integrate(b_view, mgis_bv);
-    auto &st1 = b_view.s1.thermodynamic_forces;
+      if (size_of_vars) {
+        auto internal_var =
+            getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
+        b_view.s0.internal_state_variables = &*internal_var.begin();
+        check_integration = integrate(b_view, mgis_bv);
+      } else
+        check_integration = integrate(b_view, mgis_bv);
 
-    if (IS_LARGE_STRAIN) {
-      Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(st1));
-      t_stress(i, j) = -forces(i, j);
-    } else {
-      Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(st1));
-      auto forces = to_non_symm(nstress);
-      t_stress(i, j) = -forces(i, j);
-    }
+      auto &st1 = b_view.s1.thermodynamic_forces;
+
+      if (IS_LARGE_STRAIN) {
+        Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(st1));
+        t_stress(i, j) = forces(i, j);
+      } else {
+        Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(st1));
+        auto forces = to_non_symm(nstress);
+        t_stress(i, j) = forces(i, j);
+      }
+      MoFEMFunctionReturnHot(0);
+    };
+    CHKERR mgis_integration();
 
     if (UPDATE) // template
       for (int dd = 0; dd != size_of_vars; ++dd)
         mat_int(gg, dd) = b_view.s1.internal_state_variables[dd];
 
+    // if (UPDATE)
+    //   for (auto c : mgis_bv.isvs) {
+    //     auto vsize = getVariableSize(c, mgis_bv.hypothesis);
+    //     const size_t parav_siz = get_paraview_size(vsize);
+    //     const auto offset =
+    //         getVariableOffset(mgis_bv.isvs, c.name, mgis_bv.hypothesis);
+    //     auto vec =
+    //         getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
+    //     auto tag_vec = getVectorAdaptor(&vec[offset], vsize);
+    //     tag_vec.clear();
+    //     break;
+    //   }
+    
     ++t_stress;
     ++t_grad;
   }
@@ -231,13 +255,29 @@ MoFEMErrorCode OpTangent<T>::doWork(int side, EntityType type, EntData &data) {
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    if (std::is_same<T, Tensor4Pack>::value) {
-      auto vec = get_voigt_vec(t_grad);
-      b_view.s0.gradients = vec.data();
-    } else {
-      auto vec = get_voigt_vec_symm(t_grad);
-      b_view.s0.gradients = vec.data();
-    }
+    auto mgis_integration = [&] {
+      MoFEMFunctionBeginHot;
+
+      array<double, 9> vec;
+      if (std::is_same<T, Tensor4Pack>::value)  {
+        vec = get_voigt_vec(t_grad);
+        b_view.s0.gradients = vec.data();
+      } else {
+        vec = get_voigt_vec_symm(t_grad);
+        b_view.s0.gradients = vec.data();
+      }
+
+      if (size_of_vars) {
+        auto internal_var =
+            getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
+        b_view.s0.internal_state_variables = &*internal_var.begin();
+        check_integration = integrate(b_view, mgis_bv);
+      } else
+        check_integration = integrate(b_view, mgis_bv);
+
+      MoFEMFunctionReturnHot(0);
+    };
+    CHKERR mgis_integration();
 
     if (size_of_vars) {
       auto internal_var =
@@ -341,7 +381,7 @@ OpPostProcElastic::OpPostProcElastic(
     : DomainEleOp(field_name, DomainEleOp::OPROW), postProcMesh(post_proc_mesh),
       mapGaussPts(map_gauss_pts), commonDataPtr(common_data_ptr),
       dAta(block_data) {
-  // Opetor is only executed for vertices
+  // Operator is only executed for vertices
   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
 }
 
@@ -383,19 +423,23 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
   };
 
   auto th_grad = get_tag(mgis_bv.gradients[0].name, 9);
-  auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
+  auto th_stress =
+      get_tag(mgis_bv.thermodynamic_forces[0].name + string("_AVG"), 9);
 
   size_t nb_gauss_pts1 = data.getN().size1();
   size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-  Tensor2<double, 3, 3> stress;
-
+  Tensor2<double, 3, 3> t_stress;
+  Tensor2<double, 3, 3> stress_avg(0., 0., 0., 0., 0., 0., 0., 0., 0.);
+  int check_integration;
+  // FIXME: this is risky part, it assumes that number of gauss pts is not
+  // changed
+  MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
+  auto nbg = mat_int.size1();
+  CHKERR commonDataPtr->getInternalVar(fe_ent, nbg, size_of_vars);
   auto get_internal_val_avg = [&]() {
     MoFEMFunctionBeginHot;
 
-    MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
-    auto nbg = mat_int.size1();
-    CHKERR commonDataPtr->getInternalVar(fe_ent, nbg, size_of_vars);
     int &size_of_vars = dAta.sizeIntVar;
 
     for (auto c : mgis_bv.isvs) {
@@ -408,7 +452,7 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
       VectorDouble avg(vsize, false);
       avg.clear();
       for (int gg = 0; gg != nbg; ++gg) {
-        auto vec =
+        VectorDouble vec =
             getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
         auto tag_vec = getVectorAdaptor(&vec[offset], vsize);
         avg += tag_vec;
@@ -419,6 +463,49 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
       for (int gg = 0; gg != nb_gauss_pts; ++gg)
         CHKERR set_tag(th_tag, gg, avg);
     }
+
+    auto t_grads = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
+
+    for (int gg = 0; gg != nbg; ++gg) {
+
+      auto mgis_integration = [&] {
+        MoFEMFunctionBeginHot;
+
+        array<double, 9> vec;
+        if (dAta.isFiniteStrain) {
+          vec = get_voigt_vec(t_grad);
+          b_view.s0.gradients = vec.data();
+        } else {
+          vec = get_voigt_vec_symm(t_grad);
+          b_view.s0.gradients = vec.data();
+        }
+
+        if (size_of_vars) {
+          auto internal_var = getVectorAdaptor(
+              &mat_int.data()[gg * size_of_vars], size_of_vars);
+          b_view.s0.internal_state_variables = &*internal_var.begin();
+          check_integration = integrate(b_view, mgis_bv);
+        } else
+          check_integration = integrate(b_view, mgis_bv);
+
+        auto &st1 = b_view.s1.thermodynamic_forces;
+
+        if (dAta.isFiniteStrain) {
+          Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(st1));
+          t_stress(i, j) = forces(i, j);
+        } else {
+          Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(st1));
+          auto forces = to_non_symm(nstress);
+          t_stress(i, j) = forces(i, j);
+        }
+        MoFEMFunctionReturnHot(0);
+      };
+      CHKERR mgis_integration();
+      stress_avg(i, j) += t_stress(i, j);
+      ++t_grads;
+    }
+
+    stress_avg(i, j) /= nbg;
     MoFEMFunctionReturnHot(0);
   };
 
@@ -426,26 +513,8 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    if (dAta.isFiniteStrain) { // TODO: make it template
-      auto vec = get_voigt_vec(t_grad);
-      b_view.s0.gradients = vec.data();
-    } else {
-      auto vec = get_voigt_vec_symm(t_grad);
-      b_view.s0.gradients = vec.data();
-    }
-
-    int check = integrate(b_view, mgis_bv);
-    auto &st1 = b_view.s1.thermodynamic_forces;
-    if (dAta.isFiniteStrain) {
-      Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(st1));
-      stress(i, j) = -forces(i, j);
-    } else {
-      Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(st1));
-      auto forces = to_non_symm(nstress);
-      stress(i, j) = -forces(i, j);
-    }
     CHKERR set_tag(th_grad, gg, set_matrix(t_grad));
-    CHKERR set_tag(th_stress, gg, set_matrix(stress));
+    CHKERR set_tag(th_stress, gg, set_matrix(stress_avg));
 
     ++t_grad;
   }
@@ -459,7 +528,7 @@ OpSaveGaussPts::OpSaveGaussPts(const std::string field_name,
                                BlockData &block_data)
     : DomainEleOp(field_name, DomainEleOp::OPROW), internalVarMesh(moab_mesh),
       commonDataPtr(common_data_ptr), dAta(block_data) {
-  // Opetor is only executed for vertices
+  // Operator is only executed for vertices
   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
 }
 
@@ -534,7 +603,7 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
           getVariableOffset(mgis_bv.isvs, c.name, mgis_bv.hypothesis);
       auto vec =
           getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
-      auto tag_vec = getVectorAdaptor(&vec[offset], vsize);
+      VectorDouble tag_vec = getVectorAdaptor(&vec[offset], vsize);
       tag_vec.resize(parav_siz);
 
       CHKERR set_tag(*it, vertex, tag_vec);
@@ -548,6 +617,63 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
     ++t_grad;
     ++t_stress;
     ++t_disp;
+  }
+
+  MoFEMFunctionReturn(0);
+}
+
+OpBodyForceRhs::OpBodyForceRhs(const std::string field_name,
+                               boost::shared_ptr<CommonData> common_data_ptr,
+                               BodyForceData &body_data)
+    : DomainEleOp(field_name, DomainEleOp::OPROW),
+      commonDataPtr(common_data_ptr), bodyData(body_data) {}
+
+//! [Body force]
+MoFEMErrorCode OpBodyForceRhs::doWork(int side, EntityType type,
+                                      EntData &data) {
+  MoFEMFunctionBegin;
+
+  const size_t nb_dofs = data.getIndices().size();
+  if (nb_dofs) {
+
+    auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
+    if (bodyData.tEts.find(fe_ent) == bodyData.tEts.end())
+      MoFEMFunctionReturnHot(0);
+
+    const size_t nb_base_functions = data.getN().size2();
+    if (3 * nb_base_functions < nb_dofs)
+      SETERRQ(
+          PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+          "Number of DOFs is larger than number of base functions on entity");
+
+    const size_t nb_gauss_pts = data.getN().size1();
+    std::array<double, MAX_DOFS_ON_ENTITY> nf;
+    std::fill(&nf[0], &nf[nb_dofs], 0);
+
+    auto t_w = getFTensor0IntegrationWeight();
+    auto t_base = data.getFTensor0N();
+
+    for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
+
+      double alpha = getMeasure() * t_w * bodyData.dEnsity;
+      auto t_acc = Tensor1<double, 3>(bodyData.accValuesScaled(0),
+                                      bodyData.accValuesScaled(1),
+                                      bodyData.accValuesScaled(2));
+
+      Tensor1<PackPtr<double *, 3>, 3> t_nf{&nf[0], &nf[1], &nf[2]};
+      size_t bb = 0;
+      for (; bb != nb_dofs / 3; ++bb) {
+        t_nf(i) += alpha * t_base * t_acc(i);
+        ++t_base;
+        ++t_nf;
+      }
+      for (; bb < nb_base_functions; ++bb)
+        ++t_base;
+
+      ++t_w;
+    }
+
+    CHKERR VecSetValues(getKSPf(), data, nf.data(), ADD_VALUES);
   }
 
   MoFEMFunctionReturn(0);

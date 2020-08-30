@@ -21,6 +21,20 @@ using DdgPack = Ddg<PackPtr<double *, 1>, 3, 3>;
 
 enum DataTags { RHS = 0, LHS };
 
+struct BodyForceData {
+  Range tEts;
+  VectorDouble accValues;
+  double dEnsity;
+  VectorDouble accValuesScaled;
+  BodyForceData(VectorDouble acc_values, double density, Range ents)
+      : accValues(acc_values), dEnsity(density), tEts(ents) {
+    accValuesScaled = accValues;
+  }
+  BodyForceData() = delete;
+};
+extern vector<shared_ptr<BodyForceData>> body_force_vec;
+extern double t_dt;
+
 struct BlockData {
   int iD;
   int oRder;
@@ -30,9 +44,7 @@ struct BlockData {
   string behaviourName;
 
   boost::shared_ptr<Behaviour> mGisBehaviour;
-
-  boost::shared_ptr<BehaviourData> behDataRHS;
-  boost::shared_ptr<BehaviourData> behDataLHS;
+  boost::shared_ptr<BehaviourData> behDataPtr;
 
   int sizeIntVar;
   int sizeExtVar;
@@ -54,8 +66,7 @@ struct BlockData {
       sizeIntVar = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
       sizeExtVar = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
 
-      behDataRHS = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
-      behDataLHS = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
+      behDataPtr = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
 
       const int total_number_of_params = mgis_bv.mps.size();
       // const int total_number_of_params = mgis_bv.mps.size() +
@@ -75,28 +86,21 @@ struct BlockData {
         // for (auto &p : beh_data.s0.material_properties)
         //   p = *it++;
         for (int dd = 0; dd < params.size(); + dd) {
-          behDataLHS->s0.material_properties[dd] = params[dd];
-          behDataLHS->s1.material_properties[dd] = params[dd];
-          behDataRHS->s0.material_properties[dd] = params[dd];
-          behDataRHS->s1.material_properties[dd] = params[dd];
+          behDataPtr->s0.material_properties[dd] = params[dd];
+          behDataPtr->s1.material_properties[dd] = params[dd];
         }
       }
 
       if (isFiniteStrain) {
         // rhs
-        behDataRHS->K[0] = 0; // no  tangent
-        behDataRHS->K[1] = 2; // PK1
+        behDataPtr->K[0] = 0; // no  tangent
+        behDataPtr->K[1] = 2; // PK1
         // lhs
-        behDataLHS->K[0] = 5;
-        behDataLHS->K[1] = 2; // PK1 ??FIXME:
-        behDataLHS->K[2] = 2; // PK1
       } else {
         // rhs
-        behDataRHS->K[0] = 0; // no tangent
-        behDataRHS->K[1] = 0; // cauchy
+        behDataPtr->K[0] = 0; // no tangent
+        behDataPtr->K[1] = 0; // cauchy
         // lhs
-        behDataLHS->K[0] = 5;
-        behDataLHS->K[1] = 0; // cauchy
       }
 
       //  auto it = data.params.begin();
@@ -124,9 +128,15 @@ template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
   Index<'j', 3> j;
   t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
 
-  array<double, 6> vec_sym{t_strain(0, 0),        t_strain(1, 1),
-                           t_strain(2, 2),        sqr2 * t_strain(0, 1),
-                           sqr2 * t_strain(0, 2), sqr2 * t_strain(1, 2)};
+  array<double, 9> vec_sym{t_strain(0, 0),
+                           t_strain(1, 1),
+                           t_strain(2, 2),
+                           sqr2 * t_strain(0, 1),
+                           sqr2 * t_strain(0, 2),
+                           sqr2 * t_strain(1, 2),
+                           0,
+                           0,
+                           0};
   return vec_sym;
 };
 
@@ -162,18 +172,17 @@ inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
 template <typename T1, typename T2>
 inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
   MoFEMFunctionBeginHot;
+  Index<'i', 3> i;
+  Index<'j', 3> j;
+  Index<'k', 3> k;
+  Index<'l', 3> l;
+
+  Number<0> N0;
+  Number<1> N1;
+  Number<2> N2;
 
   if (std::is_same<T2, Tensor4Pack>::value) // for finite strains
   {
-
-    Index<'i', 3> i;
-    Index<'j', 3> j;
-    Index<'k', 3> k;
-    Index<'l', 3> l;
-
-    Number<0> N0;
-    Number<1> N1;
-    Number<2> N2;
 
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
@@ -259,10 +268,6 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
 
   } else {
 
-    Number<0> N0;
-    Number<1> N1;
-    Number<2> N2;
-
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -312,6 +317,8 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
     D(N1, N2, N1, N2) = 0.5 * K[35];
   }
 
+  D(i, j, k, l) *= -1;
+
   MoFEMFunctionReturnHot(0);
 };
 
@@ -355,11 +362,13 @@ struct CommonData {
   inline auto getBlockDataView(BlockData &data, DataTags tag) {
     auto &mgis_bv = *data.mGisBehaviour;
     if (tag == RHS) {
-      return make_view(*data.behDataRHS);
+      data.behDataPtr->K[0] = 0;
+      return make_view(*data.behDataPtr);
 
     } else {
 
-      return make_view(*data.behDataLHS);
+      data.behDataPtr->K[0] = 5;
+      return make_view(*data.behDataPtr);
     }
   };
 
@@ -570,11 +579,31 @@ struct FePrePostProcess : public FEMethod {
       break;
     }
 
+    CHKERR TSGetTimeStep(ts, &t_dt);
+    // scale body force data
+    for (auto &bdata : body_force_vec) {
+      bdata->accValuesScaled = bdata->accValues;
+      CHKERR MethodForForceScaling::applyScale(this, methodsOp,
+                                               bdata->accValuesScaled);
+    }
+
     MoFEMFunctionReturn(0);
   }
 
   MoFEMErrorCode postProcess() { return 0; }
 };
+
+struct OpBodyForceRhs : public DomainEleOp {
+  OpBodyForceRhs(const std::string field_name,
+             boost::shared_ptr<CommonData> common_data_ptr,
+             BodyForceData &body_data);
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+
+private:
+  BodyForceData &bodyData;
+  boost::shared_ptr<CommonData> commonDataPtr;
+};
+
 
 typedef struct OpAssembleLhs<Tensor4Pack> OpAssembleLhsFiniteStrains;
 typedef struct OpAssembleLhs<DdgPack> OpAssembleLhsSmallStrains;

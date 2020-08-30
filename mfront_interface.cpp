@@ -170,11 +170,8 @@ int main(int argc, char *argv[]) {
                                   my_param, &my_param, &is_set);
         if (!is_set)
           continue;
-
-        block.second.behDataLHS->s0.material_properties[dd] = my_param;
-        block.second.behDataLHS->s1.material_properties[dd] = my_param;
-        block.second.behDataRHS->s0.material_properties[dd] = my_param;
-        block.second.behDataRHS->s1.material_properties[dd] = my_param;
+        block.second.behDataPtr->s0.material_properties[dd] = my_param;
+        block.second.behDataPtr->s1.material_properties[dd] = my_param;
       }
 
       int nb = 0;
@@ -183,7 +180,14 @@ int main(int argc, char *argv[]) {
       CHKERR PetscPrintf(PETSC_COMM_WORLD,
                          "%s behaviour loaded on block %d. \n",
                          mgis_bv_ptr->behaviour.c_str(), block.first);
-      auto it = block.second.behDataRHS->s1.material_properties.begin();
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Internal variables: \n");
+      for (const auto &is : mgis_bv_ptr->isvs)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, ": %s\n", is.name.c_str());
+      CHKERR PetscPrintf(PETSC_COMM_WORLD, "External variables: \n");
+      for (const auto &es : mgis_bv_ptr->esvs)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, ": %s\n", es.name.c_str());
+
+      auto it = block.second.behDataPtr->s0.material_properties.begin();
       CHKERR PetscPrintf(PETSC_COMM_WORLD, "Material properties: \n");
       for (const auto &mp : mgis_bv_ptr->mps)
         CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s = %g\n", nb++,
@@ -278,6 +282,29 @@ int main(int argc, char *argv[]) {
     };
 
     auto add_domain_ops_rhs = [&](auto &pipeline) {
+      for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(m_field, BLOCKSET, it)) {
+        if (it->getName().compare(0, 10, "BODY_FORCE") == 0) {
+          Range tets;
+          CHKERR it->getMeshsetIdEntitiesByDimension(m_field.get_moab(), 3,
+                                                     tets, true);
+          std::vector<double> params_vec;
+          it->getAttributes(params_vec);
+          if (params_vec.size() < 3)
+            SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+                    "You have to provide 4 parameters for BODY_FORCE block "
+                    "acceleration(3) and density");
+
+          VectorDouble acc;
+          acc.data().assign(params_vec.begin(), params_vec.begin() + 3);
+          const double density = params_vec[3];
+
+          body_force_vec.push_back(
+              make_shared<BodyForceData>(acc, density, tets));
+          pipeline.push_back(
+              new OpBodyForceRhs("U", commonDataPtr, *body_force_vec.back()));
+        }
+      }
+
       for (auto &sit : commonDataPtr->setOfBlocksData)
         if (sit.second.isFiniteStrain)
           pipeline.push_back(
@@ -297,6 +324,36 @@ int main(int argc, char *argv[]) {
 
     CHKERR pipeline_mng->setDomainRhsIntegrationRule(integration_rule);
     CHKERR pipeline_mng->setDomainLhsIntegrationRule(integration_rule);
+
+    auto fix_disp = [&](const std::string blockset_name) {
+      Range fix_ents;
+      for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(m_field, BLOCKSET, it)) {
+        if (it->getName().compare(0, blockset_name.length(), blockset_name) ==
+            0) {
+          CHKERR m_field.get_moab().get_entities_by_handle(it->meshset, fix_ents,
+                                                          true);
+        }
+      }
+      return fix_ents;
+    };
+
+    auto remove_ents = [&](const Range &&ents, const size_t lo_coeff,
+                           const size_t hi_coeff) {
+      auto prb_mng = m_field.getInterface<ProblemsManager>();
+      auto simple = m_field.getInterface<Simple>();
+      MoFEMFunctionBegin;
+      Range verts;
+      CHKERR m_field.get_moab().get_connectivity(ents, verts, true);
+      verts.merge(ents);
+      CHKERR prb_mng->removeDofsOnEntities(simple->getProblemName(), "U", verts,
+                                           lo_coeff, hi_coeff);
+      MoFEMFunctionReturn(0);
+    };
+
+    CHKERR remove_ents(fix_disp("FIX_X"), 0, 0);
+    CHKERR remove_ents(fix_disp("FIX_Y"), 1, 1);
+    CHKERR remove_ents(fix_disp("FIX_Z"), 2, 2);
+    CHKERR remove_ents(fix_disp("FIX_ALL"), 0, 2);
 
     ISManager *is_manager = m_field.getInterface<ISManager>();
 
