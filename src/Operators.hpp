@@ -44,18 +44,33 @@ struct BlockData {
   string behaviourName;
 
   boost::shared_ptr<Behaviour> mGisBehaviour;
+  BehaviourDataView bView;
   boost::shared_ptr<BehaviourData> behDataPtr;
 
   int sizeIntVar;
   int sizeExtVar;
+  int sizeGradVar;
 
   vector<double> params;
+
+  double dIssipation;
+  double storedEnergy;
+  double externalVariable;
+
+  vector<double> Kbuffer;
+  array<double, 9> stress1Buffer;
+  array<double, 9> grad1Buffer;
+  VectorDouble intVar1Buffer;
 
   Range tEts;
 
   BlockData()
       : oRder(-1), isFiniteStrain(false), behaviourPath("src/libBehaviour.so"),
-        behaviourName("IsotropicLinearHardeningPlasticity") {}
+        behaviourName("IsotropicLinearHardeningPlasticity") {
+    dIssipation = 0;
+    storedEnergy = 0;
+    externalVariable = 0;
+  }
 
   MoFEMErrorCode setBlockBehaviourData(bool set_params_from_blocks) {
     MoFEMFunctionBeginHot;
@@ -65,9 +80,10 @@ struct BlockData {
 
       sizeIntVar = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
       sizeExtVar = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
+      sizeGradVar = getArraySize(mgis_bv.gradients, mgis_bv.hypothesis);
 
       behDataPtr = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
-
+      bView = make_view(*behDataPtr);
       const int total_number_of_params = mgis_bv.mps.size();
       // const int total_number_of_params = mgis_bv.mps.size() +
       // mgis_bv.params.size() + mgis_bv.iparams.size() +
@@ -75,43 +91,45 @@ struct BlockData {
 
       if (set_params_from_blocks) {
 
-        // SETERRQ(PETSC_COMM_SELF, MOFEM_NOT_IMPLEMENTED,
-        //         "Not implemented (FIXME please)");
         if (params.size() < total_number_of_params)
           SETERRQ2(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
                    "Not enough parameters supplied for this block. We have %d "
                    "provided where %d are necessary for this block",
                    params.size(), total_number_of_params);
-        // auto it = params.begin();
-        // for (auto &p : beh_data.s0.material_properties)
-        //   p = *it++;
-        for (int dd = 0; dd < params.size(); + dd) {
-          behDataPtr->s0.material_properties[dd] = params[dd];
-          behDataPtr->s1.material_properties[dd] = params[dd];
+
+        for (int dd = 0; dd < total_number_of_params; + dd) {
+          bView.s0.material_properties[dd] = params[dd];
+          bView.s1.material_properties[dd] = params[dd];
         }
       }
 
+      intVar1Buffer.resize(sizeIntVar);
+      intVar1Buffer.clear();
+
       if (isFiniteStrain) {
-        // rhs
-        behDataPtr->K[0] = 0; // no  tangent
-        behDataPtr->K[1] = 2; // PK1
-        // lhs
+        Kbuffer.resize(81);
+        Kbuffer.clear();
+        bView.K = &*Kbuffer.begin();
+        bView.K[0] = 0; // no  tangent
+        bView.K[1] = 2; // PK1
+        bView.K[2] = 2; // PK1
       } else {
-        // rhs
-        behDataPtr->K[0] = 0; // no tangent
-        behDataPtr->K[1] = 0; // cauchy
-        // lhs
+        Kbuffer.resize(36);
+        Kbuffer.clear();
+        bView.K = &*Kbuffer.begin();
+        bView.K[0] = 0; // no tangent
+        bView.K[1] = 0; // cauchy
       }
 
-      //  auto it = data.params.begin();
-      //  for (auto &p : beh_data.s0.material_properties)
-      //    p = *it++;
+      for (auto &mb : {&bView.s0, &bView.s1}) {
+        mb->dissipated_energy = &dIssipation;
+        mb->stored_energy = &storedEnergy;
+        mb->external_state_variables = &externalVariable;
+      }
 
-      // for (auto &p : mgis_bv.params)
-      //   p = *it++;
-      // for (auto &p : mgis_bv.iparams)
-      //   p = *it++;
-      // for (auto &p : mgis_bv.usparams)
+      bView.s1.thermodynamic_forces = stress1Buffer.data();
+      bView.s1.gradients = grad1Buffer.data();
+      bView.s1.internal_state_variables = &*intVar1Buffer.begin();
     }
 
     MoFEMFunctionReturnHot(0);
@@ -327,11 +345,19 @@ struct CommonData {
   MoFEM::Interface &mField;
   boost::shared_ptr<MatrixDouble> mGradPtr;
   boost::shared_ptr<MatrixDouble> mStressPtr;
+
+  boost::shared_ptr<MatrixDouble> mPrevGradPtr;
+  boost::shared_ptr<MatrixDouble> mPrevStressPtr;
+
   boost::shared_ptr<MatrixDouble> mDispPtr;
   boost::shared_ptr<MatrixDouble> materialTangentPtr;
   boost::shared_ptr<MatrixDouble> internalVariablePtr;
+
   std::map<int, BlockData> setOfBlocksData;
+
   Tag internalVariableTag;
+  Tag stressTag;
+  Tag gradientTag;
 
   CommonData(MoFEM::Interface &m_field) : mField(m_field) {}
 
@@ -359,52 +385,74 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  inline auto getBlockDataView(BlockData &data, DataTags tag) {
+  inline auto &getBlockDataView(BlockData &data, DataTags tag) {
     auto &mgis_bv = *data.mGisBehaviour;
+    data.bView.dt = t_dt;
     if (tag == RHS) {
-      data.behDataPtr->K[0] = 0;
-      return make_view(*data.behDataPtr);
-
+      data.bView.K[0] = 0;
     } else {
-
-      data.behDataPtr->K[0] = 5;
-      return make_view(*data.behDataPtr);
+      data.bView.K[0] = 5;
     }
+
+    return data.bView;
   };
 
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
-                                const int nb_gauss_pts, const int var_size) {
+                                const int nb_gauss_pts, const int var_size,
+                                const int grad_size) {
     MoFEMFunctionBegin;
-    double *tag_data;
-    int tag_size;
-    rval = mField.get_moab().tag_get_by_ptr(
-        internalVariableTag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
 
-    if (rval != MB_SUCCESS || tag_size != var_size * nb_gauss_pts) {
-      internalVariablePtr->resize(nb_gauss_pts, var_size, false);
-      internalVariablePtr->clear();
-      void const *tag_data[] = {&*internalVariablePtr->data().begin()};
-      const int tag_size = internalVariablePtr->data().size();
-      CHKERR mField.get_moab().tag_set_by_ptr(internalVariableTag, &fe_ent, 1,
-                                              tag_data, &tag_size);
+    auto mget_tag_data = [&](Tag &m_tag, boost::shared_ptr<MatrixDouble> &m_mat,
+                             const int &m_size) {
+      MoFEMFunctionBeginHot;
 
-    } else {
-      MatrixAdaptor tag_vec = MatrixAdaptor(
-          nb_gauss_pts, var_size,
-          ublas::shallow_array_adaptor<double>(tag_size, tag_data));
+      double *tag_data;
+      int tag_size;
+      rval = mField.get_moab().tag_get_by_ptr(
+          m_tag, &fe_ent, 1, (const void **)&tag_data, &tag_size);
 
-      *internalVariablePtr = tag_vec;
-    }
+      if (rval != MB_SUCCESS || tag_size != m_size * nb_gauss_pts) {
+        m_mat->resize(nb_gauss_pts, m_size, false);
+        m_mat->clear();
+        void const *tag_data2[] = {&*m_mat->data().begin()};
+        const int tag_size2 = m_mat->data().size();
+        CHKERR mField.get_moab().tag_set_by_ptr(m_tag, &fe_ent, 1, tag_data2,
+                                                &tag_size2);
+
+      } else {
+        MatrixAdaptor tag_vec = MatrixAdaptor(
+            nb_gauss_pts, m_size,
+            ublas::shallow_array_adaptor<double>(tag_size, tag_data));
+
+        *m_mat = tag_vec;
+      }
+
+      MoFEMFunctionReturnHot(0);
+    };
+
+    CHKERR mget_tag_data(internalVariableTag, internalVariablePtr, var_size);
+    CHKERR mget_tag_data(stressTag, mPrevStressPtr, grad_size);
+    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, grad_size);
 
     MoFEMFunctionReturn(0);
   }
 
   MoFEMErrorCode setInternalVar(const EntityHandle fe_ent) {
     MoFEMFunctionBegin;
-    void const *tag_data[] = {&*internalVariablePtr->data().begin()};
-    const int tag_size = internalVariablePtr->data().size();
-    CHKERR mField.get_moab().tag_set_by_ptr(internalVariableTag, &fe_ent, 1,
-                                            tag_data, &tag_size);
+
+    auto mset_tag_data = [&](Tag &m_tag,
+                             boost::shared_ptr<MatrixDouble> &m_mat) {
+      MoFEMFunctionBeginHot;
+      void const *tag_data[] = {&*m_mat->data().begin()};
+      const int tag_size = m_mat->data().size();
+      CHKERR mField.get_moab().tag_set_by_ptr(m_tag, &fe_ent, 1, tag_data,
+                                              &tag_size);
+      MoFEMFunctionReturnHot(0);
+    };
+
+    CHKERR mset_tag_data(internalVariableTag, internalVariablePtr);
+    CHKERR mset_tag_data(stressTag, mPrevStressPtr);
+    CHKERR mset_tag_data(gradientTag, mPrevGradPtr);
 
     MoFEMFunctionReturn(0);
   }
@@ -416,10 +464,59 @@ struct CommonData {
     CHKERR mField.get_moab().tag_get_handle(
         "_INTERNAL_VAR", default_length, MB_TYPE_DOUBLE, internalVariableTag,
         MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_SPARSE, PETSC_NULL);
+    CHKERR mField.get_moab().tag_get_handle(
+        "_STRESS_TAG", default_length, MB_TYPE_DOUBLE, stressTag,
+        MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_SPARSE, PETSC_NULL);
+    CHKERR mField.get_moab().tag_get_handle(
+        "_GRAD_TAG", default_length, MB_TYPE_DOUBLE, gradientTag,
+        MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_SPARSE, PETSC_NULL);
 
     MoFEMFunctionReturn(0);
   }
 };
+
+template <bool IS_LARGE_STRAIN>
+inline MoFEMErrorCode mgis_integration(
+    size_t gg, FTensor::Tensor2<FTensor::PackPtr<double *, 1>, 3, 3> &t_grad,
+    CommonData &common_data, BlockData &block_data, BehaviourDataView &b_view) {
+  MoFEMFunctionBegin;
+  int check_integration;
+  MatrixDouble &mat_int = *common_data.internalVariablePtr;
+  MatrixDouble &mat_grad0 = *common_data.mPrevGradPtr;
+  MatrixDouble &mat_stress0 = *common_data.mPrevStressPtr;
+
+  int &size_of_vars = block_data.sizeIntVar;
+  int &size_of_grad = block_data.sizeGradVar;
+  auto &mgis_bv = *block_data.mGisBehaviour;
+
+  auto grad0_vec =
+      getVectorAdaptor(&mat_grad0.data()[gg * size_of_grad], size_of_grad);
+  if (IS_LARGE_STRAIN)
+    block_data.grad1Buffer = get_voigt_vec(t_grad);
+  else
+    block_data.grad1Buffer = get_voigt_vec_symm(t_grad);
+
+  b_view.s0.gradients = &*grad0_vec.begin();
+
+  auto stress0_vec =
+      getVectorAdaptor(&mat_stress0.data()[gg * size_of_grad], size_of_grad);
+
+  b_view.s0.thermodynamic_forces = &*stress0_vec.begin();
+
+  if (size_of_vars) {
+    auto internal_var =
+        getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
+    b_view.s0.internal_state_variables = &*internal_var.begin();
+    check_integration = integrate(b_view, mgis_bv);
+  } else
+    check_integration = integrate(b_view, mgis_bv);
+
+  if (check_integration < 0)
+    SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+            "Something went wrong with MGIS integration.");
+
+  MoFEMFunctionReturn(0);
+}
 
 struct Monitor : public FEMethod {
 
@@ -580,6 +677,7 @@ struct FePrePostProcess : public FEMethod {
     }
 
     CHKERR TSGetTimeStep(ts, &t_dt);
+    // cerr << t_dt << endl;
     // scale body force data
     for (auto &bdata : body_force_vec) {
       bdata->accValuesScaled = bdata->accValues;
@@ -595,15 +693,14 @@ struct FePrePostProcess : public FEMethod {
 
 struct OpBodyForceRhs : public DomainEleOp {
   OpBodyForceRhs(const std::string field_name,
-             boost::shared_ptr<CommonData> common_data_ptr,
-             BodyForceData &body_data);
+                 boost::shared_ptr<CommonData> common_data_ptr,
+                 BodyForceData &body_data);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
   BodyForceData &bodyData;
   boost::shared_ptr<CommonData> commonDataPtr;
 };
-
 
 typedef struct OpAssembleLhs<Tensor4Pack> OpAssembleLhsFiniteStrains;
 typedef struct OpAssembleLhs<DdgPack> OpAssembleLhsSmallStrains;

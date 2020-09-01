@@ -105,6 +105,8 @@ int main(int argc, char *argv[]) {
     commonDataPtr->mGradPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->mDispPtr = boost::make_shared<MatrixDouble>();
+    commonDataPtr->mPrevGradPtr = boost::make_shared<MatrixDouble>();
+    commonDataPtr->mPrevStressPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->materialTangentPtr = boost::make_shared<MatrixDouble>();
     commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
 
