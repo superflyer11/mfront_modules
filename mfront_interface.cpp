@@ -182,6 +182,11 @@ int main(int argc, char *argv[]) {
       CHKERR PetscPrintf(PETSC_COMM_WORLD,
                          "%s behaviour loaded on block %d. \n",
                          mgis_bv_ptr->behaviour.c_str(), block.first);
+      if (is_finite_strain)
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "Finite Strain Kinematics \n");
+      else 
+        CHKERR PetscPrintf(PETSC_COMM_WORLD, "Small Strain Kinematics \n");
+
       CHKERR PetscPrintf(PETSC_COMM_WORLD, "Internal variables: \n");
       for (const auto &is : mgis_bv_ptr->isvs)
         CHKERR PetscPrintf(PETSC_COMM_WORLD, ": %s\n", is.name.c_str());

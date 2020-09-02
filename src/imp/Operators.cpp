@@ -148,8 +148,10 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
     ++t_grad;
   }
 
-  if (UPDATE) // template
+  if (UPDATE) {
     CHKERR commonDataPtr->setInternalVar(fe_ent);
+    t_dt_prop = t_dt * b_view.rdt;
+  }
 
   MoFEMFunctionReturn(0);
 }

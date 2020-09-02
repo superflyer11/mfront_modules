@@ -34,6 +34,7 @@ struct BodyForceData {
 };
 extern vector<shared_ptr<BodyForceData>> body_force_vec;
 extern double t_dt;
+extern double t_dt_prop;
 
 struct BlockData {
   int iD;
@@ -108,14 +109,12 @@ struct BlockData {
 
       if (isFiniteStrain) {
         Kbuffer.resize(81);
-        Kbuffer.clear();
         bView.K = &*Kbuffer.begin();
         bView.K[0] = 0; // no  tangent
         bView.K[1] = 2; // PK1
         bView.K[2] = 2; // PK1
       } else {
         Kbuffer.resize(36);
-        Kbuffer.clear();
         bView.K = &*Kbuffer.begin();
         bView.K[0] = 0; // no tangent
         bView.K[1] = 0; // cauchy
@@ -335,7 +334,7 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
     D(N1, N2, N1, N2) = 0.5 * K[35];
   }
 
-  D(i, j, k, l) *= -1;
+  // D(i, j, k, l) *= -1;
 
   MoFEMFunctionReturnHot(0);
 };
@@ -403,7 +402,7 @@ struct CommonData {
     MoFEMFunctionBegin;
 
     auto mget_tag_data = [&](Tag &m_tag, boost::shared_ptr<MatrixDouble> &m_mat,
-                             const int &m_size) {
+                             const int &m_size, bool is_def_grad = false) {
       MoFEMFunctionBeginHot;
 
       double *tag_data;
@@ -414,7 +413,14 @@ struct CommonData {
       if (rval != MB_SUCCESS || tag_size != m_size * nb_gauss_pts) {
         m_mat->resize(nb_gauss_pts, m_size, false);
         m_mat->clear();
-        void const *tag_data2[] = {&*m_mat->data().begin()};
+        //initialize deformation gradient properly
+        if (is_def_grad && m_size == 9)
+          for (int gg = 0; gg != nb_gauss_pts; ++gg) {
+            (*m_mat)(gg, 0) = 1;
+            (*m_mat)(gg, 1) = 1;
+            (*m_mat)(gg, 2) = 1;
+          }
+            void const *tag_data2[] = {&*m_mat->data().begin()};
         const int tag_size2 = m_mat->data().size();
         CHKERR mField.get_moab().tag_set_by_ptr(m_tag, &fe_ent, 1, tag_data2,
                                                 &tag_size2);
@@ -432,7 +438,7 @@ struct CommonData {
 
     CHKERR mget_tag_data(internalVariableTag, internalVariablePtr, var_size);
     CHKERR mget_tag_data(stressTag, mPrevStressPtr, grad_size);
-    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, grad_size);
+    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, grad_size, true);
 
     MoFEMFunctionReturn(0);
   }
@@ -510,10 +516,10 @@ inline MoFEMErrorCode mgis_integration(
     check_integration = integrate(b_view, mgis_bv);
   } else
     check_integration = integrate(b_view, mgis_bv);
-
-  if (check_integration < 0)
-    SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-            "Something went wrong with MGIS integration.");
+  //FIXME: this should be handled somehow
+  // if (check_integration < 0)
+  //   SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+  //           "Something went wrong with MGIS integration.");
 
   MoFEMFunctionReturn(0);
 }
@@ -527,7 +533,11 @@ struct Monitor : public FEMethod {
       : dM(dm), postProcFe(post_proc_fe), updateHist(update_history),
         internalVarMesh(moab_mesh), printGauss(print_gauss){};
 
-  MoFEMErrorCode preProcess() { return 0; }
+  MoFEMErrorCode preProcess() {
+
+    CHKERR TSGetTimeStep(ts, &t_dt);
+    return 0;
+  }
   MoFEMErrorCode operator()() { return 0; }
 
   MoFEMErrorCode postProcess() {
@@ -553,6 +563,7 @@ struct Monitor : public FEMethod {
 
     CHKERR DMoFEMLoopFiniteElements(dM, "dFE", updateHist);
 
+    CHKERR TSSetTimeStep(ts, t_dt_prop);
     CHKERR make_vtks();
 
     // switch (atom_test_nb) {
@@ -676,7 +687,6 @@ struct FePrePostProcess : public FEMethod {
       break;
     }
 
-    CHKERR TSGetTimeStep(ts, &t_dt);
     // cerr << t_dt << endl;
     // scale body force data
     for (auto &bdata : body_force_vec) {
