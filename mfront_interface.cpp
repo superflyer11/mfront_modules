@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
 
     update_int_variables = boost::make_shared<DomainEle>(m_field);
     auto integration_rule = [&](int, int, int approx_order) {
-      return 2 * order + 1;
+      return 2 * order + 2;
     };
     update_int_variables->getRuleHook = integration_rule;
     update_int_variables->getOpPtrVector().push_back(

@@ -17,12 +17,12 @@ H0.setEntryName("HardeningSlope");
 
 @Brick StandardElastoViscoPlasticity{
   stress_potential : "Hooke" {
-	young_modulus : 206913,
-        poisson_ratio : 0.29
+	young_modulus : 207000,
+        poisson_ratio : 0.3
         },
   inelastic_flow : "Plastic" {
     criterion : "Mises",
-    isotropic_hardening : "Linear" {R0 : 450, H : 129},
-    isotropic_hardening : "Voce" {R0 : 0, Rinf : 265, b : 17}
+    isotropic_hardening : "Linear" {R0 : 450, H : 130},
+    isotropic_hardening : "Voce" {R0 : 265, Rinf : 0, b : 16}
   }
 };
