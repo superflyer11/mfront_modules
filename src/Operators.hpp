@@ -98,7 +98,7 @@ struct BlockData {
                    "provided where %d are necessary for this block",
                    params.size(), total_number_of_params);
 
-        for (int dd = 0; dd < total_number_of_params; + dd) {
+        for (int dd = 0; dd < total_number_of_params; ++dd) {
           bView.s0.material_properties[dd] = params[dd];
           bView.s1.material_properties[dd] = params[dd];
         }
