@@ -71,5 +71,5 @@ file(
 endfunction(mp_copy_file)
 
 
-mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/README)
+mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/load_history.in)
