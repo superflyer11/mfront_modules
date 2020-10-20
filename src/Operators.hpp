@@ -128,7 +128,8 @@ struct BlockData {
 
       bView.s1.thermodynamic_forces = stress1Buffer.data();
       bView.s1.gradients = grad1Buffer.data();
-      bView.s1.internal_state_variables = &*intVar1Buffer.begin();
+      if (sizeIntVar > 0)
+        bView.s1.internal_state_variables = &*intVar1Buffer.begin();
     }
 
     MoFEMFunctionReturnHot(0);
@@ -353,6 +354,11 @@ struct CommonData {
   boost::shared_ptr<MatrixDouble> internalVariablePtr;
 
   std::map<int, BlockData> setOfBlocksData;
+  std::map<EntityHandle, int> blocksIDmap;
+
+  MatrixDouble lsMat;
+  MatrixDouble gaussPts;
+  MatrixDouble myN;
 
   Tag internalVariableTag;
   Tag stressTag;
@@ -368,10 +374,13 @@ struct CommonData {
       if (it->getName().compare(0, 3, block_name) == 0) {
         std::vector<double> block_data;
         CHKERR it->getAttributes(block_data);
-        int id = it->getMeshsetId();
+        const int id = it->getMeshsetId();
         EntityHandle meshset = it->getMeshset();
         CHKERR mField.get_moab().get_entities_by_type(
             meshset, MBTET, setOfBlocksData[id].tEts, true);
+        // TODO: loop over entities and add block id to hash map
+        // for (auto ent : setOfBlocksData[id].tEts)
+        //   blocksIDmap[ent] = id;
 
         setOfBlocksData[id].iD = id;
         setOfBlocksData[id].params.resize(block_data.size());
@@ -413,14 +422,14 @@ struct CommonData {
       if (rval != MB_SUCCESS || tag_size != m_size * nb_gauss_pts) {
         m_mat->resize(nb_gauss_pts, m_size, false);
         m_mat->clear();
-        //initialize deformation gradient properly
+        // initialize deformation gradient properly
         if (is_def_grad && m_size == 9)
           for (int gg = 0; gg != nb_gauss_pts; ++gg) {
             (*m_mat)(gg, 0) = 1;
             (*m_mat)(gg, 1) = 1;
             (*m_mat)(gg, 2) = 1;
           }
-            void const *tag_data2[] = {&*m_mat->data().begin()};
+        void const *tag_data2[] = {&*m_mat->data().begin()};
         const int tag_size2 = m_mat->data().size();
         CHKERR mField.get_moab().tag_set_by_ptr(m_tag, &fe_ent, 1, tag_data2,
                                                 &tag_size2);
@@ -516,7 +525,7 @@ inline MoFEMErrorCode mgis_integration(
     check_integration = integrate(b_view, mgis_bv);
   } else
     check_integration = integrate(b_view, mgis_bv);
-  //FIXME: this should be handled somehow
+  // FIXME: this should be handled somehow
   // if (check_integration < 0)
   //   SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
   //           "Something went wrong with MGIS integration.");
@@ -647,6 +656,25 @@ private:
   std::vector<EntityHandle> &mapGaussPts;
   boost::shared_ptr<CommonData> commonDataPtr;
   BlockData &dAta;
+};
+
+struct OpPostProcInternalVariables : public DomainEleOp {
+  OpPostProcInternalVariables(const std::string field_name,
+                              moab::Interface &post_proc_mesh,
+                              std::vector<EntityHandle> &map_gauss_pts,
+                              boost::shared_ptr<CommonData> common_data_ptr,
+                              BlockData &block_data, int global_rule);
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+  // MoFEMErrorCode doWork(int row_side, int col_side, EntityType row_type,
+  //                       EntityType col_type, EntData &row_data,
+  //                       EntData &col_data);
+
+private:
+  moab::Interface &postProcMesh;
+  std::vector<EntityHandle> &mapGaussPts;
+  boost::shared_ptr<CommonData> commonDataPtr;
+  BlockData &dAta;
+  int globalRule;
 };
 
 template <typename T> T get_tangent_tensor(MatrixDouble &mat);

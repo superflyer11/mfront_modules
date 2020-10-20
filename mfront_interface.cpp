@@ -12,8 +12,8 @@ using DomainEle = VolumeElementForcesAndSourcesCore;
 using DomainEleOp = DomainEle::UserDataOperator;
 
 #include <BasicFiniteElements.hpp>
+#include <quad.h>
 
-// #ifdef WITH_MFRONT
 #include <MGIS/Behaviour/Behaviour.hxx>
 #include <MGIS/Behaviour/BehaviourData.hxx>
 #include "MGIS/Behaviour/MaterialDataManager.h"
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
                          mgis_bv_ptr->behaviour.c_str(), block.first);
       if (is_finite_strain)
         CHKERR PetscPrintf(PETSC_COMM_WORLD, "Finite Strain Kinematics \n");
-      else 
+      else
         CHKERR PetscPrintf(PETSC_COMM_WORLD, "Small Strain Kinematics \n");
 
       CHKERR PetscPrintf(PETSC_COMM_WORLD, "Internal variables: \n");
@@ -214,9 +214,23 @@ int main(int argc, char *argv[]) {
     ierr = PetscOptionsEnd();
     CHKERRQ(ierr);
 
+    auto check_behaviours_kinematics = [&] {
+      MoFEMFunctionBeginHot;
+      bool first_kin =
+          commonDataPtr->setOfBlocksData.begin()->second.isFiniteStrain;
+      for (auto &block : commonDataPtr->setOfBlocksData) {
+        if (block.second.isFiniteStrain != first_kin)
+          SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
+                  "All used behaviours have to be of same kinematics (small or "
+                  "large strains)");
+      }
+      MoFEMFunctionReturnHot(0);
+    };
+    CHKERR check_behaviours_kinematics();
+
     update_int_variables = boost::make_shared<DomainEle>(m_field);
     auto integration_rule = [&](int, int, int approx_order) {
-      return 2 * order + 2;
+      return 2 * order + 1;
     };
     update_int_variables->getRuleHook = integration_rule;
     update_int_variables->getOpPtrVector().push_back(
@@ -276,15 +290,21 @@ int main(int argc, char *argv[]) {
 
           pipeline.push_back(
               new OpTangentFiniteStrains("U", commonDataPtr, sit.second));
-          pipeline.push_back(
-              new OpAssembleLhsFiniteStrains("U", "U", commonDataPtr));
         } else {
 
           pipeline.push_back(
               new OpTangentSmallStrains("U", commonDataPtr, sit.second));
+        }
+      }
+      // FIXME: FIX READING FROM BLOCKS
+      for (auto &sit : commonDataPtr->setOfBlocksData) {
+        if (sit.second.isFiniteStrain)
+          pipeline.push_back(
+              new OpAssembleLhsFiniteStrains("U", "U", commonDataPtr));
+        else
           pipeline.push_back(
               new OpAssembleLhsSmallStrains("U", "U", commonDataPtr));
-        }
+        break;
       }
     };
 
@@ -337,8 +357,8 @@ int main(int argc, char *argv[]) {
       for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(m_field, BLOCKSET, it)) {
         if (it->getName().compare(0, blockset_name.length(), blockset_name) ==
             0) {
-          CHKERR m_field.get_moab().get_entities_by_handle(it->meshset, fix_ents,
-                                                          true);
+          CHKERR m_field.get_moab().get_entities_by_handle(it->meshset,
+                                                           fix_ents, true);
         }
       }
       return fix_ents;
@@ -492,18 +512,20 @@ int main(int argc, char *argv[]) {
 
     auto create_post_process_element = [&]() {
       MoFEMFunctionBegin;
-      // postProcFe =
-      // boost::make_shared<PostProcFaceOnRefinedMeshFor2D>(m_field);
       postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(m_field);
       postProcFe->generateReferenceElementMesh();
 
       postProcFe->getOpPtrVector().push_back(
           new OpCalculateVectorFieldGradient<3, 3>("U",
                                                    commonDataPtr->mGradPtr));
-      for (auto &sit : commonDataPtr->setOfBlocksData)
+      for (auto &sit : commonDataPtr->setOfBlocksData) {
         postProcFe->getOpPtrVector().push_back(new OpPostProcElastic(
             "U", postProcFe->postProcMesh, postProcFe->mapGaussPts,
             commonDataPtr, sit.second));
+        postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
+            "U", postProcFe->postProcMesh, postProcFe->mapGaussPts,
+            commonDataPtr, sit.second, integration_rule(0, 0, order)));
+      }
 
       postProcFe->addFieldValuesPostProc("U", "DISPLACEMENT");
       MoFEMFunctionReturn(0);
