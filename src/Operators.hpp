@@ -4,20 +4,8 @@ namespace MFrontInterface {
 constexpr double sqr2 = boost::math::constants::root_two<double>();
 constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
 
-// using Tensor4Pack = Tensor4< double*, 3, 3, 3, 3>;
 using Tensor4Pack = Tensor4<PackPtr<double *, 1>, 3, 3, 3, 3>;
 using DdgPack = Ddg<PackPtr<double *, 1>, 3, 3>;
-
-#define TENSOR4_K_PTR2(K)                                                      \
-  &K[0], &K[1], &K[2], &K[3], &K[4], &K[5], &K[6], &K[7], &K[8], &K[9],        \
-      &K[10], &K[11], &K[12], &K[13], &K[14], &K[15], &K[16], &K[17], &K[18],  \
-      &K[19], &K[20], &K[21], &K[22], &K[23], &K[24], &K[25], &K[26], &K[27],  \
-      &K[28], &K[29], &K[30], &K[31], &K[32], &K[33], &K[34], &K[35], &K[36],  \
-      &K[37], &K[38], &K[39], &K[40], &K[41], &K[42], &K[43], &K[44], &K[45],  \
-      &K[46], &K[47], &K[48], &K[49], &K[50], &K[51], &K[52], &K[53], &K[54],  \
-      &K[55], &K[56], &K[57], &K[58], &K[59], &K[60], &K[61], &K[62], &K[63],  \
-      &K[64], &K[65], &K[66], &K[67], &K[68], &K[69], &K[70], &K[71], &K[72],  \
-      &K[73], &K[74], &K[75], &K[76], &K[77], &K[78], &K[79], &K[80]
 
 enum DataTags { RHS = 0, LHS };
 
@@ -166,8 +154,6 @@ template <typename T> inline auto get_voigt_vec(T &t_grad) {
 
   array<double, 9> vec{F(0, 0), F(1, 1), F(2, 2), F(0, 1), F(1, 0),
                        F(0, 2), F(2, 0), F(1, 2), F(2, 1)};
-  // array<double, 9> vec{F(0, 0), F(0, 1), F(0, 2), F(1, 0), F(1, 1),
-  //                      F(1, 2), F(2, 0), F(2, 1), F(2, 2)};
 
   return vec;
 };
@@ -378,9 +364,8 @@ struct CommonData {
         EntityHandle meshset = it->getMeshset();
         CHKERR mField.get_moab().get_entities_by_type(
             meshset, MBTET, setOfBlocksData[id].tEts, true);
-        // TODO: loop over entities and add block id to hash map
-        // for (auto ent : setOfBlocksData[id].tEts)
-        //   blocksIDmap[ent] = id;
+        for (auto ent : setOfBlocksData[id].tEts)
+          blocksIDmap[ent] = id;
 
         setOfBlocksData[id].iD = id;
         setOfBlocksData[id].params.resize(block_data.size());
@@ -601,18 +586,7 @@ private:
 template <bool UPDATE, bool IS_LARGE_STRAIN>
 struct OpStressTmp : public DomainEleOp {
   OpStressTmp(const std::string field_name,
-              boost::shared_ptr<CommonData> common_data_ptr,
-              BlockData &block_data);
-  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-
-private:
-  boost::shared_ptr<CommonData> commonDataPtr;
-  BlockData &dAta;
-};
-
-struct OpAssembleRhs : public DomainEleOp {
-  OpAssembleRhs(const std::string field_name,
-                boost::shared_ptr<CommonData> common_data_ptr);
+              boost::shared_ptr<CommonData> common_data_ptr);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -621,25 +595,10 @@ private:
 
 template <typename T> struct OpTangent : public DomainEleOp {
   OpTangent(const std::string field_name,
-            boost::shared_ptr<CommonData> common_data_ptr,
-            BlockData &block_data);
+            boost::shared_ptr<CommonData> common_data_ptr);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
-  boost::shared_ptr<CommonData> commonDataPtr;
-  BlockData &dAta;
-};
-
-template <typename T> struct OpAssembleLhs : public DomainEleOp {
-  OpAssembleLhs(const std::string row_field_name,
-                const std::string col_field_name,
-                boost::shared_ptr<CommonData> common_data_ptr);
-  MoFEMErrorCode doWork(int row_side, int col_side, EntityType row_type,
-                        EntityType col_type, EntData &row_data,
-                        EntData &col_data);
-
-private:
-  MatrixDouble locK;
   boost::shared_ptr<CommonData> commonDataPtr;
 };
 
@@ -647,15 +606,13 @@ struct OpPostProcElastic : public DomainEleOp {
   OpPostProcElastic(const std::string field_name,
                     moab::Interface &post_proc_mesh,
                     std::vector<EntityHandle> &map_gauss_pts,
-                    boost::shared_ptr<CommonData> common_data_ptr,
-                    BlockData &block_data);
+                    boost::shared_ptr<CommonData> common_data_ptr);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
   moab::Interface &postProcMesh;
   std::vector<EntityHandle> &mapGaussPts;
   boost::shared_ptr<CommonData> commonDataPtr;
-  BlockData &dAta;
 };
 
 struct OpPostProcInternalVariables : public DomainEleOp {
@@ -663,7 +620,7 @@ struct OpPostProcInternalVariables : public DomainEleOp {
                               moab::Interface &post_proc_mesh,
                               std::vector<EntityHandle> &map_gauss_pts,
                               boost::shared_ptr<CommonData> common_data_ptr,
-                              BlockData &block_data, int global_rule);
+                              int global_rule);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
   // MoFEMErrorCode doWork(int row_side, int col_side, EntityType row_type,
   //                       EntityType col_type, EntData &row_data,
@@ -673,7 +630,6 @@ private:
   moab::Interface &postProcMesh;
   std::vector<EntityHandle> &mapGaussPts;
   boost::shared_ptr<CommonData> commonDataPtr;
-  BlockData &dAta;
   int globalRule;
 };
 
@@ -681,14 +637,12 @@ template <typename T> T get_tangent_tensor(MatrixDouble &mat);
 
 struct OpSaveGaussPts : public DomainEleOp {
   OpSaveGaussPts(const std::string field_name, moab::Interface &moab_mesh,
-                 boost::shared_ptr<CommonData> common_data_ptr,
-                 BlockData &block_data);
+                 boost::shared_ptr<CommonData> common_data_ptr);
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
   boost::shared_ptr<CommonData> commonDataPtr;
   moab::Interface &internalVarMesh;
-  BlockData &dAta;
 };
 
 struct FePrePostProcess : public FEMethod {
@@ -739,9 +693,6 @@ private:
   BodyForceData &bodyData;
   boost::shared_ptr<CommonData> commonDataPtr;
 };
-
-typedef struct OpAssembleLhs<Tensor4Pack> OpAssembleLhsFiniteStrains;
-typedef struct OpAssembleLhs<DdgPack> OpAssembleLhsSmallStrains;
 
 typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;
 typedef struct OpTangent<DdgPack> OpTangentSmallStrains;

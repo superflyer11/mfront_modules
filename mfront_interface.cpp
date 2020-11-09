@@ -25,6 +25,13 @@ using namespace mgis::behaviour;
 
 #include <Operators.hpp>
 
+using OpInternalForce = FormsIntegrators<DomainEleOp>::Assembly<
+    PETSC>::LinearForm<GAUSS>::OpGradTimesTensor<1, 3, 3>;
+using OpAssembleLhsFiniteStrains = FormsIntegrators<DomainEleOp>::Assembly<
+    PETSC>::BiLinearForm<GAUSS>::OpGradTensorGrad<1, 3, 3, 1>;
+using OpAssembleLhsSmallStrains = FormsIntegrators<DomainEleOp>::Assembly<
+    PETSC>::BiLinearForm<GAUSS>::OpGradSymTensorGrad<1, 3, 3, 0>;
+
 using namespace MFrontInterface;
 
 int main(int argc, char *argv[]) {
@@ -178,7 +185,7 @@ int main(int argc, char *argv[]) {
 
       int nb = 0;
 
-      // FIXME: PRINT PROPERLY WITH SHOWING WHAT WAS ASSIGNED BY THE USER!!!
+      // PRINT PROPERLY WITH SHOWING WHAT WAS ASSIGNED BY THE USER!!!
       CHKERR PetscPrintf(PETSC_COMM_WORLD,
                          "%s behaviour loaded on block %d. \n",
                          mgis_bv_ptr->behaviour.c_str(), block.first);
@@ -213,20 +220,21 @@ int main(int argc, char *argv[]) {
 
     ierr = PetscOptionsEnd();
     CHKERRQ(ierr);
-
-    auto check_behaviours_kinematics = [&] {
+    auto check_behaviours_kinematics = [&](bool &is_finite_kin) {
       MoFEMFunctionBeginHot;
-      bool first_kin =
+      is_finite_kin =
           commonDataPtr->setOfBlocksData.begin()->second.isFiniteStrain;
       for (auto &block : commonDataPtr->setOfBlocksData) {
-        if (block.second.isFiniteStrain != first_kin)
+        if (block.second.isFiniteStrain != is_finite_kin)
           SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
                   "All used behaviours have to be of same kinematics (small or "
                   "large strains)");
       }
       MoFEMFunctionReturnHot(0);
     };
-    CHKERR check_behaviours_kinematics();
+
+    bool is_finite_kin = true;
+    CHKERR check_behaviours_kinematics(is_finite_kin);
 
     update_int_variables = boost::make_shared<DomainEle>(m_field);
     auto integration_rule = [&](int, int, int approx_order) {
@@ -238,17 +246,16 @@ int main(int argc, char *argv[]) {
     if (print_gauss)
       update_int_variables->getOpPtrVector().push_back(
           new OpCalculateVectorFieldValues<3>("U", commonDataPtr->mDispPtr));
-    for (auto &sit : commonDataPtr->setOfBlocksData) {
-      if (sit.second.isFiniteStrain)
-        update_int_variables->getOpPtrVector().push_back(
-            new OpUpdateVariablesFiniteStrains("U", commonDataPtr, sit.second));
-      else
-        update_int_variables->getOpPtrVector().push_back(
-            new OpUpdateVariablesSmallStrains("U", commonDataPtr, sit.second));
-      if (print_gauss)
-        update_int_variables->getOpPtrVector().push_back(
-            new OpSaveGaussPts("U", moab_gauss, commonDataPtr, sit.second));
-    }
+    if (is_finite_kin)
+      update_int_variables->getOpPtrVector().push_back(
+          new OpUpdateVariablesFiniteStrains("U", commonDataPtr));
+    else
+      update_int_variables->getOpPtrVector().push_back(
+          new OpUpdateVariablesSmallStrains("U", commonDataPtr));
+    if (print_gauss)
+      update_int_variables->getOpPtrVector().push_back(
+          new OpSaveGaussPts("U", moab_gauss, commonDataPtr));
+
     // forces and pressures on surface
     CHKERR MetaNeumannForces::setMomentumFluxOperators(m_field, neumann_forces,
                                                        PETSC_NULL, "U");
@@ -274,7 +281,6 @@ int main(int argc, char *argv[]) {
 
     dirichlet_bc_ptr =
         boost::make_shared<DirichletDisplacementBc>(m_field, "U");
-    // dirichlet_bc_ptr->dIag = 1;
     dirichlet_bc_ptr->methodsOp.push_back(
         new TimeForceScale("-load_history", true));
 
@@ -285,26 +291,15 @@ int main(int argc, char *argv[]) {
     };
 
     auto add_domain_ops_lhs = [&](auto &pipeline) {
-      for (auto &sit : commonDataPtr->setOfBlocksData) {
-        if (sit.second.isFiniteStrain) {
+      if (is_finite_kin) {
+        pipeline.push_back(new OpTangentFiniteStrains("U", commonDataPtr));
+        pipeline.push_back(new OpAssembleLhsFiniteStrains(
+            "U", "U", commonDataPtr->materialTangentPtr));
+      } else {
 
-          pipeline.push_back(
-              new OpTangentFiniteStrains("U", commonDataPtr, sit.second));
-        } else {
-
-          pipeline.push_back(
-              new OpTangentSmallStrains("U", commonDataPtr, sit.second));
-        }
-      }
-      // FIXME: FIX READING FROM BLOCKS
-      for (auto &sit : commonDataPtr->setOfBlocksData) {
-        if (sit.second.isFiniteStrain)
-          pipeline.push_back(
-              new OpAssembleLhsFiniteStrains("U", "U", commonDataPtr));
-        else
-          pipeline.push_back(
-              new OpAssembleLhsSmallStrains("U", "U", commonDataPtr));
-        break;
+        pipeline.push_back(new OpTangentSmallStrains("U", commonDataPtr));
+        pipeline.push_back(new OpAssembleLhsSmallStrains(
+            "U", "U", commonDataPtr->materialTangentPtr));
       }
     };
 
@@ -332,16 +327,13 @@ int main(int argc, char *argv[]) {
         }
       }
 
-      for (auto &sit : commonDataPtr->setOfBlocksData)
-        if (sit.second.isFiniteStrain)
-          pipeline.push_back(
-              new OpStressFiniteStrains("U", commonDataPtr, sit.second));
+      if (is_finite_kin)
+        pipeline.push_back(new OpStressFiniteStrains("U", commonDataPtr));
 
-        else
-          pipeline.push_back(
-              new OpStressSmallStrains("U", commonDataPtr, sit.second));
+      else
+        pipeline.push_back(new OpStressSmallStrains("U", commonDataPtr));
 
-      pipeline.push_back(new OpAssembleRhs("U", commonDataPtr));
+      pipeline.push_back(new OpInternalForce("U", commonDataPtr->mStressPtr));
     };
 
     add_domain_base_ops(pipeline_mng->getOpDomainLhsPipeline());
@@ -372,6 +364,10 @@ int main(int argc, char *argv[]) {
       Range verts;
       CHKERR m_field.get_moab().get_connectivity(ents, verts, true);
       verts.merge(ents);
+      Range adj;
+      CHKERR m_field.get_moab().get_adjacencies(ents, 1, false, adj,
+                                                moab::Interface::UNION);
+      verts.merge(adj);
       CHKERR prb_mng->removeDofsOnEntities(simple->getProblemName(), "U", verts,
                                            lo_coeff, hi_coeff);
       MoFEMFunctionReturn(0);
@@ -518,14 +514,12 @@ int main(int argc, char *argv[]) {
       postProcFe->getOpPtrVector().push_back(
           new OpCalculateVectorFieldGradient<3, 3>("U",
                                                    commonDataPtr->mGradPtr));
-      for (auto &sit : commonDataPtr->setOfBlocksData) {
-        postProcFe->getOpPtrVector().push_back(new OpPostProcElastic(
-            "U", postProcFe->postProcMesh, postProcFe->mapGaussPts,
-            commonDataPtr, sit.second));
-        postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
-            "U", postProcFe->postProcMesh, postProcFe->mapGaussPts,
-            commonDataPtr, sit.second, integration_rule(0, 0, order)));
-      }
+      postProcFe->getOpPtrVector().push_back(
+          new OpPostProcElastic("U", postProcFe->postProcMesh,
+                                postProcFe->mapGaussPts, commonDataPtr));
+      postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
+          "U", postProcFe->postProcMesh, postProcFe->mapGaussPts, commonDataPtr,
+          integration_rule(0, 0, order)));
 
       postProcFe->addFieldValuesPostProc("U", "DISPLACEMENT");
       MoFEMFunctionReturn(0);
