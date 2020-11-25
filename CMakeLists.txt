@@ -67,9 +67,9 @@ function(mp_copy_file target)
 file(
   COPY ${target}
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
-  FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_EXECUTE)
 endfunction(mp_copy_file)
 
-
+mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/compile_behaviours.sh)
 mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/load_history.in)

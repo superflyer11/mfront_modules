@@ -152,7 +152,24 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
     CHKERR commonDataPtr->setInternalVar(fe_ent);
     t_dt_prop = t_dt * b_view.rdt;
   }
-
+  // VectorDouble my_vec(36);
+  // for (int i = 0; i != 36; i++)
+  //   my_vec(i) = i;
+  // Ddg<double *, 3, 3> my_testDdg(
+  //     &my_vec(0), &my_vec(1), &my_vec(2), &my_vec(3), &my_vec(4), &my_vec(5),
+  //     &my_vec(6), &my_vec(7), &my_vec(8), &my_vec(9), &my_vec(10), &my_vec(11),
+  //     &my_vec(12), &my_vec(13), &my_vec(14), &my_vec(15), &my_vec(16),
+  //     &my_vec(17), &my_vec(18), &my_vec(19), &my_vec(20), &my_vec(21),
+  //     &my_vec(22), &my_vec(23), &my_vec(24), &my_vec(25), &my_vec(26),
+  //     &my_vec(27), &my_vec(28), &my_vec(29), &my_vec(30), &my_vec(31),
+  //     &my_vec(32), &my_vec(33), &my_vec(34), &my_vec(35));
+  
+  // VectorDouble lambda({3, 2, 1});
+  // for (int i = 0; i != 3; i++)
+  //   for (int j = i; j != 3; j++)
+  //     for (int k = 0; k != 3; k++)
+  //       for (int l = k; l != 3; l++)
+  //         cout << i << j << k << l << " " << my_testDdg(i, j, k, l) << endl;
   MoFEMFunctionReturn(0);
 }
 

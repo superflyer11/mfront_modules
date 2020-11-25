@@ -25,7 +25,7 @@ or add it to *.bashrc* or *.bash_profile* files.
 To install MFront Interface module clone this repository into MoFEM users modules source directory, for example:
 ~~~~~
 cd $MOFEM_INSTALL_DIR/mofem-cephas/mofem/users_modules/users_modules/
-git clone git@bitbucket.org:karol41/um_mfront_interface.git mfront_interface
+git clone https://karol41@bitbucket.org/karol41/um_mfront_interface.git mfront_interface
 ~~~~~
 
 Next, the build of the users modules needs to be reconfigured:
@@ -40,9 +40,6 @@ make
 
 
 ~~~~~
-cd $MOFEM_INSTALL_DIR/um/users_modules/users_modules/
-git clone https://karol41@bitbucket.org/likask/mofem_um_bone_remodelling.git bone_remodelling
-cd ..
 
 tensor convention http://tfel.sourceforge.net/tensors.html
 
@@ -106,7 +103,7 @@ LogarithmicStrainPlasticity
 
 #validation with mofem
 
-../tools/mofem_part -my_file /home/karol/Desktop/Meshes/MFront_testing/3D_necking_coarse.cub -my_nparts 10 &&  mpirun -np 10 /home/karol/mofem_install/users_modules/mfront_interface/mfront_interface -file_name out.h5m -ksp_type fgmres -pc_type lu -pc_factor_mat_solver_type mumps -ts_max_snes_failures 1 -block_1 LogarithmicStrainPlasticity -param_1_0 450 -param_1_1 10000 -snes_rtol 1e-7 -snes_atol 1e-7 -ksp_rtol 1e-12 -ksp_atol 1e-12 -ts_adapt_type none -print_gauss -load_history load_history.in -order 2  -ts_dt 0.005 -ts_adapt_dt_max 0.02  -ts_max_time 1 -snes_monitor -ts_monitor -log_quiet -ts_type theta -ts_adapt_always_accept 1 -ts_theta_initial_guess_extrapolate 1  -ts_theta_theta 1 -ts_adapt_reject_safety 0.9 -ts_max_snes_failures 10  -snes_max_it 20 -ts_exact_final_time matchstep
+../tools/mofem_part -my_file /home/karol/Desktop/Meshes/MFront_testing/3D_necking_coarse.cub -my_nparts 10 &&  mpirun -np 10 /home/karol/mofem_install/users_modules/mfront_interface/mfront_interface -file_name out.h5m -ksp_type fgmres -pc_type lu -pc_factor_mat_solver_type mumps -ts_max_snes_failures 1 -block_1 LogarithmicStrainPlasticity -param_1_0 450 -param_1_1 10000 -snes_rtol 1e-7 -snes_atol 1e-7 -ksp_rtol 1e-12 -ksp_atol 1e-12 -ts_adapt_type none -print_gauss -load_history load_history.in -order 2  -ts_dt 0.01 -ts_adapt_dt_max 0.02  -ts_max_time 1 -snes_monitor -ts_monitor -log_quiet -ts_type theta -ts_adapt_always_accept 1 -ts_theta_initial_guess_extrapolate 1  -ts_theta_theta 1 -ts_adapt_reject_safety 0.9 -ts_max_snes_failures 10  -snes_max_it 20 -ts_exact_final_time matchstep
 
 
 #cook membrane
