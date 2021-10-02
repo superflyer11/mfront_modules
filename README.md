@@ -45,6 +45,12 @@ touch CMakeCache.txt
 make –j4
 ```
 
+Material behaviours
+=========================
+To compile particular MFront material behaviours, use the provided script:
+```
+./compile_behaviours.sh ./behaviours/ImplicitNorton.mfront
+```
 
 Example command lines:
 (work in progress)
