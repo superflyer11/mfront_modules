@@ -37,11 +37,13 @@ endif(MGIS_DIR)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/../nonlinear_elastic_materials/src)
-  
-add_executable(mfront_interface
-    ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+
+if(MGIS_HEADER)  
+  add_executable(mfront_interface
+      ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
 )
+
 
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
@@ -62,6 +64,7 @@ target_link_libraries(mfront_interface
   ${MoFEM_PROJECT_LIBS}
 )
 
+endif(MGIS_HEADER)
 
 function(mp_copy_file target)
 file(
