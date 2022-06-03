@@ -19,7 +19,7 @@ include_directories(
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(NOT MGIS_DIR)
-  message( FATAL_ERROR "You need to define MGIS_DIR" )
+  message(WARNING "MGIS_DIR is not defined! MFront Interface will not be configured." )
 endif(NOT MGIS_DIR)
 
 
@@ -33,17 +33,14 @@ if(MGIS_DIR)
     # include_directories(${MGIS_HEADER})
     add_definitions(-DWITH_MGIS)
   endif(MGIS_LIBRARY)
-endif(MGIS_DIR)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/../nonlinear_elastic_materials/src)
-
-if(MGIS_HEADER)  
-  add_executable(mfront_interface
-      ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+  
+add_executable(mfront_interface
+    ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
 )
-
 
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
@@ -60,11 +57,9 @@ target_link_libraries(mfront_interface
   mofem_petsc
   mofem_approx
   mofem_third_party
-  mofem_cblas
   ${MoFEM_PROJECT_LIBS}
 )
 
-endif(MGIS_HEADER)
 
 function(mp_copy_file target)
 file(
@@ -76,3 +71,12 @@ endfunction(mp_copy_file)
 mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/compile_behaviours.sh)
 mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 mp_copy_file(${CMAKE_CURRENT_SOURCE_DIR}/load_history.in)
+
+add_custom_target(
+  mfront_make_link_to_behaviours_directory
+  ALL
+  COMMAND ln -sf ${CMAKE_CURRENT_SOURCE_DIR}/behaviours ${CMAKE_CURRENT_BINARY_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMENT "Make linking to behaviours directory" VERBATIM)
+
+endif(MGIS_DIR)

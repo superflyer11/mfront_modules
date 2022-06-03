@@ -13,10 +13,10 @@ The most straightforward method is to use [Spack](https://spack.readthedocs.io/e
 spack install mgis
 ```
 
-In order to make sure that the installation of MoFEM and *mgis* proceeds without any conflicts it is recommented to use [this branch](https://github.com/likask/spack/tree/develop_upstream_master) of the Spack and the following command:
+In order to make sure that the installation of MoFEM and *mgis* proceeds without any conflicts it is recommented to use [this branch](https://github.com/likask/spack/tree/master) of the Spack and the following command:
 
 ```
-spack install mofem-cephas@develop+mgis
+spack install mofem-users-modules@develop+mgis ^mgis@1.1
 ```
 
 For a more detailed instructions on installing MoFEM follow [this link](http://mofem.eng.gla.ac.uk/mofem/html/installation.html). 
@@ -39,7 +39,7 @@ git clone https://karol41@bitbucket.org/karol41/um_mfront_interface.git mfront_i
 
 ```
 cd $MOFEM_INSTALL_DIR/users_modules_build
-export MGIS_PATH=$(spack find -l --path mgis | awk 'END{print}' | awk 'NF{ print $NF }')"/lib"
+export MGIS_PATH=$(spack find -l --path mgis | awk 'END{print}' | awk 'NF{ print $NF }')"" && echo $MGIS_PATH
 touch CMakeCache.txt
 ./spconfig -DMGIS_PATH=$MGIS_PATH
 make –j4
@@ -52,15 +52,6 @@ To compile particular MFront material behaviours, use the provided script:
 ./compile_behaviours.sh ./behaviours/ImplicitNorton.mfront
 ```
 
-<<<<<<< HEAD
-cd bone_remodelling
-make
- -->
-=======
-Example command lines:
-(work in progress)
-
->>>>>>> 05dbb635e0915b9aae0278006c61f9ac84bf5604
 
 #test for beam
 
