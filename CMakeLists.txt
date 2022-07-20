@@ -12,6 +12,9 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with MoFEM. If not, see <http://www.gnu.org/licenses/>
 
+set(MFRONT_INTERFACE_INSTALL_DIR "mfront_interface")  
+
+
 include_directories(
   ${UM_SOURCE_DIR}/basic_finite_elements/
 )
@@ -19,12 +22,12 @@ include_directories(
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(NOT MGIS_DIR)
-  message(WARNING "MGIS_DIR is not defined! MFront Interface will not be configured." )
+  message( WARNING "MGIS_DIR is not defined! MFront Interface will not be configured." )
 endif(NOT MGIS_DIR)
-
-
+  
 if(MGIS_DIR)
-  find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.so libMFrontGenericInterface.dylib PATHS ${MGIS_DIR}/lib)
+  # set(MGIS_FOUND TRUE)
+  find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.dylib libMFrontGenericInterface.so PATHS ${MGIS_DIR}/lib)
   find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include/MGIS/)
   add_library(MFrontGenericInterface SHARED IMPORTED)
   set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_LIBRARY})
@@ -45,7 +48,21 @@ add_executable(mfront_interface
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
 
-# /home/karol/spack/opt/spack/linux-ubuntu18.04-zen/gcc-7.4.0/mgis-1.1-imbfil7ff53kka2qik7iprmun7rjfupi
+
+add_library(mfront_lib_all
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontGenericInterface.cpp
+)
+install(
+  TARGETS mfront_lib_all
+  DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR}
+  EXPORT mfront_lib_all_targets)
+install(
+  EXPORT mfront_lib_all_targets
+  FILE mfront_lib_all_targets.cmake
+  DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
+
+
 
 add_dependencies(mfront_interface MFrontGenericInterface)
 target_link_libraries(mfront_interface
@@ -59,7 +76,6 @@ target_link_libraries(mfront_interface
   mofem_third_party
   ${MoFEM_PROJECT_LIBS}
 )
-
 
 function(mp_copy_file target)
 file(
