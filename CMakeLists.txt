@@ -77,6 +77,8 @@ target_link_libraries(mfront_interface
   ${MoFEM_PROJECT_LIBS}
 )
 
+install(TARGETS mfront_interface DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
+
 function(mp_copy_file target)
 file(
   COPY ${target}
