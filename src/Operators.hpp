@@ -9,18 +9,6 @@ using DdgPack = Ddg<PackPtr<double *, 1>, 3, 3>;
 
 enum DataTags { RHS = 0, LHS };
 
-struct BodyForceData {
-  Range tEts;
-  VectorDouble accValues;
-  double dEnsity;
-  VectorDouble accValuesScaled;
-  BodyForceData(VectorDouble acc_values, double density, Range ents)
-      : accValues(acc_values), dEnsity(density), tEts(ents) {
-    accValuesScaled = accValues;
-  }
-  BodyForceData() = delete;
-};
-extern vector<shared_ptr<BodyForceData>> body_force_vec;
 extern double t_dt;
 extern double t_dt_prop;
 
@@ -354,10 +342,10 @@ struct CommonData {
 
   MoFEMErrorCode setBlocks() {
     MoFEMFunctionBegin;
-    string block_name = "MAT";
+    string block_name = "MFRONT_";
     for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(mField, BLOCKSET, it)) {
       // FIXME: set up a proper name
-      if (it->getName().compare(0, 3, block_name) == 0) {
+      if (it->getName().compare(0, block_name.size(), block_name) == 0) {
         std::vector<double> block_data;
         CHKERR it->getAttributes(block_data);
         const int id = it->getMeshsetId();
@@ -474,6 +462,9 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 };
+extern boost::shared_ptr<CommonData> commonDataPtr;
+
+// MoFEMErrorCode saveOutputMesh(int step, bool print_gauss);
 
 template <bool IS_LARGE_STRAIN>
 inline MoFEMErrorCode mgis_integration(
@@ -537,28 +528,9 @@ struct Monitor : public FEMethod {
   MoFEMErrorCode postProcess() {
     MoFEMFunctionBegin;
 
-    auto make_vtks = [&]() {
-      MoFEMFunctionBegin;
-      CHKERR DMoFEMLoopFiniteElements(dM, "dFE", postProcFe);
-      CHKERR postProcFe->writeFile(
-          "out_" + boost::lexical_cast<std::string>(ts_step) + ".h5m");
-
-      if (printGauss) {
-        string file_name =
-            "out_gauss_" + boost::lexical_cast<std::string>(ts_step) + ".h5m";
-
-        CHKERR internalVarMesh.write_file(file_name.c_str(), "MOAB",
-                                          "PARALLEL=WRITE_PART");
-        CHKERR internalVarMesh.delete_mesh();
-      }
-
-      MoFEMFunctionReturn(0);
-    };
-
-    CHKERR DMoFEMLoopFiniteElements(dM, "dFE", updateHist);
+    // CHKERR saveOutputMesh(ts_step);
 
     CHKERR TSSetTimeStep(ts, t_dt_prop);
-    CHKERR make_vtks();
 
     // switch (atom_test_nb) {
     // case 1: {
@@ -669,29 +641,10 @@ struct FePrePostProcess : public FEMethod {
       break;
     }
 
-    // cerr << t_dt << endl;
-    // scale body force data
-    for (auto &bdata : body_force_vec) {
-      bdata->accValuesScaled = bdata->accValues;
-      CHKERR MethodForForceScaling::applyScale(this, methodsOp,
-                                               bdata->accValuesScaled);
-    }
-
     MoFEMFunctionReturn(0);
   }
 
   MoFEMErrorCode postProcess() { return 0; }
-};
-
-struct OpBodyForceRhs : public DomainEleOp {
-  OpBodyForceRhs(const std::string field_name,
-                 boost::shared_ptr<CommonData> common_data_ptr,
-                 BodyForceData &body_data);
-  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-
-private:
-  BodyForceData &bodyData;
-  boost::shared_ptr<CommonData> commonDataPtr;
 };
 
 typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;

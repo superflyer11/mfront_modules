@@ -14,7 +14,6 @@
 
 set(MFRONT_INTERFACE_INSTALL_DIR "mfront_interface")  
 
-
 include_directories(
   ${UM_SOURCE_DIR}/basic_finite_elements/
 )
@@ -24,7 +23,12 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 if(NOT MGIS_DIR)
   message( WARNING "MGIS_DIR is not defined! MFront Interface will not be configured." )
 endif(NOT MGIS_DIR)
-  
+
+set(DEFAULT_LIB_EXTENSION STRING ".so")
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(DEFAULT_LIB_EXTENSION STRING ".dylib")
+endif()
+
 if(MGIS_DIR)
   # set(MGIS_FOUND TRUE)
   find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.dylib libMFrontGenericInterface.so PATHS ${MGIS_DIR}/lib)
@@ -48,11 +52,11 @@ add_executable(mfront_interface
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
 
-
 add_library(mfront_lib_all
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontGenericInterface.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
+
 install(
   TARGETS mfront_lib_all
   DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR}
@@ -62,20 +66,20 @@ install(
   FILE mfront_lib_all_targets.cmake
   DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
 
-
-
 add_dependencies(mfront_interface MFrontGenericInterface)
+
 target_link_libraries(mfront_interface
-  MFrontGenericInterface
-  users_modules
-  mofem_finite_elements
-  mofem_interfaces
-  mofem_multi_indices
-  mofem_petsc
-  mofem_approx
-  mofem_third_party
-  ${MoFEM_PROJECT_LIBS}
-)
+    MFrontGenericInterface
+    mfront_lib_all
+    users_modules
+    mofem_finite_elements
+    mofem_interfaces
+    mofem_multi_indices
+    mofem_petsc
+    mofem_approx
+    mofem_third_party
+    ${MoFEM_PROJECT_LIBS}
+  )
 
 install(TARGETS mfront_interface DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
 
@@ -98,3 +102,13 @@ add_custom_target(
   COMMENT "Make linking to behaviours directory" VERBATIM)
 
 endif(MGIS_DIR)
+
+if(TFEL_DIR)
+  message("TFEL DIR FOUND")
+  add_test(compile_behaviours_test
+    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/Plasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNeck.mfront)
+endif(TFEL_DIR)
+
+get_property(test_names DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY TESTS)
+set_property(TEST ${test_names} PROPERTY LABELS "mfront-interface-tests")
+# set_property(TEST ${test_names} PROPERTY TIMEOUT 60)

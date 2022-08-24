@@ -34,9 +34,10 @@ Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
 
-vector<shared_ptr<BodyForceData>> body_force_vec;
 double t_dt = 0;
 double t_dt_prop = 0;
+
+boost::shared_ptr<CommonData> commonDataPtr;
 
 template <> Tensor4Pack get_tangent_tensor<Tensor4Pack>(MatrixDouble &mat) {
   return getFTensor4FromMat<3, 3, 3, 3>(mat);
@@ -258,7 +259,8 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
   auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
 
   MatrixDouble3by3 mat(3, 3);
-  auto th_disp = get_tag("DISPLACEMENT", 3);
+  //FIXME: this cannot be hard-coded
+  auto th_disp = get_tag("U", 3);
   auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
   auto th_grad = get_tag(mgis_bv.gradients[0].name, 9);
 
@@ -338,6 +340,11 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
 
   MoFEMFunctionReturn(0);
 }
+
+// MoFEMErrorCode saveOutputMesh(int step, bool print_gauss) {
+//   MoFEMFunctionBegin;
+//   MoFEMFunctionReturn(0);
+// }
 
 OpPostProcInternalVariables::OpPostProcInternalVariables(
     const std::string field_name, moab::Interface &post_proc_mesh,
@@ -443,8 +450,8 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
 
   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
   auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
-  auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
   commonDataPtr->mStressPtr->resize(9, nb_gauss_pts, false);
+  auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
   auto &stress_mat = *commonDataPtr->mStressPtr;
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
   Tensor2<double, 3, 3> stress;
@@ -566,62 +573,8 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
   MoFEMFunctionReturn(0);
 }
 
-OpBodyForceRhs::OpBodyForceRhs(const std::string field_name,
-                               boost::shared_ptr<CommonData> common_data_ptr,
-                               BodyForceData &body_data)
-    : DomainEleOp(field_name, DomainEleOp::OPROW),
-      commonDataPtr(common_data_ptr), bodyData(body_data) {}
 
 //! [Body force]
-MoFEMErrorCode OpBodyForceRhs::doWork(int side, EntityType type,
-                                      EntData &data) {
-  MoFEMFunctionBegin;
-
-  const size_t nb_dofs = data.getIndices().size();
-  if (nb_dofs) {
-
-    auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
-    if (bodyData.tEts.find(fe_ent) == bodyData.tEts.end())
-      MoFEMFunctionReturnHot(0);
-
-    const size_t nb_base_functions = data.getN().size2();
-    if (3 * nb_base_functions < nb_dofs)
-      SETERRQ(
-          PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-          "Number of DOFs is larger than number of base functions on entity");
-
-    const size_t nb_gauss_pts = data.getN().size1();
-    std::array<double, MAX_DOFS_ON_ENTITY> nf;
-    std::fill(&nf[0], &nf[nb_dofs], 0);
-
-    auto t_w = getFTensor0IntegrationWeight();
-    auto t_base = data.getFTensor0N();
-
-    for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
-
-      double alpha = getMeasure() * t_w * bodyData.dEnsity;
-      auto t_acc = Tensor1<double, 3>(bodyData.accValuesScaled(0),
-                                      bodyData.accValuesScaled(1),
-                                      bodyData.accValuesScaled(2));
-
-      Tensor1<PackPtr<double *, 3>, 3> t_nf{&nf[0], &nf[1], &nf[2]};
-      size_t bb = 0;
-      for (; bb != nb_dofs / 3; ++bb) {
-        t_nf(i) += alpha * t_base * t_acc(i);
-        ++t_base;
-        ++t_nf;
-      }
-      for (; bb < nb_base_functions; ++bb)
-        ++t_base;
-
-      ++t_w;
-    }
-
-    CHKERR VecSetValues(getKSPf(), data, nf.data(), ADD_VALUES);
-  }
-
-  MoFEMFunctionReturn(0);
-}
 
 template struct OpStressTmp<true, true>;
 template struct OpStressTmp<true, false>;

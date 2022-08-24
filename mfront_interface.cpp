@@ -25,528 +25,273 @@ using namespace mgis::behaviour;
 
 #include <Operators.hpp>
 
-using OpInternalForce = FormsIntegrators<DomainEleOp>::Assembly<
-    PETSC>::LinearForm<GAUSS>::OpGradTimesTensor<1, 3, 3>;
-using OpAssembleLhsFiniteStrains = FormsIntegrators<DomainEleOp>::Assembly<
-    PETSC>::BiLinearForm<GAUSS>::OpGradTensorGrad<1, 3, 3, 1>;
-using OpAssembleLhsSmallStrains = FormsIntegrators<DomainEleOp>::Assembly<
-    PETSC>::BiLinearForm<GAUSS>::OpGradSymTensorGrad<1, 3, 3, 0>;
-
 using namespace MFrontInterface;
 
+#include <BasicBoundaryConditionsInterface.hpp>
+#include <SurfacePressureComplexForLazy.hpp>
+
+// #ifdef WITH_MODULE_MFRONT_INTERFACE
+#include <MFrontMoFEMInterface.hpp>
+// #endif
+
+using DomainEle = VolumeElementForcesAndSourcesCore;
+using DomainEleOp = DomainEle::UserDataOperator;
+using BoundaryEle = FaceElementForcesAndSourcesCore;
+using BoundaryEleOp = BoundaryEle::UserDataOperator;
+using PostProcEle = PostProcVolumeOnRefinedMesh;
+using PostProcSkinEle = PostProcFaceOnRefinedMesh;
+
 int main(int argc, char *argv[]) {
-  MoFEM::Core::Initialize(&argc, &argv, (char *)0, help);
+
+  const string default_options = "-ksp_type fgmres \n"
+                                 "-pc_type lu \n"
+                                 "-pc_factor_mat_solver_type mumps \n"
+                                 "-ksp_atol 1e-10 \n"
+                                 "-ksp_rtol 1e-10 \n"
+                                 "-snes_monitor \n"
+                                 "-snes_max_it 100 \n"
+                                 "-snes_linesearch_type bt \n"
+                                 "-snes_linesearch_max_it 3 \n"
+                                 "-snes_atol 1e-8 \n"
+                                 "-snes_rtol 1e-8 \n"
+                                 "-ts_monitor \n"
+                                 "-ts_alpha_radius 1 \n"
+                                 "-ts_monitor \n"
+                                 "-mat_mumps_icntl_20 0 \n"
+                                 "-mat_mumps_icntl_14 1200 \n"
+                                 "-mat_mumps_icntl_24 1 \n"
+                                 "-mat_mumps_icntl_13 1 \n";
+
+  string param_file = "param_file.petsc";
+  if (!static_cast<bool>(ifstream(param_file))) {
+    std::ofstream file(param_file.c_str(), std::ios::ate);
+    if (file.is_open()) {
+      file << default_options;
+      file.close();
+    }
+  }
+
+  MoFEM::Core::Initialize(&argc, &argv, param_file.c_str(), help);
+
+  // Add logging channel for example
+  auto core_log = logging::core::get();
+  core_log->add_sink(
+      LogManager::createSink(LogManager::getStrmWorld(), "MIanager"));
+  LogManager::setLog("MIanager");
+  MOFEM_LOG_TAG("MIanager", "module_manager");
 
   try {
 
-    DMType dm_name = "DMMOFEM";
-    CHKERR DMRegister_MoFEM(dm_name);
+    moab::Core mb_instance;
+    moab::Interface &moab = mb_instance;
+    MoFEM::Core core(moab);
+    MoFEM::Interface &m_field = core;
 
-    moab::Core mb_instance;              ///< mesh database
-    moab::Interface &moab = mb_instance; ///< mesh database interface
+    int order;
+    int save_every_nth_step;
+    PetscBool is_quasi_static;
+    PetscBool is_partitioned;
 
-    MoFEM::Core core(moab);           ///< finite element database
-    MoFEM::Interface &m_field = core; ///< finite element database insterface
+    SmartPetscObj<TS> tSolver;
+    SmartPetscObj<DM> dM;
+
+    boost::shared_ptr<std::vector<unsigned char>> boundaryMarker;
+    boost::shared_ptr<FEMethod> monitor_ptr;
+
+    is_quasi_static = PETSC_TRUE;
+    CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_quasi_static", &is_quasi_static,
+                               PETSC_NULL);
+    CHKERR PetscOptionsGetInt(PETSC_NULL, "-order", &order, PETSC_NULL);
+    CHKERR PetscOptionsGetInt(PETSC_NULL, "-output_every", &save_every_nth_step,
+                              PETSC_NULL);
+
+    CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_partitioned", &is_partitioned,
+                               PETSC_NULL);
+    MOFEM_LOG("WORLD", Sev::inform)
+        << "Mesh Partition Flag Status: " << is_partitioned;
 
     Simple *simple = m_field.getInterface<Simple>();
     CHKERR simple->getOptions();
-    CHKERR simple->loadFile("");
-    int order = 2;
-    PetscBool print_gauss = PETSC_FALSE;
 
-    moab::Core mb_post_gauss;
-    moab::Interface &moab_gauss = mb_post_gauss;
-
-    auto get_options_from_command_line = [&]() {
-      MoFEMFunctionBeginHot;
-      CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, "", "", "none");
-      CHKERR PetscOptionsInt("-order", "approximation order", "", order, &order,
-                             PETSC_NULL);
-
-      CHKERR PetscOptionsBool("-print_gauss",
-                              "print gauss pts (internal variables)", "",
-                              print_gauss, &print_gauss, PETSC_NULL);
-      ierr = PetscOptionsEnd();
-      CHKERRQ(ierr);
-      MoFEMFunctionReturnHot(0);
-    };
-
-    CHKERR get_options_from_command_line();
-
-    // Add field
-    CHKERR simple->addDomainField("U", H1, AINSWORTH_LEGENDRE_BASE, 3);
-    // CHKERR simple->addDomainField("U", H1, AINSWORTH_BERNSTEIN_BEZIER_BASE,
-    // 3);
-    CHKERR simple->addBoundaryField("U", H1, AINSWORTH_LEGENDRE_BASE, 3);
-    CHKERR simple->setFieldOrder("U", order);
-    PetscBool is_partitioned = PETSC_TRUE;
-
-    CHKERR simple->defineFiniteElements();
-
-    // Add Neumann forces elements
-    CHKERR MetaNeumannForces::addNeumannBCElements(m_field, "U");
-    CHKERR MetaNodalForces::addElement(m_field, "U");
-    CHKERR MetaEdgeForces::addElement(m_field, "U");
-
-    simple->getOtherFiniteElements().push_back("FORCE_FE");
-    simple->getOtherFiniteElements().push_back("PRESSURE_FE");
-
-    CHKERR simple->defineProblem(is_partitioned);
-    CHKERR simple->buildFields();
-    CHKERR simple->buildFiniteElements();
-    CHKERR simple->buildProblem();
-
-    boost::shared_ptr<CommonData> commonDataPtr;
-    boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
-    // mofem boundary conditions
-    boost::ptr_map<std::string, NeumannForcesSurface> neumann_forces;
-    boost::ptr_map<std::string, NodalForce> nodal_forces;
-    boost::ptr_map<std::string, EdgeForce> edge_forces;
-    boost::shared_ptr<DirichletDisplacementBc> dirichlet_bc_ptr;
-    boost::shared_ptr<DomainEle> update_int_variables;
-
-    commonDataPtr = boost::make_shared<CommonData>(m_field);
-    commonDataPtr->setBlocks();
-    commonDataPtr->createTags();
-
-    commonDataPtr->mGradPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->mDispPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->mPrevGradPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->mPrevStressPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->materialTangentPtr = boost::make_shared<MatrixDouble>();
-    commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
-
-    CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, "", "", "none");
-
-    if (commonDataPtr->setOfBlocksData.empty())
-      SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-              "No blocksets on the mesh has been provided (e.g. MATERIAL1)");
-
-    auto is_lib_finite_strain = [&](const std::string &lib,
-                                    const std::string &beh_name) {
-      auto &lm = LibrariesManager::get();
-      return (lm.getBehaviourType(lib, beh_name) == 2) &&
-             (lm.getBehaviourKinematic(lib, beh_name) == 3);
-    };
-
-    auto op = FiniteStrainBehaviourOptions{};
-    op.stress_measure = FiniteStrainBehaviourOptions::PK1;
-    op.tangent_operator = FiniteStrainBehaviourOptions::DPK1_DF;
-
-    for (auto &block : commonDataPtr->setOfBlocksData) {
-      const int &id = block.first;
-      auto &lib_path = block.second.behaviourPath;
-      auto &name = block.second.behaviourName;
-      const string param_name = "-block_" + to_string(id);
-      const string param_path = "-lib_path_" + to_string(id);
-      const string param_from_blocks = "-my_params_" + to_string(id);
-      PetscBool set_from_blocks = PETSC_FALSE;
-      char char_name[255];
-      PetscBool is_param;
-
-      CHKERR PetscOptionsBool(param_from_blocks.c_str(),
-                              "set parameters from blocks", "", set_from_blocks,
-                              &set_from_blocks, PETSC_NULL);
-
-      CHKERR PetscOptionsString(param_name.c_str(), "name of the behaviour", "",
-                                "IsotropicLinearHardeningPlasticity", char_name,
-                                255, &is_param);
-      if (is_param)
-        name = string(char_name);
-      CHKERR PetscOptionsString(
-          param_path.c_str(), "path to the behaviour library", "",
-          "src/libBehaviour.so", char_name, 255, &is_param);
-      if (is_param)
-        lib_path = string(char_name);
-
-      auto &mgis_bv_ptr = block.second.mGisBehaviour;
-      auto is_finite_strain = is_lib_finite_strain(lib_path, name);
-      if (is_finite_strain) {
-        mgis_bv_ptr = boost::make_shared<Behaviour>(
-            load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL));
-        block.second.isFiniteStrain = true;
-      } else
-        mgis_bv_ptr = boost::make_shared<Behaviour>(
-            load(lib_path, name, Hypothesis::TRIDIMENSIONAL));
-
-      CHKERR block.second.setBlockBehaviourData(set_from_blocks);
-      for (size_t dd = 0; dd < mgis_bv_ptr->mps.size(); ++dd) {
-        double my_param = 0;
-        PetscBool is_set = PETSC_FALSE;
-        string param_cmd = "-param_" + to_string(id) + "_" + to_string(dd);
-        CHKERR PetscOptionsScalar(param_cmd.c_str(), "parameter from cmd", "",
-                                  my_param, &my_param, &is_set);
-        if (!is_set)
-          continue;
-        block.second.behDataPtr->s0.material_properties[dd] = my_param;
-        block.second.behDataPtr->s1.material_properties[dd] = my_param;
-      }
-
-      int nb = 0;
-
-      // PRINT PROPERLY WITH SHOWING WHAT WAS ASSIGNED BY THE USER!!!
-      CHKERR PetscPrintf(PETSC_COMM_WORLD,
-                         "%s behaviour loaded on block %d. \n",
-                         mgis_bv_ptr->behaviour.c_str(), block.first);
-      if (is_finite_strain)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "Finite Strain Kinematics \n");
-      else
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "Small Strain Kinematics \n");
-
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Internal variables: \n");
-      for (const auto &is : mgis_bv_ptr->isvs)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, ": %s\n", is.name.c_str());
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "External variables: \n");
-      for (const auto &es : mgis_bv_ptr->esvs)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, ": %s\n", es.name.c_str());
-
-      auto it = block.second.behDataPtr->s0.material_properties.begin();
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Material properties: \n");
-      for (const auto &mp : mgis_bv_ptr->mps)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s = %g\n", nb++,
-                           mp.name.c_str(), *it++);
-
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Real parameters: \n");
-      for (auto &p : mgis_bv_ptr->params)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Integer parameters: \n");
-      for (auto &p : mgis_bv_ptr->iparams)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
-      CHKERR PetscPrintf(PETSC_COMM_WORLD, "Unsigned short parameters: \n");
-      for (auto &p : mgis_bv_ptr->usparams)
-        CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
-    }
-
-    ierr = PetscOptionsEnd();
-    CHKERRQ(ierr);
-    auto check_behaviours_kinematics = [&](bool &is_finite_kin) {
-      MoFEMFunctionBeginHot;
-      is_finite_kin =
-          commonDataPtr->setOfBlocksData.begin()->second.isFiniteStrain;
-      for (auto &block : commonDataPtr->setOfBlocksData) {
-        if (block.second.isFiniteStrain != is_finite_kin)
-          SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-                  "All used behaviours have to be of same kinematics (small or "
-                  "large strains)");
-      }
-      MoFEMFunctionReturnHot(0);
-    };
-
-    bool is_finite_kin = true;
-    CHKERR check_behaviours_kinematics(is_finite_kin);
-
-    update_int_variables = boost::make_shared<DomainEle>(m_field);
-    auto integration_rule = [&](int, int, int approx_order) {
-      return 2 * order + 1;
-    };
-    update_int_variables->getRuleHook = integration_rule;
-    update_int_variables->getOpPtrVector().push_back(
-        new OpCalculateVectorFieldGradient<3, 3>("U", commonDataPtr->mGradPtr));
-    if (print_gauss)
-      update_int_variables->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldValues<3>("U", commonDataPtr->mDispPtr));
-    if (is_finite_kin)
-      update_int_variables->getOpPtrVector().push_back(
-          new OpUpdateVariablesFiniteStrains("U", commonDataPtr));
+    if (is_partitioned)
+      CHKERR simple->loadFile("");
     else
-      update_int_variables->getOpPtrVector().push_back(
-          new OpUpdateVariablesSmallStrains("U", commonDataPtr));
-    if (print_gauss)
-      update_int_variables->getOpPtrVector().push_back(
-          new OpSaveGaussPts("U", moab_gauss, commonDataPtr));
+      CHKERR simple->loadFile("", "");
 
-    // forces and pressures on surface
-    CHKERR MetaNeumannForces::setMomentumFluxOperators(m_field, neumann_forces,
-                                                       PETSC_NULL, "U");
-    // nodal forces
-    CHKERR MetaNodalForces::setOperators(m_field, nodal_forces, PETSC_NULL,
-                                         "U");
-    // edge forces
-    CHKERR MetaEdgeForces::setOperators(m_field, edge_forces, PETSC_NULL, "U");
+    simple->getProblemName() = "MoFEM MFront Interface module";
+    simple->getDomainFEName() = "MFRONT_EL";
 
-    for (auto mit = neumann_forces.begin(); mit != neumann_forces.end();
-         mit++) {
-      mit->second->methodsOp.push_back(
-          new TimeForceScale("-load_history", true));
+    // Select base
+    enum bases { AINSWORTH, DEMKOWICZ, BERNSTEIN, LASBASETOPT };
+    const char *list_bases[] = {"ainsworth", "demkowicz", "bernstein"};
+    PetscInt choice_base_value = AINSWORTH;
+    CHKERR PetscOptionsGetEList(PETSC_NULL, NULL, "-base", list_bases,
+                                LASBASETOPT, &choice_base_value, PETSC_NULL);
+
+    FieldApproximationBase base;
+    switch (choice_base_value) {
+    case AINSWORTH:
+      base = AINSWORTH_LEGENDRE_BASE;
+      MOFEM_LOG("WORLD", Sev::inform)
+          << "Set AINSWORTH_LEGENDRE_BASE for displacements";
+      break;
+    case DEMKOWICZ:
+      base = DEMKOWICZ_JACOBI_BASE;
+      MOFEM_LOG("WORLD", Sev::inform)
+          << "Set DEMKOWICZ_JACOBI_BASE for displacements";
+      break;
+    case BERNSTEIN:
+      base = AINSWORTH_BERNSTEIN_BEZIER_BASE;
+      MOFEM_LOG("WORLD", Sev::inform)
+          << "Set AINSWORTH_BERNSTEIN_BEZIER_BASE for displacements";
+      break;
+    default:
+      base = LASTBASE;
+      break;
     }
-    for (auto mit = nodal_forces.begin(); mit != nodal_forces.end(); mit++) {
-      mit->second->methodsOp.push_back(
-          new TimeForceScale("-load_history", true));
+
+    // Add displacement field 
+    CHKERR m_field.add_field("U", H1, base, 3);
+
+    // Add field representing ho-geometry
+    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, AINSWORTH_LEGENDRE_BASE,
+                             3);
+
+    // Add entities to field
+    CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "U");
+    CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "MESH_NODE_POSITIONS");
+
+    // Set approximation order to entities
+    if (base == AINSWORTH_BERNSTEIN_BEZIER_BASE)
+      CHKERR m_field.set_field_order(0, MBVERTEX, "U", order);
+    else
+      CHKERR m_field.set_field_order(0, MBVERTEX, "U", 1);
+    CHKERR m_field.set_field_order(0, MBEDGE, "U", order);
+    CHKERR m_field.set_field_order(0, MBTRI, "U", order);
+    CHKERR m_field.set_field_order(0, MBTET, "U", order);
+
+    CHKERR m_field.set_field_order(0, MBVERTEX, "MESH_NODE_POSITIONS", 1);
+    // CHKERR m_field.set_field_order(0, MBEDGE, "MESH_NODE_POSITIONS", 2);
+    CHKERR m_field.set_field_order(0, MBEDGE, "MESH_NODE_POSITIONS", 1);
+    CHKERR m_field.set_field_order(0, MBTRI, "MESH_NODE_POSITIONS", 1);
+    CHKERR m_field.set_field_order(0, MBTET, "MESH_NODE_POSITIONS", 1);
+
+    // setup the modules
+    boost::ptr_vector<GenericElementInterface> m_modules;
+
+    // Basic Boundary Conditions module should always be first (dirichlet)
+    m_modules.push_back(new BasicBoundaryConditionsInterface(
+        m_field, "U", "MESH_NODE_POSITIONS", simple->getProblemName(),
+        simple->getDomainFEName(), true, is_quasi_static, nullptr,
+        is_partitioned));
+
+    // #ifdef WITH_MODULE_MFRONT_INTERFACE
+    m_modules.push_back(
+        new MFrontMoFEMInterface(m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+    // #endif
+
+    for (auto &&mod : m_modules) {
+      mod.getCommandLineParameters();
+      mod.addElementFields();
     }
-    for (auto mit = edge_forces.begin(); mit != edge_forces.end(); mit++) {
-      mit->second->methodsOp.push_back(
-          new TimeForceScale("-load_history", true));
+
+    // build fields
+    // simple->buildFields();
+    CHKERR m_field.build_fields();
+    for (auto &&mod : m_modules)
+      mod.createElements();
+
+    Projection10NodeCoordsOnField ent_method(m_field, "MESH_NODE_POSITIONS");
+    CHKERR m_field.loop_dofs("MESH_NODE_POSITIONS", ent_method);
+
+    CHKERR m_field.build_finite_elements();
+    CHKERR m_field.build_adjacencies(simple->getBitRefLevel());
+
+    DMType dm_name = "DMMOFEM";
+    // Register DM problem
+    CHKERR DMRegister_MoFEM(dm_name);
+    dM = createSmartDM(m_field.get_comm(), dm_name);
+    CHKERR DMSetType(dM, dm_name);
+    CHKERR DMMoFEMSetIsPartitioned(dM, is_partitioned);
+    // Create DM instance
+    CHKERR DMMoFEMCreateMoFEM(dM, &m_field, simple->getProblemName().c_str(),
+                              simple->getBitRefLevel());
+    CHKERR DMSetFromOptions(dM);
+
+    for (auto &&mod : m_modules) {
+      mod.setOperators();
+      mod.addElementsToDM(dM);
     }
 
-    dirichlet_bc_ptr =
-        boost::make_shared<DirichletDisplacementBc>(m_field, "U");
-    dirichlet_bc_ptr->methodsOp.push_back(
-        new TimeForceScale("-load_history", true));
+    CHKERR DMSetUp(dM);
+    monitor_ptr = boost::make_shared<FEMethod>();
+    monitor_ptr->preProcessHook = []() { return 0; };
+    monitor_ptr->operatorHook = []() { return 0; };
+    monitor_ptr->postProcessHook = [&]() {
+      MoFEMFunctionBeginHot;
+      // auto ts_time = monitor_ptr->ts_t;
+      auto ts_step = monitor_ptr->ts_step;
 
-    PipelineManager *pipeline_mng = m_field.getInterface<PipelineManager>();
-    auto add_domain_base_ops = [&](auto &pipeline) {
-      pipeline.push_back(new OpCalculateVectorFieldGradient<3, 3>(
-          "U", commonDataPtr->mGradPtr));
-    };
-
-    auto add_domain_ops_lhs = [&](auto &pipeline) {
-      if (is_finite_kin) {
-        pipeline.push_back(new OpTangentFiniteStrains("U", commonDataPtr));
-        pipeline.push_back(new OpAssembleLhsFiniteStrains(
-            "U", "U", commonDataPtr->materialTangentPtr));
-      } else {
-
-        pipeline.push_back(new OpTangentSmallStrains("U", commonDataPtr));
-        pipeline.push_back(new OpAssembleLhsSmallStrains(
-            "U", "U", commonDataPtr->materialTangentPtr));
-      }
-    };
-
-    auto add_domain_ops_rhs = [&](auto &pipeline) {
-      for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(m_field, BLOCKSET, it)) {
-        if (it->getName().compare(0, 10, "BODY_FORCE") == 0) {
-          Range tets;
-          CHKERR it->getMeshsetIdEntitiesByDimension(m_field.get_moab(), 3,
-                                                     tets, true);
-          std::vector<double> params_vec;
-          it->getAttributes(params_vec);
-          if (params_vec.size() < 3)
-            SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-                    "You have to provide 4 parameters for BODY_FORCE block "
-                    "acceleration(3) and density");
-
-          VectorDouble acc;
-          acc.data().assign(params_vec.begin(), params_vec.begin() + 3);
-          const double density = params_vec[3];
-
-          body_force_vec.push_back(
-              make_shared<BodyForceData>(acc, density, tets));
-          pipeline.push_back(
-              new OpBodyForceRhs("U", commonDataPtr, *body_force_vec.back()));
-        }
+      for (auto &&mod : m_modules) {
+        mod.updateElementVariables();
+        if (ts_step % save_every_nth_step == 0)
+          mod.postProcessElement(ts_step);
       }
 
-      if (is_finite_kin)
-        pipeline.push_back(new OpStressFiniteStrains("U", commonDataPtr));
-
-      else
-        pipeline.push_back(new OpStressSmallStrains("U", commonDataPtr));
-
-      pipeline.push_back(new OpInternalForce("U", commonDataPtr->mStressPtr));
+      MoFEMFunctionReturnHot(0);
     };
 
-    add_domain_base_ops(pipeline_mng->getOpDomainLhsPipeline());
-    add_domain_base_ops(pipeline_mng->getOpDomainRhsPipeline());
-    add_domain_ops_lhs(pipeline_mng->getOpDomainLhsPipeline());
-    add_domain_ops_rhs(pipeline_mng->getOpDomainRhsPipeline());
+    auto t_type = GenericElementInterface::IM2;
+    if (is_quasi_static)
+      t_type = GenericElementInterface::IM;
+    for (auto &&mod : m_modules) {
+      mod.setupSolverFunctionTS(t_type);
+      mod.setupSolverJacobianTS(t_type);
+    }
 
-    CHKERR pipeline_mng->setDomainRhsIntegrationRule(integration_rule);
-    CHKERR pipeline_mng->setDomainLhsIntegrationRule(integration_rule);
-
-    auto fix_disp = [&](const std::string blockset_name) {
-      Range fix_ents;
-      for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(m_field, BLOCKSET, it)) {
-        if (it->getName().compare(0, blockset_name.length(), blockset_name) ==
-            0) {
-          CHKERR m_field.get_moab().get_entities_by_handle(it->meshset,
-                                                           fix_ents, true);
-        }
-      }
-      return fix_ents;
-    };
-
-    auto remove_ents = [&](const Range &&ents, const size_t lo_coeff,
-                           const size_t hi_coeff) {
-      auto prb_mng = m_field.getInterface<ProblemsManager>();
-      auto simple = m_field.getInterface<Simple>();
+    auto set_time_monitor = [&](auto solver) {
       MoFEMFunctionBegin;
-      Range verts;
-      CHKERR m_field.get_moab().get_connectivity(ents, verts, true);
-      verts.merge(ents);
-      Range adj;
-      CHKERR m_field.get_moab().get_adjacencies(ents, 1, false, adj,
-                                                moab::Interface::UNION);
-      verts.merge(adj);
-      CHKERR prb_mng->removeDofsOnEntities(simple->getProblemName(), "U", verts,
-                                           lo_coeff, hi_coeff);
-      MoFEMFunctionReturn(0);
-    };
-
-    CHKERR remove_ents(fix_disp("FIX_X"), 0, 0);
-    CHKERR remove_ents(fix_disp("FIX_Y"), 1, 1);
-    CHKERR remove_ents(fix_disp("FIX_Z"), 2, 2);
-    CHKERR remove_ents(fix_disp("FIX_ALL"), 0, 2);
-
-    ISManager *is_manager = m_field.getInterface<ISManager>();
-
-    // auto solver = pipeline_mng->createTS();
-    auto create_custom_ts = [&]() {
-      auto set_dm_section = [&](auto dm) {
-        MoFEMFunctionBegin;
-        PetscSection section;
-        CHKERR m_field.getInterface<ISManager>()->sectionCreate(
-            simple->getProblemName(), &section);
-        CHKERR DMSetDefaultSection(dm, section);
-        CHKERR DMSetDefaultGlobalSection(dm, section);
-        CHKERR PetscSectionDestroy(&section);
-        MoFEMFunctionReturn(0);
-      };
-
-      auto dm = simple->getDM();
-      CHKERR set_dm_section(dm);
-
-      boost::shared_ptr<FEMethod> null;
-      auto preProc = boost::make_shared<FePrePostProcess>();
-      preProc->methodsOp.push_back(new TimeForceScale("-load_history", true));
-
-      // Add element to calculate lhs of stiff part
-      if (pipeline_mng->getDomainLhsFE()) {
-
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getDomainFEName(), null,
-                                     preProc, null);
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getDomainFEName(), null,
-                                     dirichlet_bc_ptr, null);
-
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getDomainFEName(),
-                                     pipeline_mng->getDomainLhsFE(), null,
-                                     null);
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getDomainFEName(), null, null,
-                                     dirichlet_bc_ptr);
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getDomainFEName(), null, null,
-                                     preProc);
-      }
-      if (pipeline_mng->getBoundaryLhsFE())
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getBoundaryFEName(),
-                                     pipeline_mng->getBoundaryLhsFE(), null,
-                                     null);
-      if (pipeline_mng->getSkeletonLhsFE())
-        CHKERR DMMoFEMTSSetIJacobian(dm, simple->getSkeletonFEName(),
-                                     pipeline_mng->getSkeletonLhsFE(), null,
-                                     null);
-
-      // Add element to calculate rhs of stiff part
-      if (pipeline_mng->getDomainRhsFE()) {
-
-        // add dirichlet boundary conditions
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getDomainFEName(), null,
-                                     preProc, null);
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getDomainFEName(), null,
-                                     dirichlet_bc_ptr, null);
-
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getDomainFEName(),
-                                     pipeline_mng->getDomainRhsFE(), null,
-                                     null);
-
-        // Add surface forces
-
-        for (auto fit = neumann_forces.begin(); fit != neumann_forces.end();
-             fit++) {
-          CHKERR DMMoFEMTSSetIFunction(dm, fit->first.c_str(),
-                                       &fit->second->getLoopFe(), NULL, NULL);
-        }
-
-        // Add edge forces
-        for (auto fit = edge_forces.begin(); fit != edge_forces.end(); fit++) {
-          cerr << fit->first.c_str() << endl;
-          CHKERR DMMoFEMTSSetIFunction(dm, fit->first.c_str(),
-                                       &fit->second->getLoopFe(), NULL, NULL);
-        }
-
-        // Add nodal forces
-        for (auto fit = nodal_forces.begin(); fit != nodal_forces.end();
-             fit++) {
-          CHKERR DMMoFEMTSSetIFunction(dm, fit->first.c_str(),
-                                       &fit->second->getLoopFe(), NULL, NULL);
-        }
-
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getDomainFEName(), null, null,
-                                     dirichlet_bc_ptr);
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getDomainFEName(), null, null,
-                                     preProc);
-      }
-      if (pipeline_mng->getBoundaryRhsFE())
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getBoundaryFEName(),
-                                     pipeline_mng->getBoundaryRhsFE(), null,
-                                     null);
-      if (pipeline_mng->getSkeletonRhsFE())
-        CHKERR DMMoFEMTSSetIFunction(dm, simple->getSkeletonFEName(),
-                                     pipeline_mng->getSkeletonRhsFE(), null,
-                                     null);
-
-      auto ts = MoFEM::createTS(m_field.get_comm());
-      CHKERR TSSetDM(ts, dm);
-      return ts;
-    };
-
-    auto solver = create_custom_ts();
-
-    CHKERR TSSetExactFinalTime(solver, TS_EXACTFINALTIME_STEPOVER);
-    auto dm = simple->getDM();
-    auto D = smartCreateDMVector(dm);
-
-    CHKERR DMoFEMMeshToLocalVector(dm, D, INSERT_VALUES, SCATTER_FORWARD);
-
-    CHKERR TSSetSolution(solver, D);
-    CHKERR TSSetFromOptions(solver);
-    CHKERR TSSetUp(solver);
-
-    auto set_section_monitor = [&]() {
-      MoFEMFunctionBegin;
-      SNES snes;
-      CHKERR TSGetSNES(solver, &snes);
-      PetscViewerAndFormat *vf;
-      CHKERR PetscViewerAndFormatCreate(PETSC_VIEWER_STDOUT_WORLD,
-                                        PETSC_VIEWER_DEFAULT, &vf);
-      CHKERR SNESMonitorSet(
-          snes,
-          (MoFEMErrorCode(*)(SNES, PetscInt, PetscReal,
-                             void *))SNESMonitorFields,
-          vf, (MoFEMErrorCode(*)(void **))PetscViewerAndFormatDestroy);
-      MoFEMFunctionReturn(0);
-    };
-
-    auto create_post_process_element = [&]() {
-      MoFEMFunctionBegin;
-      postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(m_field);
-      postProcFe->generateReferenceElementMesh();
-
-      postProcFe->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldGradient<3, 3>("U",
-                                                   commonDataPtr->mGradPtr));
-      postProcFe->getOpPtrVector().push_back(
-          new OpPostProcElastic("U", postProcFe->postProcMesh,
-                                postProcFe->mapGaussPts, commonDataPtr));
-      postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
-          "U", postProcFe->postProcMesh, postProcFe->mapGaussPts, commonDataPtr,
-          integration_rule(0, 0, order)));
-
-      postProcFe->addFieldValuesPostProc("U", "DISPLACEMENT");
-      MoFEMFunctionReturn(0);
-    };
-
-    auto set_time_monitor = [&]() {
-      MoFEMFunctionBegin;
-      boost::shared_ptr<Monitor> monitor_ptr(new Monitor(
-          dm, postProcFe, update_int_variables, moab_gauss, print_gauss));
       boost::shared_ptr<ForcesAndSourcesCore> null;
-      CHKERR DMMoFEMTSSetMonitor(dm, solver, simple->getDomainFEName(),
+      CHKERR DMMoFEMTSSetMonitor(dM, solver, simple->getDomainFEName(),
                                  monitor_ptr, null, null);
       MoFEMFunctionReturn(0);
     };
 
-    // CHKERR set_section_monitor();
-    CHKERR create_post_process_element();
-    CHKERR set_time_monitor();
+    auto set_dm_section = [&](auto dm) {
+      MoFEMFunctionBeginHot;
+      auto section = m_field.getInterface<ISManager>()->sectionCreate(
+          simple->getProblemName());
+      CHKERR DMSetSection(dm, section);
+      MoFEMFunctionReturnHot(0);
+    };
 
-    CHKERR TSSolve(solver, D);
+    CHKERR set_dm_section(dM);
 
-    CHKERR VecGhostUpdateBegin(D, INSERT_VALUES, SCATTER_FORWARD);
-    CHKERR VecGhostUpdateEnd(D, INSERT_VALUES, SCATTER_FORWARD);
-    CHKERR DMoFEMMeshToLocalVector(dm, D, INSERT_VALUES, SCATTER_REVERSE);
+    auto D = smartCreateDMVector(dM);
+    tSolver = MoFEM::createTS(m_field.get_comm());
+
+    if (is_quasi_static) {
+      CHKERR TSSetSolution(tSolver, D);
+    } else {
+      CHKERR TSSetType(tSolver, TSALPHA2);
+      auto DD = smartVectorDuplicate(D);
+      CHKERR TS2SetSolution(tSolver, D, DD);
+    }
+
+    CHKERR TSSetDM(tSolver, dM);
+
+    // default max time is 1
+    CHKERR TSSetMaxTime(tSolver, 1.0);
+    CHKERR TSSetExactFinalTime(tSolver, TS_EXACTFINALTIME_MATCHSTEP);
+    CHKERR TSSetFromOptions(tSolver);
+
+    CHKERR set_time_monitor(tSolver);
+
+    CHKERR TSSetUp(tSolver);
+    CHKERR TSSolve(tSolver, NULL);
   }
   CATCH_ERRORS;
 
-  CHKERR MoFEM::Core::Finalize();
+  MoFEM::Core::Finalize();
+  return 0;
 }
-// #endif
