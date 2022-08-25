@@ -24,11 +24,6 @@ if(NOT MGIS_DIR)
   message( WARNING "MGIS_DIR is not defined! MFront Interface will not be configured." )
 endif(NOT MGIS_DIR)
 
-set(DEFAULT_LIB_EXTENSION STRING ".so")
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-  set(DEFAULT_LIB_EXTENSION STRING ".dylib")
-endif()
-
 if(MGIS_DIR)
   # set(MGIS_FOUND TRUE)
   find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.dylib libMFrontGenericInterface.so PATHS ${MGIS_DIR}/lib)
@@ -56,6 +51,12 @@ add_library(mfront_lib_all
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="dylib")
+  else()
+    target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="so")
+endif()
 
 install(
   TARGETS mfront_lib_all

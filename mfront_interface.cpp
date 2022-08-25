@@ -7,7 +7,7 @@ static char help[] = "mfront --obuild --interface=generic BEHAVIOUR.mfront \n";
 using namespace MoFEM;
 using namespace FTensor;
 
-using EntData = DataForcesAndSourcesCore::EntData;
+using EntData = EntitiesFieldData::EntData;
 using DomainEle = VolumeElementForcesAndSourcesCore;
 using DomainEleOp = DomainEle::UserDataOperator;
 
@@ -74,11 +74,11 @@ int main(int argc, char *argv[]) {
   MoFEM::Core::Initialize(&argc, &argv, param_file.c_str(), help);
 
   // Add logging channel for example
-  auto core_log = logging::core::get();
-  core_log->add_sink(
-      LogManager::createSink(LogManager::getStrmWorld(), "MIanager"));
-  LogManager::setLog("MIanager");
-  MOFEM_LOG_TAG("MIanager", "module_manager");
+  // auto core_log = logging::core::get();
+  // core_log->add_sink(
+  //     LogManager::createSink(LogManager::getStrmWorld(), "MIanager"));
+  // LogManager::setLog("MIanager");
+  // MOFEM_LOG_TAG("MIanager", "module_manager");
 
   try {
 
@@ -233,9 +233,9 @@ int main(int argc, char *argv[]) {
       auto ts_step = monitor_ptr->ts_step;
 
       for (auto &&mod : m_modules) {
-        mod.updateElementVariables();
         if (ts_step % save_every_nth_step == 0)
           mod.postProcessElement(ts_step);
+        mod.updateElementVariables();
       }
 
       MoFEMFunctionReturnHot(0);

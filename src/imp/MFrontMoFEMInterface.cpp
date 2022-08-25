@@ -4,11 +4,7 @@
 using namespace MoFEM;
 using namespace FTensor;
 
-#ifndef DEFAULT_LIB_EXTENSION
-  #define DEFAULT_LIB_EXTENSION ".so"
-#endif
-
-using EntData = DataForcesAndSourcesCore::EntData;
+using EntData = EntitiesFieldData::EntData;
 using DomainEle = VolumeElementForcesAndSourcesCore;
 using DomainEleOp = DomainEle::UserDataOperator;
 
@@ -39,6 +35,7 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
       isQuasiStatic(is_quasi_static) {
   oRder = 2;
   isFiniteKinematics = true;
+  printGauss = PETSC_FALSE;
   optionsPrefix = "mi_";
 }
 
@@ -75,11 +72,13 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
         << "No blocksets on the mesh has been provided for MFront (e.g. "
            "MFRONT_MAT_1)";
 
-  auto is_lib_finite_strain = [&](const std::string &lib,
-                                  const std::string &beh_name) {
+  auto check_lib_finite_strain = [&](const std::string &lib,
+                                     const std::string &beh_name, bool &flag) {
+    MoFEMFunctionBeginHot;
     auto &lm = LibrariesManager::get();
-    return bool(lm.getBehaviourType(lib, beh_name) == 2) &&
-           (lm.getBehaviourKinematic(lib, beh_name) == 3);
+    flag = bool(lm.getBehaviourType(lib, beh_name) == 2) &&
+        (lm.getBehaviourKinematic(lib, beh_name) == 3);
+    MoFEMFunctionReturnHot(0);
   };
 
   auto op = FiniteStrainBehaviourOptions{};
@@ -115,7 +114,8 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
       lib_path = string(char_name);
 
     auto &mgis_bv_ptr = block.second.mGisBehaviour;
-    auto is_finite_strain = is_lib_finite_strain(lib_path, name);
+    bool is_finite_strain = false;
+    CHKERR check_lib_finite_strain(lib_path, name, is_finite_strain);
     if (is_finite_strain) {
       mgis_bv_ptr = boost::make_shared<Behaviour>(
           load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL));
@@ -341,7 +341,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
 
   MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianTS(const TSType type) {
     MoFEMFunctionBegin;
-    auto method = mfrontPipelineLhsPtr;
+    auto &method = mfrontPipelineLhsPtr;
     switch (type) {
     case IM:
       CHKERR DMMoFEMTSSetIJacobian(dM, "MFRONT_EL", method, method, method);
@@ -362,7 +362,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
 
   MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionTS(const TSType type) {
     MoFEMFunctionBegin;
-    auto method = mfrontPipelineRhsPtr;
+    auto &method = mfrontPipelineRhsPtr;
     switch (type) {
     case IM:
       CHKERR DMMoFEMTSSetIFunction(dM, "MFRONT_EL", method, method, method);
@@ -427,6 +427,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     };
 
     // CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
+    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
     CHKERR make_vtks();
 
     // CHKERR saveOutputMesh(step, printGauss);
@@ -436,7 +437,6 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
 
   MoFEMErrorCode MFrontMoFEMInterface::updateElementVariables() {
     MoFEMFunctionBegin;
-    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
     MoFEMFunctionReturn(0);
   };
 

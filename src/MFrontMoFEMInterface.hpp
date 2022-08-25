@@ -12,7 +12,7 @@
 
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
-  using EntData = DataForcesAndSourcesCore::EntData;
+  using EntData = EntitiesFieldData::EntData;
   using DomainEle = VolumeElementForcesAndSourcesCore;
   using DomainEleOp = DomainEle::UserDataOperator;
 
