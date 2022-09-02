@@ -84,7 +84,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
     CHKERR mgis_integration<IS_LARGE_STRAIN>(gg, t_grad, *commonDataPtr, dAta,
                                              b_view);
 
-    if (IS_LARGE_STRAIN) {
+    if constexpr (IS_LARGE_STRAIN) {
       Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(dAta.stress1Buffer));
       t_stress(i, j) = forces(i, j);
     } else {
@@ -93,7 +93,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
       t_stress(i, j) = forces(i, j);
     }
 
-    if (UPDATE) {
+    if constexpr (UPDATE) {
       for (int dd = 0; dd != dAta.sizeIntVar; ++dd) {
         mat_int(gg, dd) = b_view.s1.internal_state_variables[dd];
       }
@@ -107,9 +107,9 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
     ++t_grad;
   }
 
-  if (UPDATE) {
+  if constexpr (UPDATE) {
     CHKERR commonDataPtr->setInternalVar(fe_ent);
-    t_dt_prop = t_dt * b_view.rdt;
+    // t_dt_prop = t_dt * b_view.rdt;
   }
 
   MoFEMFunctionReturn(0);

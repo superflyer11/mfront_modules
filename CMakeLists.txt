@@ -20,6 +20,9 @@ include_directories(
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+include_directories(
+  ${PROJECT_SOURCE_DIR}/basic_finite_elements/nonlinear_elastic_materials/src)
+
 if(NOT MGIS_DIR)
   message( WARNING "MGIS_DIR is not defined! MFront Interface will not be configured." )
 endif(NOT MGIS_DIR)

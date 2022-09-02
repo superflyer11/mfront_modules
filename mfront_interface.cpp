@@ -27,6 +27,9 @@ using namespace mgis::behaviour;
 
 using namespace MFrontInterface;
 
+#include <ElasticMaterials.hpp>
+#include <NonlinearElasticElementInterface.hpp>
+
 #include <BasicBoundaryConditionsInterface.hpp>
 #include <SurfacePressureComplexForLazy.hpp>
 
@@ -121,51 +124,17 @@ int main(int argc, char *argv[]) {
     simple->getProblemName() = "MoFEM MFront Interface module";
     simple->getDomainFEName() = "MFRONT_EL";
 
-    // Select base
-    enum bases { AINSWORTH, DEMKOWICZ, BERNSTEIN, LASBASETOPT };
-    const char *list_bases[] = {"ainsworth", "demkowicz", "bernstein"};
-    PetscInt choice_base_value = AINSWORTH;
-    CHKERR PetscOptionsGetEList(PETSC_NULL, NULL, "-base", list_bases,
-                                LASBASETOPT, &choice_base_value, PETSC_NULL);
-
-    FieldApproximationBase base;
-    switch (choice_base_value) {
-    case AINSWORTH:
-      base = AINSWORTH_LEGENDRE_BASE;
-      MOFEM_LOG("WORLD", Sev::inform)
-          << "Set AINSWORTH_LEGENDRE_BASE for displacements";
-      break;
-    case DEMKOWICZ:
-      base = DEMKOWICZ_JACOBI_BASE;
-      MOFEM_LOG("WORLD", Sev::inform)
-          << "Set DEMKOWICZ_JACOBI_BASE for displacements";
-      break;
-    case BERNSTEIN:
-      base = AINSWORTH_BERNSTEIN_BEZIER_BASE;
-      MOFEM_LOG("WORLD", Sev::inform)
-          << "Set AINSWORTH_BERNSTEIN_BEZIER_BASE for displacements";
-      break;
-    default:
-      base = LASTBASE;
-      break;
-    }
-
+    FieldApproximationBase base = AINSWORTH_LEGENDRE_BASE;
     // Add displacement field 
     CHKERR m_field.add_field("U", H1, base, 3);
 
     // Add field representing ho-geometry
-    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, AINSWORTH_LEGENDRE_BASE,
-                             3);
+    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, base, 3);
 
     // Add entities to field
     CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "U");
     CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "MESH_NODE_POSITIONS");
-
-    // Set approximation order to entities
-    if (base == AINSWORTH_BERNSTEIN_BEZIER_BASE)
-      CHKERR m_field.set_field_order(0, MBVERTEX, "U", order);
-    else
-      CHKERR m_field.set_field_order(0, MBVERTEX, "U", 1);
+    CHKERR m_field.set_field_order(0, MBVERTEX, "U", 1);
     CHKERR m_field.set_field_order(0, MBEDGE, "U", order);
     CHKERR m_field.set_field_order(0, MBTRI, "U", order);
     CHKERR m_field.set_field_order(0, MBTET, "U", order);
@@ -184,6 +153,9 @@ int main(int argc, char *argv[]) {
         m_field, "U", "MESH_NODE_POSITIONS", simple->getProblemName(),
         simple->getDomainFEName(), true, is_quasi_static, nullptr,
         is_partitioned));
+
+    // m_modules.push_back(new NonlinearElasticElementInterface(
+    //     m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
     // #ifdef WITH_MODULE_MFRONT_INTERFACE
     m_modules.push_back(

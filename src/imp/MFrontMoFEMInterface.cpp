@@ -33,7 +33,7 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
       meshNodeField(mesh_posi_field_name),
       isDisplacementField(is_displacement_field),
       isQuasiStatic(is_quasi_static) {
-  oRder = 2;
+  oRder = -1;
   isFiniteKinematics = true;
   printGauss = PETSC_FALSE;
   optionsPrefix = "mi_";
@@ -230,6 +230,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
     updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
 
+    //FIXME: 
     CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineRhsPtr, true, false, false,
                        false);
     CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineLhsPtr, true, false, false,
@@ -237,11 +238,23 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     CHKERR addHOOpsVol(meshNodeField, *updateIntVariablesElePtr, true, false,
                        false, false);
 
-    for (auto &[id, data] : commonDataPtr->setOfBlocksData)
+    for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
       CHKERR mField.add_ents_to_finite_element_by_type(data.tEts, MBTET,
                                                        "MFRONT_EL");
+      if (oRder > 0) {
 
-    MoFEMFunctionReturnHot(0);
+        CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
+                                      positionField, oRder);
+        CHKERR
+        mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
+                               oRder);
+        CHKERR
+        mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
+                               oRder);
+      }
+    }
+
+      MoFEMFunctionReturnHot(0);
   };
 
   MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
