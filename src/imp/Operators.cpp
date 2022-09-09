@@ -357,10 +357,6 @@ OpPostProcInternalVariables::OpPostProcInternalVariables(
   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
 }
 
-// MoFEMErrorCode
-// OpPostProcInternalVariables::doWork(int row_side, int col_side,
-//                                     EntityType row_type, EntityType col_type,
-//                                     EntData &row_data, EntData &col_data)
 
 MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
                                                    EntData &row_data) {
@@ -420,6 +416,7 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
   auto &myN = commonDataPtr->myN;
   size_t nb_gauss_pts = QUAD_3D_TABLE[rule]->npoints;
 
+  //FIXME: implement this for hex as well
   if (gaussPts.size2() != nb_gauss_pts || myN.size1() != nb_gauss_pts) {
 
     gaussPts.resize(4, nb_gauss_pts, false);
@@ -438,9 +435,6 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
     double *shape_ptr = &*myN.data().begin();
     cblas_dcopy(4 * nb_gauss_pts, QUAD_3D_TABLE[rule]->points, 1, shape_ptr, 1);
 
-    // CHKERR Tools::shapeFunMBTET(&*myN.data().begin(), &gaussPts(0, 0),
-    //                             &gaussPts(1, 0), &gaussPts(2, 0),
-    //                             nb_gauss_pts);
   }
 
   auto set_tag = [&](auto th, auto gg, auto &mat) {
@@ -454,7 +448,6 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
   auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
   auto &stress_mat = *commonDataPtr->mStressPtr;
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-  Tensor2<double, 3, 3> stress;
 
   // FIXME: make sure that the sizes are consistent
   // size_t nb_gauss_pts = row_data.getN().size1();
@@ -463,27 +456,26 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
                                        dAta.sizeGradVar);
 
   MatrixDouble mat_int_fs(size_of_vars, nb_rows, false);
-  mat_int_fs.clear();
   MatrixDouble mat_stress_fs(9, nb_rows, false);
+  mat_int_fs.clear();
   mat_stress_fs.clear();
-
-  auto &ls_mat = commonDataPtr->lsMat;
+  auto &L = commonDataPtr->lsMat;
 
   // calculate inverse of N^T N   only once
-  if (ls_mat.size1() != nb_rows || ls_mat.size2() != nb_cols) {
-
-    ls_mat.resize(nb_rows, nb_cols, false);
-    ls_mat.clear();
+  if (L.size1() != nb_rows || L.size2() != nb_cols) {
+    MatrixDouble LU(nb_rows, nb_cols, false);
+    LU.clear();
+    L = LU;
 
     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
       double alpha = getMeasure() * gaussPts(3, gg);
       auto shape_function =
           getVectorAdaptor(&myN.data()[gg * nb_rows], nb_rows);
 
-      ls_mat += alpha * outer_prod(shape_function, shape_function);
+      LU += alpha * outer_prod(shape_function, shape_function);
     }
 
-    inverse(&*ls_mat.data().begin(), ls_mat.size1());
+    cholesky_decompose(LU, L);
   }
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
@@ -498,7 +490,6 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
 
         auto ls_vec_c = row(mat_int_fs, cc);
         ls_vec_c += alpha * int_var * shape_function;
-
         cc++;
       }
     }
@@ -522,49 +513,57 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
       }
 
     ++t_stress;
-    ++t_grad;
   }
 
-  VectorDouble internal_var_at_gauss(size_of_vars, false);
-  for (size_t gg = 0; gg != row_data.getN().size1(); ++gg) {
-    internal_var_at_gauss.clear();
+  MatrixDouble stress_at_gauss(mapGaussPts.size(), 9, false);
+  MatrixDouble internal_var_at_gauss(mapGaussPts.size(), size_of_vars, false);
+  internal_var_at_gauss.clear();
+  stress_at_gauss.clear();
+  for (size_t gg = 0; gg != mapGaussPts.size(); ++gg) {
 
     if (size_of_vars != 0) {
       for (int cc = 0; cc != size_of_vars; ++cc) {
         auto ls_vec_c = row(mat_int_fs, cc);
-        VectorDouble field_c_vec = prod(ls_mat, ls_vec_c);
-        internal_var_at_gauss(cc) =
+        VectorDouble field_c_vec = ls_vec_c;
+        cholesky_solve(L, field_c_vec, ublas::lower());
+        internal_var_at_gauss(gg, cc) +=
             inner_prod(trans(row_data.getN(gg)), field_c_vec);
-      }
-
-      auto it = tags_vec.begin();
-      for (auto c : mgis_bv.isvs) {
-        auto vsize = getVariableSize(c, mgis_bv.hypothesis);
-        const size_t parav_siz = get_paraview_size(vsize);
-        const auto offset =
-            getVariableOffset(mgis_bv.isvs, c.name, mgis_bv.hypothesis);
-        VectorDouble tag_vec =
-            getVectorAdaptor(&internal_var_at_gauss(offset), vsize);
-        tag_vec.resize(parav_siz);
-        CHKERR postProcMesh.tag_set_data(*it, &mapGaussPts[gg], 1,
-                                         &*tag_vec.begin());
-        it++;
       }
     }
 
     for (int ii = 0; ii != 3; ++ii)
       for (int jj = 0; jj != 3; ++jj) {
         auto ls_vec_c = row(mat_stress_fs, 3 * ii + jj);
-        VectorDouble field_c_vec = prod(ls_mat, ls_vec_c);
-        const double stress_c =
-            inner_prod(trans(row_data.getN(gg)), field_c_vec);
-        stress(ii, jj) = stress_c;
+        // VectorDouble field_c_vec = prod(ls_mat, ls_vec_c);
+        VectorDouble field_c_vec = ls_vec_c;
+        cholesky_solve(L, field_c_vec, ublas::lower());
+        stress_at_gauss(gg, 3 * ii + jj) +=
+            inner_prod(trans(row_data.getN(gg)), ls_vec_c);
+        ;
       }
+  }
+  for (size_t gg = 0; gg != mapGaussPts.size(); ++gg) {
 
-    // keep the convention consistent for postprocessing!
-    array<double, 9> my_stress_vec{stress(0, 0), stress(1, 1), stress(2, 2),
-                                   stress(0, 1), stress(1, 0), stress(0, 2),
-                                   stress(2, 0), stress(1, 2), stress(2, 1)};
+    auto it = tags_vec.begin();
+    for (auto c : mgis_bv.isvs) {
+      auto vsize = getVariableSize(c, mgis_bv.hypothesis);
+      const size_t parav_siz = get_paraview_size(vsize);
+      const auto offset =
+          getVariableOffset(mgis_bv.isvs, c.name, mgis_bv.hypothesis);          
+      auto vec = getVectorAdaptor(
+          &internal_var_at_gauss.data()[gg * size_of_vars], size_of_vars);
+      VectorDouble tag_vec = getVectorAdaptor(&vec[offset], vsize);      
+      tag_vec.resize(parav_siz);
+      CHKERR postProcMesh.tag_set_data(*it, &mapGaussPts[gg], 1,
+                                       &*tag_vec.begin());
+      it++;
+    }
+
+    // keep the convention consistent for postprocessing
+    array<double, 9> my_stress_vec{
+        stress_at_gauss(gg, 0), stress_at_gauss(gg, 1), stress_at_gauss(gg, 2),
+        stress_at_gauss(gg, 3), stress_at_gauss(gg, 4), stress_at_gauss(gg, 5),
+        stress_at_gauss(gg, 6), stress_at_gauss(gg, 7), stress_at_gauss(gg, 8)};
 
     CHKERR postProcMesh.tag_set_data(th_stress, &mapGaussPts[gg], 1,
                                      my_stress_vec.data());

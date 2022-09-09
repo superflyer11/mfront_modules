@@ -77,11 +77,11 @@ int main(int argc, char *argv[]) {
   MoFEM::Core::Initialize(&argc, &argv, param_file.c_str(), help);
 
   // Add logging channel for example
-  // auto core_log = logging::core::get();
-  // core_log->add_sink(
-  //     LogManager::createSink(LogManager::getStrmWorld(), "MIanager"));
-  // LogManager::setLog("MIanager");
-  // MOFEM_LOG_TAG("MIanager", "module_manager");
+  auto core_log = logging::core::get();
+  core_log->add_sink(LogManager::createSink(LogManager::getStrmWorld(),
+                                            "MoFEM_MFront_Interface"));
+  LogManager::setLog("MoFEM_MFront_Interface");
+  MOFEM_LOG_TAG("MoFEM_MFront_Interface", "module_manager");
 
   try {
 
@@ -91,9 +91,9 @@ int main(int argc, char *argv[]) {
     MoFEM::Interface &m_field = core;
 
     int order;
-    int save_every_nth_step;
-    PetscBool is_quasi_static;
-    PetscBool is_partitioned;
+    int save_every_nth_step = 1;
+    PetscBool is_quasi_static = PETSC_TRUE;
+    PetscBool is_partitioned = PETSC_TRUE;
 
     SmartPetscObj<TS> tSolver;
     SmartPetscObj<DM> dM;
@@ -101,7 +101,6 @@ int main(int argc, char *argv[]) {
     boost::shared_ptr<std::vector<unsigned char>> boundaryMarker;
     boost::shared_ptr<FEMethod> monitor_ptr;
 
-    is_quasi_static = PETSC_TRUE;
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_quasi_static", &is_quasi_static,
                                PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-order", &order, PETSC_NULL);
@@ -154,13 +153,11 @@ int main(int argc, char *argv[]) {
         simple->getDomainFEName(), true, is_quasi_static, nullptr,
         is_partitioned));
 
-    // m_modules.push_back(new NonlinearElasticElementInterface(
-    //     m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+    m_modules.push_back(new NonlinearElasticElementInterface(
+        m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
-    // #ifdef WITH_MODULE_MFRONT_INTERFACE
     m_modules.push_back(
         new MFrontMoFEMInterface(m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
-    // #endif
 
     for (auto &&mod : m_modules) {
       mod.getCommandLineParameters();
@@ -168,7 +165,6 @@ int main(int argc, char *argv[]) {
     }
 
     // build fields
-    // simple->buildFields();
     CHKERR m_field.build_fields();
     for (auto &&mod : m_modules)
       mod.createElements();
@@ -191,8 +187,8 @@ int main(int argc, char *argv[]) {
     CHKERR DMSetFromOptions(dM);
 
     for (auto &&mod : m_modules) {
-      mod.setOperators();
-      mod.addElementsToDM(dM);
+      CHKERR mod.setOperators();
+      CHKERR mod.addElementsToDM(dM);
     }
 
     CHKERR DMSetUp(dM);
@@ -200,25 +196,25 @@ int main(int argc, char *argv[]) {
     monitor_ptr->preProcessHook = []() { return 0; };
     monitor_ptr->operatorHook = []() { return 0; };
     monitor_ptr->postProcessHook = [&]() {
-      MoFEMFunctionBeginHot;
+      MoFEMFunctionBegin;
       // auto ts_time = monitor_ptr->ts_t;
       auto ts_step = monitor_ptr->ts_step;
 
       for (auto &&mod : m_modules) {
+        CHKERR mod.updateElementVariables();
         if (ts_step % save_every_nth_step == 0)
-          mod.postProcessElement(ts_step);
-        mod.updateElementVariables();
+          CHKERR mod.postProcessElement(ts_step);
       }
 
-      MoFEMFunctionReturnHot(0);
+      MoFEMFunctionReturn(0);
     };
 
     auto t_type = GenericElementInterface::IM2;
     if (is_quasi_static)
       t_type = GenericElementInterface::IM;
     for (auto &&mod : m_modules) {
-      mod.setupSolverFunctionTS(t_type);
-      mod.setupSolverJacobianTS(t_type);
+      CHKERR mod.setupSolverFunctionTS(t_type);
+      CHKERR mod.setupSolverJacobianTS(t_type);
     }
 
     auto set_time_monitor = [&](auto solver) {

@@ -34,6 +34,7 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
       isDisplacementField(is_displacement_field),
       isQuasiStatic(is_quasi_static) {
   oRder = -1;
+  atomTest = -1;
   isFiniteKinematics = true;
   printGauss = PETSC_FALSE;
   optionsPrefix = "mi_";
@@ -42,11 +43,13 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
 MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   MoFEMFunctionBegin;
   isQuasiStatic = PETSC_FALSE;
-  // oRder = 2;
+  oRder = 2;
   CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, optionsPrefix.c_str(), "", "none");
   //FIXME: make it possible to set a separate orders for contact, nonlinear elasticity, mfront... etc
   CHKERR PetscOptionsInt("-order", "approximation order", "", oRder, &oRder,
                          PETSC_NULL);
+  CHKERR PetscOptionsInt("-atom_test", "atom test number", "", atomTest,
+                         &atomTest, PETSC_NULL);
 
   CHKERR PetscOptionsBool("-print_gauss",
                           "print gauss pts (internal variables)", "",
@@ -241,17 +244,17 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
       CHKERR mField.add_ents_to_finite_element_by_type(data.tEts, MBTET,
                                                        "MFRONT_EL");
-      if (oRder > 0) {
+      // if (oRder > 0) {
 
-        CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
-                                      positionField, oRder);
-        CHKERR
-        mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
-                               oRder);
-        CHKERR
-        mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
-                               oRder);
-      }
+      //   CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
+      //                                 positionField, oRder);
+      //   CHKERR
+      //   mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
+      //                          oRder);
+      //   CHKERR
+      //   mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
+      //                          oRder);
+      // }
     }
 
       MoFEMFunctionReturnHot(0);
@@ -403,18 +406,17 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
       postProcFe->generateReferenceElementMesh();
 
       postProcFe->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldGradient<3, 3>("U",
+          new OpCalculateVectorFieldGradient<3, 3>(positionField,
                                                    commonDataPtr->mGradPtr));
       postProcFe->getOpPtrVector().push_back(
-          new OpPostProcElastic("U", postProcFe->postProcMesh,
+          new OpPostProcElastic(positionField, postProcFe->postProcMesh,
                                 postProcFe->mapGaussPts, commonDataPtr));
-
-        //FIXME: postprocessing internal variables is crappy
+      int rule = 2 * oRder + 1;
       postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
-          "U", postProcFe->postProcMesh, postProcFe->mapGaussPts, commonDataPtr,
-          2));
+          positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
+          commonDataPtr, rule));
 
-      postProcFe->addFieldValuesPostProc("U", "DISPLACEMENT");
+      postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
       MoFEMFunctionReturn(0);
     };
 
@@ -439,17 +441,35 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
       MoFEMFunctionReturn(0);
     };
 
-    // CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
-    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
     CHKERR make_vtks();
 
-    // CHKERR saveOutputMesh(step, printGauss);
+    switch (atomTest) {
+    case 1:
+      if (step == 75) {
+        auto t_disp = getFTensor1FromMat<3>(*(commonDataPtr->mDispPtr));
+        auto min_gg_disp_x = t_disp(0);
+        MOFEM_LOG("WORLD", Sev::inform)
+            << "Displacement on the gauss point:" << min_gg_disp_x;
+        if (abs(0.2761 + min_gg_disp_x) > 1e-3)
+          SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+                  "atom test diverged!");
+      }
+      break;
+
+    default:
+      if (atomTest > -1)
+        SETERRQ(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
+                "This atom test number is not yet implemented");
+      break;
+    }
+
 
     MoFEMFunctionReturn(0);
   };
 
   MoFEMErrorCode MFrontMoFEMInterface::updateElementVariables() {
+
     MoFEMFunctionBegin;
+    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
     MoFEMFunctionReturn(0);
   };
-

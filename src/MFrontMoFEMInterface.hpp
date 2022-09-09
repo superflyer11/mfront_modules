@@ -32,6 +32,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   PetscBool printGauss;
 
   PetscInt oRder;
+  int atomTest;
   bool isDisplacementField;
   bool isFiniteKinematics;
   BitRefLevel bIt;
@@ -53,20 +54,20 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
                        bool is_displacement_field = true,
                        PetscBool is_quasi_static = PETSC_TRUE);
 
-  MoFEMErrorCode getCommandLineParameters();
-  MoFEMErrorCode addElementFields();
-  MoFEMErrorCode createElements();
-  MoFEMErrorCode setOperators();
-  MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm);
+  MoFEMErrorCode getCommandLineParameters() override;
+  MoFEMErrorCode addElementFields() override;
+  MoFEMErrorCode createElements() override;
+  MoFEMErrorCode setOperators() override;
+  MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
 
-  MoFEMErrorCode setupSolverJacobianTS(const TSType type);
-  MoFEMErrorCode setupSolverFunctionTS(const TSType type);
+  MoFEMErrorCode setupSolverJacobianTS(const TSType type) override;
+  MoFEMErrorCode setupSolverFunctionTS(const TSType type) override;
 
-  MoFEMErrorCode setupSolverJacobianSNES();
-  MoFEMErrorCode setupSolverFunctionSNES();
+  MoFEMErrorCode setupSolverJacobianSNES() override ;
+  MoFEMErrorCode setupSolverFunctionSNES() override;
 
-  MoFEMErrorCode updateElementVariables();
-  MoFEMErrorCode postProcessElement(int step);
+  MoFEMErrorCode updateElementVariables() override;
+  MoFEMErrorCode postProcessElement(int step) override;
 };
 
 #endif // __MFRONTGENERICINTERFACE_HPP__

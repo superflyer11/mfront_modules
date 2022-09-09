@@ -57,8 +57,10 @@ add_library(mfront_lib_all
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="dylib")
+    set(DEFAULT_LIB_EXTENSION "dylib")
   else()
     target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="so")
+    set(DEFAULT_LIB_EXTENSION "so")
 endif()
 
 install(
@@ -109,8 +111,15 @@ endif(MGIS_DIR)
 
 if(TFEL_DIR)
   message("TFEL DIR FOUND")
+
   add_test(compile_behaviours_test
     ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/Plasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNeck.mfront)
+
+  add_test(mi_necking_miehe_test
+    ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface
+    -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_miehe_coarse.cub
+    -mi_block_1 LogarithmicStrainPlasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_print_gauss 1 -order 2 -mi_param_1_0 450 -mi_param_1_1 130 -ts_dt 0.02 -ksp_monitor -log_sl verbose -pc_type lu -ts_type theta -ts_adapt_always_accept 1 -ts_theta_initial_guess_extrapolate 1 -ts_theta_theta 1 -ts_max_time 1.5 -ts_adapt_type none -mi_atom_test 1
+  )
 endif(TFEL_DIR)
 
 get_property(test_names DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY TESTS)
