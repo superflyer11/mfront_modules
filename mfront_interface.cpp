@@ -160,14 +160,14 @@ int main(int argc, char *argv[]) {
         new MFrontMoFEMInterface(m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
     for (auto &&mod : m_modules) {
-      mod.getCommandLineParameters();
-      mod.addElementFields();
+      CHKERR mod.getCommandLineParameters();
+      CHKERR mod.addElementFields();
     }
 
     // build fields
     CHKERR m_field.build_fields();
     for (auto &&mod : m_modules)
-      mod.createElements();
+      CHKERR mod.createElements();
 
     Projection10NodeCoordsOnField ent_method(m_field, "MESH_NODE_POSITIONS");
     CHKERR m_field.loop_dofs("MESH_NODE_POSITIONS", ent_method);
