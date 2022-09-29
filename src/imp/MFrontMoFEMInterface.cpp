@@ -426,15 +426,15 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     auto make_vtks = [&]() {
       MoFEMFunctionBegin;
       CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", postProcFe);
-      CHKERR postProcFe->writeFile(
-          "out_mi_" + boost::lexical_cast<std::string>(step) + ".h5m");
-
+      CHKERR postProcFe->writeFile("out_" + optionsPrefix +
+                                   boost::lexical_cast<std::string>(step) +
+                                   ".h5m");
       if (printGauss) {
-        string file_name =
-            "out_mi_gauss_" + boost::lexical_cast<std::string>(step) + ".h5m";
+        string file_name = "out_" + optionsPrefix + "gauss_" +
+                           boost::lexical_cast<std::string>(step) + ".h5m";
 
         CHKERR moabGaussIntPtr->write_file(file_name.c_str(), "MOAB",
-                                          "PARALLEL=WRITE_PART");
+                                           "PARALLEL=WRITE_PART");
         CHKERR moabGaussIntPtr->delete_mesh();
       }
 

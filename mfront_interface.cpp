@@ -59,7 +59,6 @@ int main(int argc, char *argv[]) {
                                  "-snes_rtol 1e-8 \n"
                                  "-ts_monitor \n"
                                  "-ts_alpha_radius 1 \n"
-                                 "-ts_monitor \n"
                                  "-mat_mumps_icntl_20 0 \n"
                                  "-mat_mumps_icntl_14 1200 \n"
                                  "-mat_mumps_icntl_24 1 \n"
@@ -124,7 +123,7 @@ int main(int argc, char *argv[]) {
     simple->getDomainFEName() = "MFRONT_EL";
 
     FieldApproximationBase base = AINSWORTH_LEGENDRE_BASE;
-    // Add displacement field 
+    // Add displacement field
     CHKERR m_field.add_field("U", H1, base, 3);
 
     // Add field representing ho-geometry
@@ -156,24 +155,16 @@ int main(int argc, char *argv[]) {
     m_modules.push_back(new NonlinearElasticElementInterface(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
-    m_modules.push_back(
-        new MFrontMoFEMInterface(m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
-
+    m_modules.push_back(new MFrontMoFEMInterface(
+        m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+    
     for (auto &&mod : m_modules) {
       CHKERR mod.getCommandLineParameters();
       CHKERR mod.addElementFields();
+      CHKERR mod.createElements();
     }
 
-    // build fields
     CHKERR m_field.build_fields();
-    for (auto &&mod : m_modules)
-      CHKERR mod.createElements();
-
-    Projection10NodeCoordsOnField ent_method(m_field, "MESH_NODE_POSITIONS");
-    CHKERR m_field.loop_dofs("MESH_NODE_POSITIONS", ent_method);
-
-    CHKERR m_field.build_finite_elements();
-    CHKERR m_field.build_adjacencies(simple->getBitRefLevel());
 
     DMType dm_name = "DMMOFEM";
     // Register DM problem
@@ -186,10 +177,13 @@ int main(int argc, char *argv[]) {
                               simple->getBitRefLevel());
     CHKERR DMSetFromOptions(dM);
 
-    for (auto &&mod : m_modules) {
-      CHKERR mod.setOperators();
+    for (auto &&mod : m_modules)
       CHKERR mod.addElementsToDM(dM);
-    }
+
+    Projection10NodeCoordsOnField ent_method(m_field, "MESH_NODE_POSITIONS");
+    CHKERR m_field.loop_dofs("MESH_NODE_POSITIONS", ent_method);
+    CHKERR m_field.build_finite_elements();
+    CHKERR m_field.build_adjacencies(simple->getBitRefLevel());
 
     CHKERR DMSetUp(dM);
     monitor_ptr = boost::make_shared<FEMethod>();
@@ -213,6 +207,7 @@ int main(int argc, char *argv[]) {
     if (is_quasi_static)
       t_type = GenericElementInterface::IM;
     for (auto &&mod : m_modules) {
+      CHKERR mod.setOperators();
       CHKERR mod.setupSolverFunctionTS(t_type);
       CHKERR mod.setupSolverJacobianTS(t_type);
     }
