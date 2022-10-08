@@ -78,6 +78,12 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   auto check_lib_finite_strain = [&](const std::string &lib,
                                      const std::string &beh_name, bool &flag) {
     MoFEMFunctionBeginHot;
+
+    ifstream f(lib.c_str());
+    if (!f.good())
+      MOFEM_LOG("WORLD", Sev::error)
+          << "Problem with the behaviour path: " << lib;
+
     auto &lm = LibrariesManager::get();
     flag = bool(lm.getBehaviourType(lib, beh_name) == 2) &&
         (lm.getBehaviourKinematic(lib, beh_name) == 3);
@@ -115,9 +121,9 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
         default_lib_path.c_str(), char_name, 255, &is_param);
     if (is_param)
       lib_path = string(char_name);
-
     auto &mgis_bv_ptr = block.second.mGisBehaviour;
     bool is_finite_strain = false;
+
     CHKERR check_lib_finite_strain(lib_path, name, is_finite_strain);
     if (is_finite_strain) {
       mgis_bv_ptr = boost::make_shared<Behaviour>(
@@ -233,7 +239,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
     updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
 
-    //FIXME: 
+    //TODO: update it according to the newest MoFEM
     CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineRhsPtr, true, false, false,
                        false);
     CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineLhsPtr, true, false, false,

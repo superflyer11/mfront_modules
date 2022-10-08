@@ -259,7 +259,7 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
   auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
 
   MatrixDouble3by3 mat(3, 3);
-  //FIXME: this cannot be hard-coded
+  //FIXME: this should not be hard-coded
   auto th_disp = get_tag("U", 3);
   auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
   auto th_grad = get_tag(mgis_bv.gradients[0].name, 9);
@@ -431,7 +431,6 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
                 1);
     myN.resize(nb_gauss_pts, 4, false);
     myN.clear();
-    // FIXME: TEST
     double *shape_ptr = &*myN.data().begin();
     cblas_dcopy(4 * nb_gauss_pts, QUAD_3D_TABLE[rule]->points, 1, shape_ptr, 1);
 
@@ -449,8 +448,6 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
   auto &stress_mat = *commonDataPtr->mStressPtr;
   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
 
-  // FIXME: make sure that the sizes are consistent
-  // size_t nb_gauss_pts = row_data.getN().size1();
   auto nbg = mat_int.size1();
   CHKERR commonDataPtr->getInternalVar(fe_ent, nbg, dAta.sizeIntVar,
                                        dAta.sizeGradVar);

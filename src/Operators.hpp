@@ -342,11 +342,11 @@ struct CommonData {
 
   MoFEMErrorCode setBlocks() {
     MoFEMFunctionBegin;
-    string block_name = "MFRONT_";
+    string block_name = "MFRONT";
     for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(mField, BLOCKSET, it)) {
-      // FIXME: set up a proper name
       if (it->getName().compare(0, block_name.size(), block_name) == 0) {
         std::vector<double> block_data;
+      // FIXME: TODO: maybe this should be set only from the command line!!!
         CHKERR it->getAttributes(block_data);
         const int id = it->getMeshsetId();
         EntityHandle meshset = it->getMeshset();
