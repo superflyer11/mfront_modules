@@ -84,6 +84,9 @@ target_link_libraries(mfront_interface
     mofem_petsc
     mofem_approx
     mofem_third_party
+    mofem_matrix_function
+    mofem_post_proc
+    mofem_boundary_conditions
     ${MoFEM_PROJECT_LIBS}
   )
 
