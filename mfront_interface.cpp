@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
 
     m_modules.push_back(new MFrontMoFEMInterface(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
-    
+
     for (auto &&mod : m_modules) {
       CHKERR mod.getCommandLineParameters();
       CHKERR mod.addElementFields();
