@@ -14,6 +14,10 @@ constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
 using Tensor4Pack = Tensor4<PackPtr<double *, 1>, 3, 3, 3, 3>;
 using DdgPack = Ddg<PackPtr<double *, 1>, 3, 3>;
 
+using EntData = EntitiesFieldData::EntData;
+using DomainEle = VolumeElementForcesAndSourcesCore;
+using DomainEleOp = DomainEle::UserDataOperator;
+
 enum DataTags { RHS = 0, LHS };
 
 extern double t_dt;
@@ -538,18 +542,6 @@ struct Monitor : public FEMethod {
     // CHKERR saveOutputMesh(ts_step);
 
     CHKERR TSSetTimeStep(ts, t_dt_prop);
-
-    // switch (atom_test_nb) {
-    // case 1: {
-    //   if (ts_step == 12)
-    //     if (fabs(min_disp + 9.3536) > 1e-4)
-    //       SETERRQ(PETSC_COMM_SELF, MOFEM_ATOM_TEST_INVALID,
-    //               "atom test diverged!");
-    //   break;
-    // }
-    // default:
-    //   break;
-    // }
 
     MoFEMFunctionReturn(0);
   }

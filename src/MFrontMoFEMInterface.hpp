@@ -37,7 +37,6 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   PetscBool printGauss;
 
   PetscInt oRder;
-  int atomTest;
   bool isDisplacementField;
   bool isFiniteKinematics;
   BitRefLevel bIt;

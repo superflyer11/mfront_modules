@@ -12,10 +12,6 @@
 using namespace MoFEM;
 using namespace FTensor;
 
-using EntData = EntitiesFieldData::EntData;
-using DomainEle = VolumeElementForcesAndSourcesCore;
-using DomainEleOp = DomainEle::UserDataOperator;
-
 #include <BasicFiniteElements.hpp>
 #include <quad.h>
 #include <MGIS/Behaviour/Behaviour.hxx>
@@ -41,7 +37,6 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
       isDisplacementField(is_displacement_field),
       isQuasiStatic(is_quasi_static) {
   oRder = -1;
-  atomTest = -1;
   isFiniteKinematics = true;
   printGauss = PETSC_FALSE;
   optionsPrefix = "mi_";
@@ -56,8 +51,6 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   // elasticity, mfront... etc
   CHKERR PetscOptionsInt("-order", "approximation order", "", oRder, &oRder,
                          PETSC_NULL);
-  CHKERR PetscOptionsInt("-atom_test", "atom test number", "", atomTest,
-                         &atomTest, PETSC_NULL);
 
   CHKERR PetscOptionsBool("-print_gauss",
                           "print gauss pts (internal variables)", "",
@@ -455,26 +448,6 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
   };
 
   CHKERR make_vtks();
-
-  switch (atomTest) {
-  case 1:
-    if (step == 75) {
-      auto t_disp = getFTensor1FromMat<3>(*(commonDataPtr->mDispPtr));
-      auto min_gg_disp_x = t_disp(0);
-      MOFEM_LOG("WORLD", Sev::inform)
-          << "Displacement on the gauss point:" << min_gg_disp_x;
-      if (abs(0.2761 + min_gg_disp_x) > 1e-3)
-        SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                "atom test diverged!");
-    }
-    break;
-
-  default:
-    if (atomTest > -1)
-      SETERRQ(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
-              "This atom test number is not yet implemented");
-    break;
-  }
 
   MoFEMFunctionReturn(0);
 };

@@ -1,6 +1,6 @@
 @DSL Implicit;
 
-@Behaviour LogarithmicStrainPlasticity;
+@Behaviour LogarithmicStrainPlasticityMiehe;
 @Author Thomas Helfer/Jérémy Bleyer;
 @Date 07 / 04 / 2020;
 
@@ -15,13 +15,19 @@ s0.setGlossaryName("YieldStress");
 @MaterialProperty stress H0;
 H0.setEntryName("HardeningSlope");
 
+@MaterialProperty real Rult;
+Rult.setEntryName("UltimateStrength");
+@MaterialProperty real be;
+be.setEntryName("HardeningExponent");
+
 @Brick StandardElastoViscoPlasticity{
   stress_potential : "Hooke" {
-	young_modulus : 210e9,
-        poisson_ratio : 0.3
+	    young_modulus : 206899.94,
+        poisson_ratio : 0.29
         },
   inelastic_flow : "Plastic" {
     criterion : "Mises",
-    isotropic_hardening : "Linear" {H : "H0", R0 : "s0"}
+    isotropic_hardening : "Linear" {R0 : s0, H : H0},
+    isotropic_hardening : "Voce" {R0 : 0, Rinf : Rult, b : be}
   }
 };
