@@ -1,8 +1,8 @@
 @DSL Implicit;
 
 @Behaviour LogarithmicStrainPlasticityMiehe;
-@Author Thomas Helfer/Jérémy Bleyer;
-@Date 07 / 04 / 2020;
+@Author Andrei Shvarts;
+@Date 16 / 03 / 2023;
 
 @StrainMeasure Hencky;
 
