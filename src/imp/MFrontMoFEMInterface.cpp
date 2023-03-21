@@ -151,8 +151,8 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
                                 my_param, &my_param, &is_set);
       if (!is_set)
         continue;
-      block.second.behDataPtr->s0.material_properties[dd] = my_param;
-      block.second.behDataPtr->s1.material_properties[dd] = my_param;
+      setMaterialProperty(block.second.behDataPtr->s0, dd, my_param);
+      setMaterialProperty(block.second.behDataPtr->s1, dd, my_param);
     }
 
     int nb = 0;

@@ -45,11 +45,6 @@ struct BlockData {
   double storedEnergy;
   double externalVariable;
 
-  vector<double> Kbuffer;
-  array<double, 9> stress1Buffer;
-  array<double, 9> grad1Buffer;
-  VectorDouble intVar1Buffer;
-
   Range tEts;
 
   BlockData()
@@ -58,6 +53,16 @@ struct BlockData {
     dIssipation = 0;
     storedEnergy = 0;
     externalVariable = 0;
+  }
+
+  inline MoFEMErrorCode setTag(DataTags tag) {
+    MoFEMFunctionBeginHot;
+    if (tag == RHS) {
+      behDataPtr->K[0] = 0;
+    } else {
+      behDataPtr->K[0] = 5;
+    }
+    MoFEMFunctionReturnHot(0);
   }
 
   MoFEMErrorCode setBlockBehaviourData(bool set_params_from_blocks) {
@@ -86,37 +91,25 @@ struct BlockData {
                    params.size(), total_number_of_params);
 
         for (int dd = 0; dd < total_number_of_params; ++dd) {
-          bView.s0.material_properties[dd] = params[dd];
-          bView.s1.material_properties[dd] = params[dd];
+          setMaterialProperty(behDataPtr->s0, dd, params[dd]);
+          setMaterialProperty(behDataPtr->s1, dd, params[dd]);
         }
       }
 
-      intVar1Buffer.resize(sizeIntVar);
-      intVar1Buffer.clear();
-
       if (isFiniteStrain) {
-        Kbuffer.resize(81);
-        bView.K = &*Kbuffer.begin();
-        bView.K[0] = 0; // no  tangent
-        bView.K[1] = 2; // PK1
-        bView.K[2] = 2; // PK1
+        behDataPtr->K[0] = 0; // no tangent
+        behDataPtr->K[1] = 2; // PK1
+        behDataPtr->K[2] = 2; // PK1
       } else {
-        Kbuffer.resize(36);
-        bView.K = &*Kbuffer.begin();
-        bView.K[0] = 0; // no tangent
-        bView.K[1] = 0; // cauchy
+        behDataPtr->K[0] = 0; // no tangent
+        behDataPtr->K[1] = 0; // cauchy
       }
 
-      for (auto &mb : {&bView.s0, &bView.s1}) {
-        mb->dissipated_energy = &dIssipation;
-        mb->stored_energy = &storedEnergy;
-        mb->external_state_variables = &externalVariable;
+      for (auto &mb : {&behDataPtr->s0, &behDataPtr->s1}) {
+        mb->dissipated_energy = dIssipation;
+        mb->stored_energy = storedEnergy;
+        setExternalStateVariable(*mb, 0, externalVariable);
       }
-
-      bView.s1.thermodynamic_forces = stress1Buffer.data();
-      bView.s1.gradients = grad1Buffer.data();
-      if (sizeIntVar > 0)
-        bView.s1.internal_state_variables = &*intVar1Buffer.begin();
     }
 
     MoFEMFunctionReturnHot(0);
@@ -377,18 +370,6 @@ struct CommonData {
     MoFEMFunctionReturn(0);
   }
 
-  inline auto &getBlockDataView(BlockData &data, DataTags tag) {
-    auto &mgis_bv = *data.mGisBehaviour;
-    data.bView.dt = t_dt;
-    if (tag == RHS) {
-      data.bView.K[0] = 0;
-    } else {
-      data.bView.K[0] = 5;
-    }
-
-    return data.bView;
-  };
-
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
                                 const int nb_gauss_pts, const int var_size,
                                 const int grad_size) {
@@ -478,9 +459,10 @@ extern boost::shared_ptr<CommonData> commonDataPtr;
 // MoFEMErrorCode saveOutputMesh(int step, bool print_gauss);
 
 template <bool IS_LARGE_STRAIN>
-inline MoFEMErrorCode mgis_integration(
-    size_t gg, FTensor::Tensor2<FTensor::PackPtr<double *, 1>, 3, 3> &t_grad,
-    CommonData &common_data, BlockData &block_data, BehaviourDataView &b_view) {
+inline MoFEMErrorCode
+mgis_integration(size_t gg,
+                 FTensor::Tensor2<FTensor::PackPtr<double *, 1>, 3, 3> &t_grad,
+                 CommonData &common_data, BlockData &block_data) {
   MoFEMFunctionBegin;
   int check_integration;
   MatrixDouble &mat_int = *common_data.internalVariablePtr;
@@ -493,25 +475,31 @@ inline MoFEMErrorCode mgis_integration(
 
   auto grad0_vec =
       getVectorAdaptor(&mat_grad0.data()[gg * size_of_grad], size_of_grad);
-  if (IS_LARGE_STRAIN)
-    block_data.grad1Buffer = get_voigt_vec(t_grad);
-  else
-    block_data.grad1Buffer = get_voigt_vec_symm(t_grad);
+  if (IS_LARGE_STRAIN) {
+    setGradient(block_data.behDataPtr->s1, 0, 9,
+                &*get_voigt_vec(t_grad).data());
+  } else {
+    setGradient(block_data.behDataPtr->s1, 0, 9,
+                &*get_voigt_vec_symm(t_grad).data());
+  }
 
-  b_view.s0.gradients = &*grad0_vec.begin();
+  setGradient(block_data.behDataPtr->s0, 0, grad0_vec.size(),
+              &*grad0_vec.begin());
 
   auto stress0_vec =
       getVectorAdaptor(&mat_stress0.data()[gg * size_of_grad], size_of_grad);
 
-  b_view.s0.thermodynamic_forces = &*stress0_vec.begin();
+  setThermodynamicForce(block_data.behDataPtr->s0, 0, stress0_vec.size(),
+                        &*stress0_vec.begin());
 
   if (size_of_vars) {
     auto internal_var =
         getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
-    b_view.s0.internal_state_variables = &*internal_var.begin();
-    check_integration = integrate(b_view, mgis_bv);
-  } else
-    check_integration = integrate(b_view, mgis_bv);
+    setInternalStateVariable(block_data.behDataPtr->s0, 0, internal_var.size(),
+                             &*internal_var.begin());
+  }
+
+  check_integration = integrate(block_data.bView, mgis_bv);
   // FIXME: this should be handled somehow
   // if (check_integration < 0)
   //   SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
