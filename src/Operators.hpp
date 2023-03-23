@@ -500,10 +500,19 @@ mgis_integration(size_t gg,
   }
 
   check_integration = integrate(block_data.bView, mgis_bv);
-  // FIXME: this should be handled somehow
-  // if (check_integration < 0)
-  //   SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-  //           "Something went wrong with MGIS integration.");
+  switch (check_integration) {
+  case -1:
+    SETERRQ(PETSC_COMM_SELF, MOFEM_OPERATION_UNSUCCESSFUL,
+            "MFront integration failed");
+    break;
+  case 0:
+    MOFEM_LOG("WORLD", Sev::inform)
+        << "Mfront integration succeeded but results are unreliable";
+    break;
+  case 1:
+  default:
+    break;
+  }
 
   MoFEMFunctionReturn(0);
 }

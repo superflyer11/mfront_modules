@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
     default:
       if (atom_test > -1)
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
-                 "Atom test number %dis not yet implemented", atom_test);
+                 "Atom test number %d is not yet implemented", atom_test);
       break;
     }
 
@@ -249,6 +249,7 @@ int main(int argc, char *argv[]) {
     monitor_ptr->operatorHook = []() { return 0; };
     monitor_ptr->postProcessHook = [&]() {
       MoFEMFunctionBegin;
+      
       auto ts_time = monitor_ptr->ts_t;
       auto ts_step = monitor_ptr->ts_step;
 
@@ -266,14 +267,15 @@ int main(int argc, char *argv[]) {
                 m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
                 MF_EXIST, QUIET);
 
-        switch (atom_test) {
-        case 1:
-          for (auto &it : atom_test_data) {
-            if (fabs(ts_time - it.first.first) < 1e-2) {
-              it.second = true;
-
-              if (field_ptr->size1()) {
-                auto t_p = getFTensor1FromMat<3>(*field_ptr);
+        if (field_ptr->size1()) {
+          auto t_p = getFTensor1FromMat<3>(*field_ptr);
+          MOFEM_LOG("ATOM_TEST", Sev::inform)
+              << "Field Eval: " << t_p(0) << " " << t_p(1) << " " << t_p(2);
+          switch (atom_test) {
+          case 1:
+            for (auto &it : atom_test_data) {
+              if (fabs(ts_time - it.first.first) < 1e-2) {
+                it.second = true;
                 double rel_dif =
                     fabs(t_p(1) - it.first.second) / it.first.second;
                 if (rel_dif > 5e-2) {
@@ -283,19 +285,20 @@ int main(int argc, char *argv[]) {
                            it.first.first, it.first.second, t_p(1));
                 } else {
                   MOFEM_LOG("ATOM_TEST", Sev::inform)
-                      << "Expected y-disp " << it.first.second
-                      << ", computed " << t_p(1) << ", rel diff " << rel_dif;
+                      << "Expected y-disp " << it.first.second << ", computed "
+                      << t_p(1) << ", rel diff " << rel_dif;
                 }
                 break;
               }
             }
+            break;
+          default:
+            break;
           }
-          MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
-          break;
-        default:
-          break;
         }
+        MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
       }
+
       MoFEMFunctionReturn(0);
     };
 
