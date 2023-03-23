@@ -355,8 +355,15 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
 
   auto opt = mField.getInterface<OperatorsTester>();
 
+  auto x0 = opt->setRandomFields(
+      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+
+  CHKERR DMoFEMMeshToGlobalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
+  CHKERR updateElementVariables();
+
   auto x = opt->setRandomFields(
       dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+
   auto diff_x = opt->setRandomFields(
       dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
 
