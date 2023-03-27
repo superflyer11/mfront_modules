@@ -340,6 +340,66 @@ MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
   add_domain_ops_lhs(mfrontPipelineLhsPtr->getOpPtrVector());
   add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
 
+  if (testJacobian) {
+    CHKERR testOperators();
+  }
+
+  MoFEMFunctionReturn(0);
+}
+
+MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
+  MoFEMFunctionBegin;
+
+  auto simple = mField.getInterface<Simple>();
+
+  auto opt = mField.getInterface<OperatorsTester>();
+
+  auto x0 = opt->setRandomFields(
+      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+
+  CHKERR DMoFEMMeshToGlobalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
+  CHKERR updateElementVariables();
+
+  auto x = opt->setRandomFields(
+      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+
+  auto diff_x = opt->setRandomFields(
+      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+
+  auto res = opt->assembleVec(
+      dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,
+      SmartPetscObj<Vec>(), SmartPetscObj<Vec>(), 0, 1, CacheTupleSharedPtr());
+
+  double res_norm;
+  CHKERR VecNorm(res, NORM_2, &res_norm);
+
+  double eps = res_norm * 1e-10;
+
+  auto diff_res = opt->checkCentralFiniteDifference(
+      dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, mfrontPipelineLhsPtr,
+      x, SmartPetscObj<Vec>(), SmartPetscObj<Vec>(), diff_x, 0, 1, eps);
+
+  double diff_res_norm;
+  CHKERR VecNorm(diff_res, NORM_2, &diff_res_norm);
+
+  double rel_diff = diff_res_norm / res_norm;
+  MOFEM_LOG_C("WORLD", Sev::inform,
+              "Relative difference between hand-coded and finite difference "
+              "Jacobian: %3.4e",
+              rel_diff);
+
+  constexpr double err = 1e-7;
+  if (rel_diff > err)
+    SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+            "Relative norm of the difference between hand-coded and the "
+            "finite difference Jacobian is too high");
+
+  // CHKERR VecZeroEntries(x0);
+  // CHKERR VecGhostUpdateBegin(x0, INSERT_VALUES, SCATTER_FORWARD);
+  // CHKERR VecGhostUpdateEnd(x0, INSERT_VALUES, SCATTER_FORWARD);
+  // CHKERR DMoFEMMeshToGlobalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
+  // CHKERR updateElementVariables();       
+
   MoFEMFunctionReturn(0);
 }
 
