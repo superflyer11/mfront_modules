@@ -42,8 +42,8 @@ Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
 
-double t_dt = 1.0;
-double t_dt_prop = 1.0;
+double t_dt = 0.0;
+double t_dt_prop = 0.0;
 
 boost::shared_ptr<CommonData> commonDataPtr;
 

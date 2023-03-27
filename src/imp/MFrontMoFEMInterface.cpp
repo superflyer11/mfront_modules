@@ -395,6 +395,12 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
             "Relative norm of the difference between hand-coded and the "
             "finite difference Jacobian is too high");
 
+  // CHKERR VecZeroEntries(x0);
+  // CHKERR VecGhostUpdateBegin(x0, INSERT_VALUES, SCATTER_FORWARD);
+  // CHKERR VecGhostUpdateEnd(x0, INSERT_VALUES, SCATTER_FORWARD);
+  // CHKERR DMoFEMMeshToGlobalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
+  // CHKERR updateElementVariables();       
+
   MoFEMFunctionReturn(0);
 }
 
