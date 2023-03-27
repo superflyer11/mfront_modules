@@ -107,7 +107,8 @@ int main(int argc, char *argv[]) {
     PetscBool is_partitioned = PETSC_TRUE;
 
     int atom_test = -1;
-    std::vector<std::pair<std::pair<double, double>, bool>> atom_test_data;
+    std::vector<std::pair<std::pair<double, std::array<double, 3>>, bool>>
+        atom_test_data;
 
     PetscBool field_eval_flag = PETSC_FALSE;
     std::array<double, 3> field_eval_coords;
@@ -137,16 +138,21 @@ int main(int argc, char *argv[]) {
 
     switch (atom_test) {
     case 1:
-      atom_test_data = {{{0.2, 0.11935}, false},
-                        {{0.5, 0.32597}, false},
-                        {{0.7, 0.68715}, false},
-                        {{0.9, 1.3457}, false},
-                        {{1.2, 2.662}, false}};
+      atom_test_data = {{{0.1, {-0.11010643, 0, 0}}, false},
+                        {{0.2, {-0.2246288, 0, 0}}, false},
+                        {{0.3, {-0.33801552, 0, 0}}, false},
+                        {{0.4, {-0.4528381, 0, 0}}, false},
+                        {{0.5, {-0.57686366, 0, 0}}, false},
+                        {{0.6, {-0.7539502, 0, 0}}, false},
+                        {{0.7, {-1.1205213, 0, 0}}, false},
+                        {{0.8, {-1.5958605, 0, 0}}, false},
+                        {{0.9, {-2.1240415, 0, 0}}, false},
+                        {{1.0, {-2.6948517, 0, 0}}, false}};
       break;
     default:
       if (atom_test > -1)
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
-                 "Atom test number %dis not yet implemented", atom_test);
+                 "Atom test number %d is not yet implemented", atom_test);
       break;
     }
 
@@ -258,6 +264,20 @@ int main(int argc, char *argv[]) {
           CHKERR mod.postProcessElement(ts_step);
       }
 
+      double threshold = 1e-2;
+      auto check_diff = [threshold](auto exp, auto comp) {
+        for (int dd : {0, 1, 2}) {
+          double diff = fabs(exp[dd] - comp(dd));
+          if (fabs(exp[dd]) > std::numeric_limits<double>::epsilon()) {
+            diff /= fabs(exp[dd]);
+          }
+          if (diff > threshold) {
+            return false;
+          }
+        }
+        return true;
+      };
+
       if (field_eval_flag) {
         CHKERR m_field.getInterface<FieldEvaluatorInterface>()
             ->evalFEAtThePoint3D(
@@ -270,21 +290,14 @@ int main(int argc, char *argv[]) {
         case 1:
           for (auto &it : atom_test_data) {
             if (fabs(ts_time - it.first.first) < 1e-2) {
-              it.second = true;
-
               if (field_ptr->size1()) {
+                it.second = true;
                 auto t_p = getFTensor1FromMat<3>(*field_ptr);
-                double rel_dif =
-                    fabs(t_p(1) - it.first.second) / it.first.second;
-                if (rel_dif > 5e-2) {
-                  SETERRQ3(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                           "Atom test failed for time %3.2f: expected "
-                           "displacement %3.4f, computed %3.4f",
-                           it.first.first, it.first.second, t_p(1));
-                } else {
-                  MOFEM_LOG("ATOM_TEST", Sev::inform)
-                      << "Expected y-disp " << it.first.second
-                      << ", computed " << t_p(1) << ", rel diff " << rel_dif;
+                if (!check_diff(it.first.second, t_p)) {
+                  SETERRQ2(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+                           "Atom test failed for time %1.1f: difference is "
+                           "greater than %0.2f",
+                           it.first.first, threshold);
                 }
                 break;
               }
