@@ -22,7 +22,7 @@ be.setEntryName("HardeningExponent");
 
 @Brick StandardElastoViscoPlasticity{
   stress_potential : "Hooke" {
-	    young_modulus : 206913,
+	    young_modulus : 206900,
         poisson_ratio : 0.29
         },
   inelastic_flow : "Plastic" {

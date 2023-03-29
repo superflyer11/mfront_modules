@@ -109,6 +109,7 @@ int main(int argc, char *argv[]) {
     int atom_test = -1;
     std::vector<std::pair<std::pair<double, std::array<double, 3>>, bool>>
         atom_test_data;
+    double atom_test_threshold = 1;
 
     PetscBool field_eval_flag = PETSC_FALSE;
     std::array<double, 3> field_eval_coords;
@@ -138,16 +139,22 @@ int main(int argc, char *argv[]) {
 
     switch (atom_test) {
     case 1:
-      atom_test_data = {{{0.1, {-0.11010643, 0, 0}}, false},
-                        {{0.2, {-0.2246288, 0, 0}}, false},
-                        {{0.3, {-0.33801552, 0, 0}}, false},
-                        {{0.4, {-0.4528381, 0, 0}}, false},
-                        {{0.5, {-0.57686366, 0, 0}}, false},
-                        {{0.6, {-0.7539502, 0, 0}}, false},
-                        {{0.7, {-1.1205213, 0, 0}}, false},
-                        {{0.8, {-1.5958605, 0, 0}}, false},
-                        {{0.9, {-2.1240415, 0, 0}}, false},
-                        {{1.0, {-2.6948517, 0, 0}}, false}};
+      atom_test_data = {
+          {{0.1, {-0.1101, 0, 0}}, false}, {{0.2, {-0.2246, 0, 0}}, false},
+          {{0.3, {-0.3380, 0, 0}}, false}, {{0.4, {-0.4528, 0, 0}}, false},
+          {{0.5, {-0.5769, 0, 0}}, false}, {{0.6, {-0.7539, 0, 0}}, false},
+          {{0.7, {-1.1205, 0, 0}}, false}, {{0.8, {-1.5959, 0, 0}}, false},
+          {{0.9, {-2.1240, 0, 0}}, false}, {{1.0, {-2.6948, 0, 0}}, false}};
+      atom_test_threshold = 1e-2;
+      break;
+    case 2:
+      atom_test_data = {
+          {{0.14, {0, 0.085558, 0}}, false}, {{0.28, {0, 0.17058, 0}}, false},
+          {{0.42, {0, 0.26118, 0}}, false},  {{0.56, {0, 0.38472, 0}}, false},
+          {{0.70, {0, 0.68715, 0}}, false},  {{0.84, {0, 1.1362, 0}}, false},
+          {{0.98, {0, 1.6878, 0}}, false},   {{1.12, {0, 2.3067, 0}}, false},
+          {{1.26, {0, 2.8729, 0}}, false},   {{1.40, {0, 3.2957, 0}}, false}};
+      atom_test_threshold = 6e-2;
       break;
     default:
       if (atom_test > -1)
@@ -264,50 +271,49 @@ int main(int argc, char *argv[]) {
           CHKERR mod.postProcessElement(ts_step);
       }
 
-      double threshold = 1e-2;
-      auto check_diff = [threshold](auto exp, auto comp) {
+      auto check_diff = [atom_test_threshold](auto exp, auto comp) {
         for (int dd : {0, 1, 2}) {
           double diff = fabs(exp[dd] - comp(dd));
           if (fabs(exp[dd]) > std::numeric_limits<double>::epsilon()) {
             diff /= fabs(exp[dd]);
           }
-          if (diff > threshold) {
+          if (diff > atom_test_threshold) {
             return false;
           }
         }
         return true;
       };
 
-      if (field_eval_flag) {
-        CHKERR m_field.getInterface<FieldEvaluatorInterface>()
-            ->evalFEAtThePoint3D(
-                field_eval_coords.data(), 1e-12, simple->getProblemName(),
-                simple->getDomainFEName(), field_eval_data,
-                m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
-                MF_EXIST, QUIET);
-
-        switch (atom_test) {
-        case 1:
-          for (auto &it : atom_test_data) {
-            if (fabs(ts_time - it.first.first) < 1e-2) {
-              it.second = true;
+      switch (atom_test) {
+      case 1:
+      case 2:
+        for (auto &it : atom_test_data) {
+          if (fabs(ts_time - it.first.first) < 1e-2) {
+            it.second = true;
+            if (field_eval_flag) {
+              CHKERR m_field.getInterface<FieldEvaluatorInterface>()
+                  ->evalFEAtThePoint3D(
+                      field_eval_coords.data(), 1e-12, simple->getProblemName(),
+                      simple->getDomainFEName(), field_eval_data,
+                      m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
+                      MF_EXIST, QUIET);
               if (field_ptr->size1()) {
                 auto t_p = getFTensor1FromMat<3>(*field_ptr);
                 if (!check_diff(it.first.second, t_p)) {
                   SETERRQ2(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                           "Atom test failed for time %1.1f: difference is "
+                           "Atom test failed for time %1.2f: difference is "
                            "greater than %0.2f",
-                           it.first.first, threshold);
+                           it.first.first, atom_test_threshold);
                 }
-                break;
               }
             }
+            break;
           }
-          MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
-          break;
-        default:
-          break;
         }
+        MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
+        break;
+      default:
+        break;
       }
       MoFEMFunctionReturn(0);
     };
@@ -364,10 +370,11 @@ int main(int argc, char *argv[]) {
 
     switch (atom_test) {
     case 1:
+    case 2:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                   "Atom test failed: output for time %3.2f was not observed",
+                   "Atom test failed: output for time %1.2f was not observed",
                    it.first.first);
         }
       }

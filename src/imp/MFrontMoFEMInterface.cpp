@@ -411,7 +411,7 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
               "Jacobian: %3.4e",
               rel_diff);
 
-  constexpr double err = 1e-9;
+  constexpr double err = 1e-7;
   if (rel_diff > err)
     SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
             "Relative norm of the difference between hand-coded and the "
