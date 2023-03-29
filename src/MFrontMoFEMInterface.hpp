@@ -36,8 +36,10 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   PetscBool isQuasiStatic;
   PetscBool printGauss;
 
+  PetscBool testJacobian;
+  PetscReal randomFieldScale;
+
   PetscInt oRder;
-  int atomTest;
   bool isDisplacementField;
   bool isFiniteKinematics;
   BitRefLevel bIt;
@@ -63,6 +65,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode addElementFields() override;
   MoFEMErrorCode createElements() override;
   MoFEMErrorCode setOperators() override;
+  MoFEMErrorCode testOperators(); //FIXME: Add this funtion to GenericElementInterface
+
   MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
 
   MoFEMErrorCode setupSolverJacobianTS(const TSType type) override;

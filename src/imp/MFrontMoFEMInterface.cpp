@@ -12,10 +12,6 @@
 using namespace MoFEM;
 using namespace FTensor;
 
-using EntData = EntitiesFieldData::EntData;
-using DomainEle = VolumeElementForcesAndSourcesCore;
-using DomainEleOp = DomainEle::UserDataOperator;
-
 #include <BasicFiniteElements.hpp>
 #include <quad.h>
 #include <MGIS/Behaviour/Behaviour.hxx>
@@ -41,9 +37,10 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
       isDisplacementField(is_displacement_field),
       isQuasiStatic(is_quasi_static) {
   oRder = -1;
-  atomTest = -1;
   isFiniteKinematics = true;
   printGauss = PETSC_FALSE;
+  testJacobian = PETSC_FALSE;
+  randomFieldScale = 1.0;
   optionsPrefix = "mi_";
 }
 
@@ -56,12 +53,16 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   // elasticity, mfront... etc
   CHKERR PetscOptionsInt("-order", "approximation order", "", oRder, &oRder,
                          PETSC_NULL);
-  CHKERR PetscOptionsInt("-atom_test", "atom test number", "", atomTest,
-                         &atomTest, PETSC_NULL);
 
   CHKERR PetscOptionsBool("-print_gauss",
                           "print gauss pts (internal variables)", "",
                           printGauss, &printGauss, PETSC_NULL);
+
+  CHKERR PetscOptionsBool("-test_jacobian", "test Jacobian (LHS matrix)", "",
+                          testJacobian, &testJacobian, PETSC_NULL);
+  CHKERR PetscOptionsReal("-random_field_scale",
+                          "scale for the finite difference jacobian", "",
+                          randomFieldScale, &randomFieldScale, PETSC_NULL);
 
   if (printGauss)
     moabGaussIntPtr = boost::shared_ptr<moab::Interface>(new moab::Core());
@@ -150,8 +151,8 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
                                 my_param, &my_param, &is_set);
       if (!is_set)
         continue;
-      block.second.behDataPtr->s0.material_properties[dd] = my_param;
-      block.second.behDataPtr->s1.material_properties[dd] = my_param;
+      setMaterialProperty(block.second.behDataPtr->s0, dd, my_param);
+      setMaterialProperty(block.second.behDataPtr->s1, dd, my_param);
     }
 
     int nb = 0;
@@ -351,20 +352,42 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
   MoFEMFunctionBegin;
 
   auto simple = mField.getInterface<Simple>();
-
   auto opt = mField.getInterface<OperatorsTester>();
 
-  auto x0 = opt->setRandomFields(
-      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+  Range tets, verts, ho_ents;
+  for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
+    tets.merge(data.tEts);
+  }
 
-  CHKERR DMoFEMMeshToGlobalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
+  CHKERR mField.get_moab().get_connectivity(tets, verts, true);
+  for (auto d : {1, 2, 3}) {
+    CHKERR mField.get_moab().get_adjacencies(verts, d, false, ho_ents,
+                                             moab::Interface::UNION);
+  }
+
+  auto set_random_field = [&](double scale_verts, double scale_ho_ents) {
+    auto x =
+        opt->setRandomFields(dM, {{positionField, {-scale_verts, scale_verts}}},
+                             boost::make_shared<Range>(verts));
+
+    auto x_ho_ents = opt->setRandomFields(
+        dM, {{positionField, {-scale_ho_ents, scale_ho_ents}}},
+        boost::make_shared<Range>(ho_ents));
+
+    CHKERR VecAXPY(x, 1., x_ho_ents);
+    CHKERR VecGhostUpdateBegin(x, INSERT_VALUES, SCATTER_FORWARD);
+    CHKERR VecGhostUpdateEnd(x, INSERT_VALUES, SCATTER_FORWARD);
+
+    return x;
+  };
+
+  auto x0 = set_random_field(randomFieldScale * 0.1, randomFieldScale * 0.01);
+
+  CHKERR DMoFEMMeshToLocalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
   CHKERR updateElementVariables();
 
-  auto x = opt->setRandomFields(
-      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
-
-  auto diff_x = opt->setRandomFields(
-      dM, {{positionField, {-randomFieldScale, randomFieldScale}}});
+  auto x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+  auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
 
   auto res = opt->assembleVec(
       dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,
@@ -394,11 +417,9 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
             "Relative norm of the difference between hand-coded and the "
             "finite difference Jacobian is too high");
 
-  // CHKERR VecZeroEntries(x0);
-  // CHKERR VecGhostUpdateBegin(x0, INSERT_VALUES, SCATTER_FORWARD);
-  // CHKERR VecGhostUpdateEnd(x0, INSERT_VALUES, SCATTER_FORWARD);
-  // CHKERR DMoFEMMeshToGlobalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
-  // CHKERR updateElementVariables();       
+  auto zero = set_random_field(0, 0);
+  CHKERR DMoFEMMeshToLocalVector(dM, zero, INSERT_VALUES, SCATTER_REVERSE);
+  commonDataPtr->clearTags();
 
   MoFEMFunctionReturn(0);
 }
@@ -515,26 +536,6 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
   };
 
   CHKERR make_vtks();
-
-  switch (atomTest) {
-  case 1:
-    if (step == 75) {
-      auto t_disp = getFTensor1FromMat<3>(*(commonDataPtr->mDispPtr));
-      auto min_gg_disp_x = t_disp(0);
-      MOFEM_LOG("WORLD", Sev::inform)
-          << "Displacement on the gauss point:" << min_gg_disp_x;
-      if (abs(0.2761 + min_gg_disp_x) > 1e-3)
-        SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                "atom test diverged!");
-    }
-    break;
-
-  default:
-    if (atomTest > -1)
-      SETERRQ(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
-              "This atom test number is not yet implemented");
-    break;
-  }
 
   MoFEMFunctionReturn(0);
 };

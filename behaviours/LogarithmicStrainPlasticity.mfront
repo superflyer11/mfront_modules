@@ -15,11 +15,6 @@ s0.setGlossaryName("YieldStress");
 @MaterialProperty stress H0;
 H0.setEntryName("HardeningSlope");
 
-@Parameter s0     =  1.e9;
-s0.setEntryName("YieldStress");
-@Parameter H0     =  1.e9;
-H0.setEntryName("HardeningSlope");
-
 @Brick StandardElastoViscoPlasticity{
   stress_potential : "Hooke" {
 	young_modulus : 210e9,
