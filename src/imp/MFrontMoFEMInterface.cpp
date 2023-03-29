@@ -381,13 +381,13 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
     return x;
   };
 
-  auto x0 = set_random_field(randomFieldScale, randomFieldScale * 1e-1);
+  auto x0 = set_random_field(randomFieldScale * 0.1, randomFieldScale * 0.01);
 
   CHKERR DMoFEMMeshToLocalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
   CHKERR updateElementVariables();
 
-  auto x = set_random_field(randomFieldScale, randomFieldScale * 1e-1);
-  auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 1e-1);
+  auto x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+  auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
 
   auto res = opt->assembleVec(
       dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,

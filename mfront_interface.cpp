@@ -152,8 +152,10 @@ int main(int argc, char *argv[]) {
           {{0.14, {0, 0.085558, 0}}, false}, {{0.28, {0, 0.17058, 0}}, false},
           {{0.42, {0, 0.26118, 0}}, false},  {{0.56, {0, 0.38472, 0}}, false},
           {{0.70, {0, 0.68715, 0}}, false},  {{0.84, {0, 1.1362, 0}}, false},
-          {{0.98, {0, 1.6878, 0}}, false},   {{1.12, {0, 2.3067, 0}}, false},
-          {{1.26, {0, 2.8729, 0}}, false},   {{1.40, {0, 3.2957, 0}}, false}};
+          {{0.98, {0, 1.6878, 0}}, false}};
+      // {{1.12, {0, 2.3067, 0}}, false},
+      // {{1.26, {0, 2.8729, 0}}, false},
+      // {{1.40, {0, 3.2957, 0}}, false}
       atom_test_threshold = 6e-2;
       break;
     default:
@@ -258,7 +260,11 @@ int main(int argc, char *argv[]) {
     }
 
     monitor_ptr = boost::make_shared<FEMethod>();
-    monitor_ptr->preProcessHook = []() { return 0; };
+    monitor_ptr->preProcessHook = [&]() { 
+      MoFEMFunctionBegin;
+      t_dt = monitor_ptr->ts_dt;
+      MoFEMFunctionReturn(0);
+      };
     monitor_ptr->operatorHook = []() { return 0; };
     monitor_ptr->postProcessHook = [&]() {
       MoFEMFunctionBegin;

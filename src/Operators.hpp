@@ -146,6 +146,8 @@ template <typename T> inline auto get_voigt_vec(T &t_grad) {
 
   // double det;
   // CHKERR determinantTensor3by3(F, det);
+  // if (det < 0)
+  //   MOFEM_LOG("WORLD", Sev::error) << "NEGATIVE DET!!!" << det;
 
   array<double, 9> vec{F(0, 0), F(1, 1), F(2, 2), F(0, 1), F(1, 0),
                        F(0, 2), F(2, 0), F(1, 2), F(2, 1)};
@@ -514,6 +516,8 @@ mgis_integration(size_t gg,
                              &*internal_var.begin());
   }
 
+  // cout << "TIME STEP: " << block_data.behDataPtr->dt << endl;
+
   check_integration = integrate(block_data.bView, mgis_bv);
   switch (check_integration) {
   case -1:
@@ -532,39 +536,39 @@ mgis_integration(size_t gg,
   MoFEMFunctionReturn(0);
 }
 
-struct Monitor : public FEMethod {
+// struct Monitor : public FEMethod {
 
-  Monitor(SmartPetscObj<DM> &dm,
-          boost::shared_ptr<PostProcVolumeOnRefinedMesh> post_proc_fe,
-          boost::shared_ptr<DomainEle> update_history,
-          moab::Interface &moab_mesh, bool print_gauss)
-      : dM(dm), postProcFe(post_proc_fe), updateHist(update_history),
-        internalVarMesh(moab_mesh), printGauss(print_gauss){};
+//   Monitor(SmartPetscObj<DM> &dm,
+//           boost::shared_ptr<PostProcVolumeOnRefinedMesh> post_proc_fe,
+//           boost::shared_ptr<DomainEle> update_history,
+//           moab::Interface &moab_mesh, bool print_gauss)
+//       : dM(dm), postProcFe(post_proc_fe), updateHist(update_history),
+//         internalVarMesh(moab_mesh), printGauss(print_gauss){};
 
-  MoFEMErrorCode preProcess() {
+//   MoFEMErrorCode preProcess() {
 
-    CHKERR TSGetTimeStep(ts, &t_dt);
-    return 0;
-  }
-  MoFEMErrorCode operator()() { return 0; }
+//     CHKERR TSGetTimeStep(ts, &t_dt);
+//     return 0;
+//   }
+//   MoFEMErrorCode operator()() { return 0; }
 
-  MoFEMErrorCode postProcess() {
-    MoFEMFunctionBegin;
+//   MoFEMErrorCode postProcess() {
+//     MoFEMFunctionBegin;
 
-    // CHKERR saveOutputMesh(ts_step);
+//     // CHKERR saveOutputMesh(ts_step);
 
-    CHKERR TSSetTimeStep(ts, t_dt_prop);
+//     CHKERR TSSetTimeStep(ts, t_dt_prop);
 
-    MoFEMFunctionReturn(0);
-  }
+//     MoFEMFunctionReturn(0);
+//   }
 
-private:
-  SmartPetscObj<DM> dM;
-  boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
-  boost::shared_ptr<DomainEle> updateHist;
-  moab::Interface &internalVarMesh;
-  bool printGauss;
-};
+// private:
+//   SmartPetscObj<DM> dM;
+//   boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
+//   boost::shared_ptr<DomainEle> updateHist;
+//   moab::Interface &internalVarMesh;
+//   bool printGauss;
+// };
 
 template <bool UPDATE, bool IS_LARGE_STRAIN>
 struct OpStressTmp : public DomainEleOp {
