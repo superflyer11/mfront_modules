@@ -151,6 +151,9 @@ template <typename T> inline auto get_voigt_vec(T &t_grad) {
   Index<'j', 3> j;
   F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
 
+  // double det;
+  // CHKERR determinantTensor3by3(F, det);
+
   array<double, 9> vec{F(0, 0), F(1, 1), F(2, 2), F(0, 1), F(1, 0),
                        F(0, 2), F(2, 0), F(1, 2), F(2, 1)};
 
@@ -470,6 +473,18 @@ struct CommonData {
         "_GRAD_TAG", default_length, MB_TYPE_DOUBLE, gradientTag,
         MB_TAG_CREAT | MB_TAG_VARLEN | MB_TAG_SPARSE, PETSC_NULL);
 
+    MoFEMFunctionReturn(0);
+  }
+
+  MoFEMErrorCode clearTags() {
+    MoFEMFunctionBegin;
+    double zero = 0;
+    for (auto &[id, data] : setOfBlocksData) {
+      CHKERR mField.get_moab().tag_clear_data(internalVariableTag, data.tEts,
+                                              &zero);
+      CHKERR mField.get_moab().tag_clear_data(stressTag, data.tEts, &zero);
+      CHKERR mField.get_moab().tag_clear_data(gradientTag, data.tEts, &zero);
+    }
     MoFEMFunctionReturn(0);
   }
 };

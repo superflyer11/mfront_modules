@@ -290,8 +290,8 @@ int main(int argc, char *argv[]) {
         case 1:
           for (auto &it : atom_test_data) {
             if (fabs(ts_time - it.first.first) < 1e-2) {
+              it.second = true;
               if (field_ptr->size1()) {
-                it.second = true;
                 auto t_p = getFTensor1FromMat<3>(*field_ptr);
                 if (!check_diff(it.first.second, t_p)) {
                   SETERRQ2(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
