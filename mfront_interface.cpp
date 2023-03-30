@@ -158,6 +158,12 @@ int main(int argc, char *argv[]) {
       // {{1.40, {0, 3.2957, 0}}, false}
       atom_test_threshold = 6e-2;
       break;
+    case 3:
+      break;
+    case 4:
+      break;
+    case 5:
+      break;
     default:
       if (atom_test > -1)
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,

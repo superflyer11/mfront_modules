@@ -122,8 +122,8 @@ if(TFEL_DIR)
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/3D_necking_coarse_4parts.h5m -mi_block_1 LogarithmicStrainPlasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -ts_max_time 1.0 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 65  -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_theta_initial_guess_extrapolate 1 -ts_theta_theta 1  -ts_exact_final_time matchstep -atom_test 1 -field_eval_coords 6.2975,0,0 -mi_test_jacobian 1 -mi_random_field_scale 0.01 -is_partitioned 1
   )
 
-  add_test(creep
-  valgrind --dsymutil=yes --track-origins=yes --trace-children=yes --show-leak-kinds=all --verbose --log-file=valgrind-out.txt ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_test.cub -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 0 -mi_param_1_3 0 -mi_param_1_4 1e-4 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/relax.in -ts_max_time 0.1 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 0 -ts_exact_final_time matchstep -pc_type lu
+  add_test(creep_plate
+  ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_plate.cub -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/creep_test.in -ts_max_time 1.0 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu
 )
 endif(TFEL_DIR)
 
