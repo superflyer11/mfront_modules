@@ -76,6 +76,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
 
   dAta.setTag(RHS);
   dAta.behDataPtr->dt = t_dt;
+  dAta.bView.dt = t_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar);
@@ -145,6 +146,7 @@ MoFEMErrorCode OpTangent<T>::doWork(int side, EntityType type, EntData &data) {
 
   dAta.setTag(LHS);
   dAta.behDataPtr->dt = t_dt;
+  dAta.bView.dt = t_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar);
@@ -380,6 +382,7 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
 
   dAta.setTag(RHS);
   dAta.behDataPtr->dt = t_dt;
+  dAta.bView.dt = t_dt;
 
   int &size_of_vars = dAta.sizeIntVar;
   int &size_of_grad = dAta.sizeGradVar;

@@ -516,8 +516,6 @@ mgis_integration(size_t gg,
                              &*internal_var.begin());
   }
 
-  // cout << "TIME STEP: " << block_data.behDataPtr->dt << endl;
-
   check_integration = integrate(block_data.bView, mgis_bv);
   switch (check_integration) {
   case -1:

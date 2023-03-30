@@ -7,7 +7,7 @@
   "Generalised Maxwell law"
 }
 
-@IntegerConstant Nv = 1;
+@IntegerConstant Nv = 3;
 
 @MaterialProperty real k0;
 k0.setGlossaryName("BulkModulus");

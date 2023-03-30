@@ -1,0 +1,61 @@
+@DSL       DefaultDSL;
+@Behaviour StandardLinearSolid;
+@Author    Andrei Shvarts;
+@Date      29/03/2023; 
+
+@Description{
+  "Standard Linear Solid"
+}
+
+@MaterialProperty real k0;
+k0.setGlossaryName("BulkModulus");
+@MaterialProperty real mu0;
+mu0.setGlossaryName("ShearModulus");
+
+@MaterialProperty real k1;
+k1.setEntryName("ViscoelasticBulkModulus");
+@MaterialProperty real mu1;
+mu1.setEntryName("ViscoelasticShearModulus");
+@MaterialProperty real tau1;
+tau1.setEntryName("TimeScale");
+
+@StateVariable StressStensor sej;
+sej.setEntryName("ViscoelasticStress");
+
+@LocalVariable stress l0;
+@LocalVariable stress d[2];
+
+@InitLocalVariables{
+  l0 = k0-2*mu0/3;
+}
+
+@PredictionOperator{
+  Dt = l0*Stensor4::IxI()+2*mu0*Stensor4::Id();
+}
+
+@Integrator{
+  const auto id = Stensor::Id();
+  const auto e = eto+deto;
+  d   = {l0,2*mu0};
+  sig = d[0]*trace(e)*id+d[1]*e;
+  if(dt>0){
+    const auto edt = exp(-dt/tau1);
+    const auto c   =  tau1*(1-edt)/dt;
+    const auto c1  =    k1*c;
+    const auto c2  = 2*mu1*c;
+    const auto pj  = trace(sej)*edt/3+c1*trace(deto); 
+    d[0] += c1-c2/3;
+    d[1] += c2;
+    // updating stresses
+    sej  = deviator(sej)*edt+c2*deviator(deto)+pj*id;
+    sig    += sej;
+  }
+}
+
+@TangentOperator{
+  if(smt==CONSISTENTTANGENTOPERATOR){
+    Dt = d[0]*Stensor4::IxI()+d[1]*Stensor4::Id();
+  } else {
+    Dt = l0*Stensor4::IxI()+2*mu0*Stensor4::Id();
+  }
+}
