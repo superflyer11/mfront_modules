@@ -490,16 +490,16 @@ mgis_integration(size_t gg,
   int &size_of_grad = block_data.sizeGradVar;
   auto &mgis_bv = *block_data.mGisBehaviour;
 
-  auto grad0_vec =
-      getVectorAdaptor(&mat_grad0.data()[gg * size_of_grad], size_of_grad);
   if (IS_LARGE_STRAIN) {
-    setGradient(block_data.behDataPtr->s1, 0, 9,
+    setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                 &*get_voigt_vec(t_grad).data());
   } else {
-    setGradient(block_data.behDataPtr->s1, 0, 9,
+    setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                 &*get_voigt_vec_symm(t_grad).data());
   }
 
+  auto grad0_vec =
+      getVectorAdaptor(&mat_grad0.data()[gg * size_of_grad], size_of_grad);
   setGradient(block_data.behDataPtr->s0, 0, grad0_vec.size(),
               &*grad0_vec.begin());
 
