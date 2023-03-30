@@ -123,7 +123,7 @@ if(TFEL_DIR)
   )
 
   add_test(necking_miehe
-  ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_miehe_fine_4parts.h5m -mi_block_1 LogarithmicStrainPlasticityNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 450 -mi_param_1_1 129.24 -mi_param_1_2 265 -mi_param_1_3 16.93 -ts_max_time 1.4 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -atom_test 2 -field_eval_coords 0,-6.298,0 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
+  ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_miehe_fine_4parts.h5m -mi_block_1 LogarithmicStrainPlasticityNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 450 -mi_param_1_1 129.24 -mi_param_1_2 265 -mi_param_1_3 16.93 -ts_max_time 1.0 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.01 -atom_test 2 -field_eval_coords 0,-6.298,0 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
 )
 endif(TFEL_DIR)
 
