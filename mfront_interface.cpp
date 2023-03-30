@@ -151,12 +151,20 @@ int main(int argc, char *argv[]) {
                         {{0.42, {0.2612}}, false}, {{0.56, {0.3847}}, false},
                         {{0.70, {0.6871}}, false}, {{0.84, {1.1362}}, false},
                         {{0.98, {1.6878}}, false}};
+      // FIXME: these times cannot be reached with MGIS 2.0
       // {{1.12, {2.3067}}, false},
       // {{1.26, {2.8729}}, false},
       // {{1.40, {3.2957}}, false}};
       atom_test_threshold = 6e-2;
       break;
     case 3:
+      atom_test_data = {
+          {{0.01, {0.001157, 100}}, false}, {{0.02, {0.001196, 100}}, false},
+          {{0.04, {0.001258, 100}}, false}, {{0.06, {0.001304, 100}}, false},
+          {{0.08, {0.001337, 100}}, false}, {{0.10, {0.001362, 100}}, false},
+          {{0.14, {0.001393, 100}}, false}, {{0.16, {0.001402, 100}}, false},
+          {{0.20, {0.001414, 100}}, false}, {{0.50, {0.001428, 100}}, false}};
+      atom_test_threshold = 1e-2;
       break;
     case 4:
       break;
@@ -283,7 +291,7 @@ int main(int argc, char *argv[]) {
       }
 
       for (auto &it : atom_test_data) {
-        if (fabs(ts_time - it.first.first) < 1e-2) {
+        if (fabs(ts_time - it.first.first) < 1e-3) {
           it.second = true;
 
           if (field_eval_flag) {
@@ -302,6 +310,8 @@ int main(int argc, char *argv[]) {
               auto t_p = getFTensor1FromMat<3>(*field_ptr);
               rel_dif =
                   fabs(it.first.second[0] - t_p(0)) / fabs(it.first.second[0]);
+              MOFEM_LOG("ATOM_TEST", Sev::verbose)
+                  << "Relative difference: " << rel_dif;
             }
             break;
           case 2:
@@ -309,14 +319,30 @@ int main(int argc, char *argv[]) {
               auto t_p = getFTensor1FromMat<3>(*field_ptr);
               rel_dif =
                   fabs(it.first.second[0] - t_p(1)) / fabs(it.first.second[0]);
+              MOFEM_LOG("ATOM_TEST", Sev::verbose)
+                  << "Relative difference: " << rel_dif;
             }
             break;
+          case 3: {
+            double eps_rel_dif =
+                fabs(it.first.second[0] -
+                     *getGradient(
+                         commonDataPtr->setOfBlocksData[1].behDataPtr->s1, 1)) /
+                fabs(it.first.second[0]);
+            double sig_rel_dif =
+                fabs(it.first.second[1] -
+                     *getThermodynamicForce(
+                         commonDataPtr->setOfBlocksData[1].behDataPtr->s1, 1)) /
+                fabs(it.first.second[1]);
+            rel_dif = (eps_rel_dif > sig_rel_dif) ? eps_rel_dif : sig_rel_dif;
+            MOFEM_LOG("WORLD", Sev::verbose)
+                << "Relative difference eps: " << eps_rel_dif
+                << " sig: " << sig_rel_dif;
+          } break;
           default:
             break;
           }
 
-          MOFEM_LOG("ATOM_TEST", Sev::verbose)
-              << "Relative difference: " << rel_dif;
           MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
 
           if (rel_dif > atom_test_threshold) {
@@ -385,6 +411,9 @@ int main(int argc, char *argv[]) {
     switch (atom_test) {
     case 1:
     case 2:
+    case 3:
+    case 4:
+    case 5:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,

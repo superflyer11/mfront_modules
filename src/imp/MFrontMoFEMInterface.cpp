@@ -381,6 +381,7 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
     return x;
   };
 
+  // FIXME: integration fails with MGIS 2.0 if random field scale is increased
   auto x0 = set_random_field(randomFieldScale * 0.1, randomFieldScale * 0.01);
 
   CHKERR DMoFEMMeshToLocalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
@@ -505,10 +506,12 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
     postProcFe->getOpPtrVector().push_back(
         new OpPostProcElastic(positionField, postProcFe->postProcMesh,
                               postProcFe->mapGaussPts, commonDataPtr));
-    int rule = 2 * oRder + 1;
-    postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
-        positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
-        commonDataPtr, rule));
+
+    // FIXME: projection is not working correctly                          
+    // int rule = 2 * oRder + 1;
+    // postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
+    //     positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
+    //     commonDataPtr, rule));
 
     postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
     MoFEMFunctionReturn(0);
