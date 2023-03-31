@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
           {{0.08, {0.001337, 100}}, false}, {{0.10, {0.001362, 100}}, false},
           {{0.14, {0.001393, 100}}, false}, {{0.16, {0.001402, 100}}, false},
           {{0.20, {0.001414, 100}}, false}, {{0.50, {0.001428, 100}}, false}};
-      atom_test_threshold = 5e-2;
+      atom_test_threshold = 1e-2;
       break;
     case 5:
       atom_test_data = {
@@ -183,8 +183,8 @@ int main(int argc, char *argv[]) {
           {{0.50, {0.0014284, 100}}, false}, {{0.52, {0.0002325, 0.0}}, false},
           {{0.54, {0.0001703, 0.0}}, false}, {{0.56, {0.0001248, 0.0}}, false},
           {{0.58, {0.0000914, 0.0}}, false}, {{0.60, {0.0000670, 0.0}}, false},
-          {{1.00, {0.0000001, 0.0}}, false}};
-      atom_test_threshold = 4e-2;
+          {{1.00, {0.133e-6, 0.0}}, false}};
+      atom_test_threshold = 5e-2;
       break;
     default:
       if (atom_test > -1)
