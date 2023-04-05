@@ -1,19 +1,14 @@
 @DSL Implicit;
 
-@Behaviour LogarithmicStrainPlasticity;
-@Author Thomas Helfer/Jérémy Bleyer;
-@Date 07 / 04 / 2020;
+@Behaviour LogPlastNonlinHardNoParam;
+@Author Andrei Shvarts;
+@Date 05 / 04 / 2023;
 
 @StrainMeasure Hencky;
 
 @Algorithm NewtonRaphson;
 @Epsilon 1.e-14;
 @Theta 1;
-
-@MaterialProperty stress s0;
-s0.setGlossaryName("YieldStress");
-@MaterialProperty stress H0;
-H0.setEntryName("HardeningSlope");
 
 @Brick StandardElastoViscoPlasticity{
   stress_potential : "Hooke" {
@@ -22,7 +17,7 @@ H0.setEntryName("HardeningSlope");
         },
   inelastic_flow : "Plastic" {
     criterion : "Mises",
-    isotropic_hardening : "Linear" {R0 : 450, H : 129},
+    isotropic_hardening : "Linear" {R0 : 450, H : 130},
     isotropic_hardening : "Voce" {R0 : 0, Rinf : 265, b : 17}
   }
 };
