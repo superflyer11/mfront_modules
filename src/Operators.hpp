@@ -38,6 +38,7 @@ struct BlockData {
   int sizeIntVar;
   int sizeExtVar;
   int sizeGradVar;
+  int sizeStressVar;
 
   vector<double> params;
 
@@ -74,6 +75,8 @@ struct BlockData {
       sizeIntVar = getArraySize(mgis_bv.isvs, mgis_bv.hypothesis);
       sizeExtVar = getArraySize(mgis_bv.esvs, mgis_bv.hypothesis);
       sizeGradVar = getArraySize(mgis_bv.gradients, mgis_bv.hypothesis);
+      sizeStressVar =
+          getArraySize(mgis_bv.thermodynamic_forces, mgis_bv.hypothesis);
 
       behDataPtr = boost::make_shared<BehaviourData>(BehaviourData{mgis_bv});
       bView = make_view(*behDataPtr);
@@ -488,6 +491,8 @@ mgis_integration(size_t gg,
 
   int &size_of_vars = block_data.sizeIntVar;
   int &size_of_grad = block_data.sizeGradVar;
+  int &size_of_stress = block_data.sizeStressVar;
+  
   auto &mgis_bv = *block_data.mGisBehaviour;
 
   if (IS_LARGE_STRAIN) {
@@ -500,19 +505,17 @@ mgis_integration(size_t gg,
 
   auto grad0_vec =
       getVectorAdaptor(&mat_grad0.data()[gg * size_of_grad], size_of_grad);
-  setGradient(block_data.behDataPtr->s0, 0, grad0_vec.size(),
-              &*grad0_vec.begin());
+  setGradient(block_data.behDataPtr->s0, 0, size_of_grad, &*grad0_vec.begin());
 
-  auto stress0_vec =
-      getVectorAdaptor(&mat_stress0.data()[gg * size_of_grad], size_of_grad);
-
-  setThermodynamicForce(block_data.behDataPtr->s0, 0, stress0_vec.size(),
+  auto stress0_vec = getVectorAdaptor(&mat_stress0.data()[gg * size_of_stress],
+                                      size_of_stress);
+  setThermodynamicForce(block_data.behDataPtr->s0, 0, size_of_stress,
                         &*stress0_vec.begin());
 
   if (size_of_vars) {
     auto internal_var =
         getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
-    setInternalStateVariable(block_data.behDataPtr->s0, 0, internal_var.size(),
+    setInternalStateVariable(block_data.behDataPtr->s0, 0, size_of_vars,
                              &*internal_var.begin());
   }
 

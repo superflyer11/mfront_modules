@@ -150,11 +150,8 @@ int main(int argc, char *argv[]) {
       atom_test_data = {{{0.14, {0.0855}}, false}, {{0.28, {0.1706}}, false},
                         {{0.42, {0.2612}}, false}, {{0.56, {0.3847}}, false},
                         {{0.70, {0.6871}}, false}, {{0.84, {1.1362}}, false},
-                        {{0.98, {1.6878}}, false}};
-      // FIXME: these times cannot be reached with MGIS 2.0
-      // {{1.12, {2.3067}}, false},
-      // {{1.26, {2.8729}}, false},
-      // {{1.40, {3.2957}}, false}};
+                        {{0.98, {1.6878}}, false}, {{1.12, {2.3067}}, false},
+                        {{1.26, {2.8729}}, false}, {{1.40, {3.2957}}, false}};
       atom_test_threshold = 6e-2;
       break;
     case 3:
@@ -310,7 +307,7 @@ int main(int argc, char *argv[]) {
 
       auto calc_if_relative = [](auto diff, auto norm) {
         if (fabs(norm) > 1e-15)
-          return diff / norm;
+          return diff / fabs(norm);
         return diff;
       };
 

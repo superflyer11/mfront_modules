@@ -1,6 +1,6 @@
 @DSL Implicit;
 
-@Behaviour LogarithmicStrainPlasticity;
+@Behaviour LogPlastNonlinHard;
 @Author Thomas Helfer/Jérémy Bleyer;
 @Date 07 / 04 / 2020;
 
