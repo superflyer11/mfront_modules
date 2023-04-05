@@ -151,8 +151,8 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
                                 my_param, &my_param, &is_set);
       if (!is_set)
         continue;
-      block.second.behDataPtr->s0.material_properties[dd] = my_param;
-      block.second.behDataPtr->s1.material_properties[dd] = my_param;
+      setMaterialProperty(block.second.behDataPtr->s0, dd, my_param);
+      setMaterialProperty(block.second.behDataPtr->s1, dd, my_param);
     }
 
     int nb = 0;
@@ -381,13 +381,49 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
     return x;
   };
 
-  auto x0 = set_random_field(randomFieldScale, randomFieldScale * 1e-1);
+  auto x0 = set_random_field(randomFieldScale, randomFieldScale * 0.1);
 
   CHKERR DMoFEMMeshToLocalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
   CHKERR updateElementVariables();
 
-  auto x = set_random_field(randomFieldScale, randomFieldScale * 1e-1);
-  auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 1e-1);
+  auto x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+  auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+
+  // auto post_proc = [&](auto dm, auto f_res, auto out_name) {
+  //   MoFEMFunctionBegin;
+  //   auto post_proc_fe =
+  //       boost::make_shared<PostProcBrokenMeshInMoab<DomainEle>>(mField);
+
+  //   using OpPPMap = OpPostProcMapInMoab<3, 3>;
+
+  //   auto l_mat = boost::make_shared<MatrixDouble>();
+  //   post_proc_fe->getOpPtrVector().push_back(
+  //       new OpCalculateVectorFieldValues<3>(positionField, l_mat, f_res));
+
+  //   post_proc_fe->getOpPtrVector().push_back(
+
+  //       new OpPPMap(
+
+  //           post_proc_fe->getPostProcMesh(), post_proc_fe->getMapGaussPts(),
+
+  //           {},
+
+  //           {{positionField, l_mat}},
+
+  //           {}, {})
+
+  //   );
+
+  //   CHKERR DMoFEMLoopFiniteElements(dm, simple->getDomainFEName(),
+  //                                   post_proc_fe);
+
+  //   post_proc_fe->writeFile(out_name);
+  //   MoFEMFunctionReturn(0);
+  // };
+
+  // CHKERR post_proc(dM, x0, "x0.h5m");
+  // CHKERR post_proc(dM, x, "x.h5m");
+  // CHKERR post_proc(dM, diff_x, "x_diff.h5m");
 
   auto res = opt->assembleVec(
       dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,
@@ -505,10 +541,13 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
     postProcFe->getOpPtrVector().push_back(
         new OpPostProcElastic(positionField, postProcFe->postProcMesh,
                               postProcFe->mapGaussPts, commonDataPtr));
-    int rule = 2 * oRder + 1;
-    postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
-        positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
-        commonDataPtr, rule));
+
+    // FIXME: projection is not working correctly           
+    // FIXME: pushing this operator leads to MFront integration failure               
+    // int rule = 2 * oRder + 1;
+    // postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
+    //     positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
+    //     commonDataPtr, rule));
 
     postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
     MoFEMFunctionReturn(0);

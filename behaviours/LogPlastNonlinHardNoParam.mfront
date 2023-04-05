@@ -1,8 +1,8 @@
 @DSL Implicit;
 
-@Behaviour LogarithmicStrainPlasticity;
-@Author Thomas Helfer/Jérémy Bleyer;
-@Date 07 / 04 / 2020;
+@Behaviour LogPlastNonlinHardNoParam;
+@Author Andrei Shvarts;
+@Date 05 / 04 / 2023;
 
 @StrainMeasure Hencky;
 

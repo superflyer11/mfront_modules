@@ -42,8 +42,8 @@ Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
 
-double t_dt = 0;
-double t_dt_prop = 0;
+double t_dt = 1;
+double t_dt_prop = 1;
 
 boost::shared_ptr<CommonData> commonDataPtr;
 
@@ -73,7 +73,10 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
-  auto &b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+
+  dAta.setTag(RHS);
+  dAta.behDataPtr->dt = t_dt;
+  dAta.bView.dt = t_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar);
@@ -89,25 +92,26 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    CHKERR mgis_integration<IS_LARGE_STRAIN>(gg, t_grad, *commonDataPtr, dAta,
-                                             b_view);
+    CHKERR mgis_integration<IS_LARGE_STRAIN>(gg, t_grad, *commonDataPtr, dAta);
 
     if constexpr (IS_LARGE_STRAIN) {
-      Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(dAta.stress1Buffer));
+      Tensor2<double, 3, 3> forces(
+          VOIGT_VEC_FULL(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
       t_stress(i, j) = forces(i, j);
     } else {
-      Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(dAta.stress1Buffer));
+      Tensor2_symmetric<double, 3> nstress(
+          VOIGT_VEC_SYMM(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
       auto forces = to_non_symm(nstress);
       t_stress(i, j) = forces(i, j);
     }
 
     if constexpr (UPDATE) {
       for (int dd = 0; dd != dAta.sizeIntVar; ++dd) {
-        mat_int(gg, dd) = b_view.s1.internal_state_variables[dd];
+        mat_int(gg, dd) = *getInternalStateVariable(dAta.behDataPtr->s1, dd);
       }
       for (int dd = 0; dd != dAta.sizeGradVar; ++dd) {
-        mat_grad0(gg, dd) = b_view.s1.gradients[dd];
-        mat_stress0(gg, dd) = b_view.s1.thermodynamic_forces[dd];
+        mat_grad0(gg, dd) = *getGradient(dAta.behDataPtr->s1, dd);
+        mat_stress0(gg, dd) = *getThermodynamicForce(dAta.behDataPtr->s1, dd);
       }
     }
 
@@ -139,7 +143,10 @@ MoFEMErrorCode OpTangent<T>::doWork(int side, EntityType type, EntData &data) {
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
-  auto &b_view = commonDataPtr->getBlockDataView(dAta, LHS);
+
+  dAta.setTag(LHS);
+  dAta.behDataPtr->dt = t_dt;
+  dAta.bView.dt = t_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar);
@@ -157,10 +164,9 @@ MoFEMErrorCode OpTangent<T>::doWork(int side, EntityType type, EntData &data) {
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    CHKERR mgis_integration<IS_LARGE_STRAIN>(gg, t_grad, *commonDataPtr, dAta,
-                                             b_view);
+    CHKERR mgis_integration<IS_LARGE_STRAIN>(gg, t_grad, *commonDataPtr, dAta);
 
-    CHKERR get_tensor4_from_voigt(dAta.Kbuffer, D1);
+    CHKERR get_tensor4_from_voigt(&*dAta.behDataPtr->K.begin(), D1);
 
     ++D1;
     ++t_grad;
@@ -187,7 +193,7 @@ MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
-  auto b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+
   int &size_of_vars = dAta.sizeIntVar;
   int &size_of_grad = dAta.sizeGradVar;
   auto get_tag = [&](std::string name, size_t size) {
@@ -250,7 +256,7 @@ MoFEMErrorCode OpSaveGaussPts::doWork(int side, EntityType type,
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
-  auto b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+
   int &size_of_vars = dAta.sizeIntVar;
   int &size_of_grad = dAta.sizeGradVar;
 
@@ -373,7 +379,11 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
-  auto b_view = commonDataPtr->getBlockDataView(dAta, RHS);
+
+  dAta.setTag(RHS);
+  dAta.behDataPtr->dt = t_dt;
+  dAta.bView.dt = t_dt;
+
   int &size_of_vars = dAta.sizeIntVar;
   int &size_of_grad = dAta.sizeGradVar;
   bool is_large_strain = dAta.isFiniteStrain;
@@ -500,13 +510,15 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
     }
 
     if (is_large_strain) {
-      CHKERR mgis_integration<true>(gg, t_grad, *commonDataPtr, dAta, b_view);
-      Tensor2<double, 3, 3> forces(VOIGT_VEC_FULL(dAta.stress1Buffer));
+      CHKERR mgis_integration<true>(gg, t_grad, *commonDataPtr, dAta);
+      Tensor2<double, 3, 3> forces(
+          VOIGT_VEC_FULL(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
       t_stress(i, j) = forces(i, j);
 
     } else {
-      CHKERR mgis_integration<false>(gg, t_grad, *commonDataPtr, dAta, b_view);
-      Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM(dAta.stress1Buffer));
+      CHKERR mgis_integration<false>(gg, t_grad, *commonDataPtr, dAta);
+      Tensor2_symmetric<double, 3> nstress(
+          VOIGT_VEC_SYMM(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
       auto forces = to_non_symm(nstress);
       t_stress(i, j) = forces(i, j);
     }
