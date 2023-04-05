@@ -150,11 +150,38 @@ int main(int argc, char *argv[]) {
       atom_test_data = {{{0.14, {0.0855}}, false}, {{0.28, {0.1706}}, false},
                         {{0.42, {0.2612}}, false}, {{0.56, {0.3847}}, false},
                         {{0.70, {0.6871}}, false}, {{0.84, {1.1362}}, false},
-                        {{0.98, {1.6878}}, false}};
-      // {{1.12, {2.3067}}, false},
-      // {{1.26, {2.8729}}, false},
-      // {{1.40, {3.2957}}, false}};
+                        {{0.98, {1.6878}}, false}, {{1.12, {2.3067}}, false},
+                        {{1.26, {2.8729}}, false}, {{1.40, {3.2957}}, false}};
       atom_test_threshold = 6e-2;
+      break;
+    case 3:
+      atom_test_data = {
+          {{0.01, {0.001, 86.3746}}, false}, {{0.02, {0.001, 83.4064}}, false},
+          {{0.04, {0.001, 78.9866}}, false}, {{0.06, {0.001, 76.0239}}, false},
+          {{0.08, {0.001, 74.0379}}, false}, {{0.10, {0.001, 72.7067}}, false},
+          {{0.14, {0.001, 71.2162}}, false}, {{0.16, {0.001, 70.8152}}, false},
+          {{0.20, {0.001, 70.3663}}, false}, {{0.50, {0.001, 70.0009}}, false}};
+      atom_test_threshold = 1e-2;
+      break;
+    case 4:
+      atom_test_data = {
+          {{0.01, {0.001157, 100}}, false}, {{0.02, {0.001196, 100}}, false},
+          {{0.04, {0.001258, 100}}, false}, {{0.06, {0.001304, 100}}, false},
+          {{0.08, {0.001337, 100}}, false}, {{0.10, {0.001362, 100}}, false},
+          {{0.14, {0.001393, 100}}, false}, {{0.16, {0.001402, 100}}, false},
+          {{0.20, {0.001414, 100}}, false}, {{0.50, {0.001428, 100}}, false}};
+      atom_test_threshold = 1e-2;
+      break;
+    case 5:
+      atom_test_data = {
+          {{0.02, {0.0011960, 100}}, false}, {{0.04, {0.0012582, 100}}, false},
+          {{0.06, {0.0013037, 100}}, false}, {{0.08, {0.0013371, 100}}, false},
+          {{0.10, {0.0013616, 100}}, false}, {{0.20, {0.0014144, 100}}, false},
+          {{0.50, {0.0014284, 100}}, false}, {{0.52, {0.0002325, 0.0}}, false},
+          {{0.54, {0.0001703, 0.0}}, false}, {{0.56, {0.0001248, 0.0}}, false},
+          {{0.58, {0.0000914, 0.0}}, false}, {{0.60, {0.0000670, 0.0}}, false},
+          {{1.00, {0.133e-6, 0.0}}, false}};
+      atom_test_threshold = 5e-2;
       break;
     default:
       if (atom_test > -1)
@@ -162,6 +189,8 @@ int main(int argc, char *argv[]) {
                  "Atom test number %d is not yet implemented", atom_test);
       break;
     }
+
+    
 
     Simple *simple = m_field.getInterface<Simple>();
     CHKERR simple->getOptions();
@@ -276,8 +305,14 @@ int main(int argc, char *argv[]) {
           CHKERR mod.postProcessElement(ts_step);
       }
 
+      auto calc_if_relative = [](auto diff, auto norm) {
+        if (fabs(norm) > 1e-15)
+          return diff / fabs(norm);
+        return diff;
+      };
+
       for (auto &it : atom_test_data) {
-        if (fabs(ts_time - it.first.first) < 1e-2) {
+        if (fabs(ts_time - it.first.first) < 1e-3) {
           it.second = true;
 
           if (field_eval_flag) {
@@ -289,35 +324,52 @@ int main(int argc, char *argv[]) {
                     MF_EXIST, QUIET);
           }
 
-          double rel_dif = 0;
+          double dif = 0;
           switch (atom_test) {
           case 1:
-            if (field_ptr->size1()) {
-              auto t_p = getFTensor1FromMat<3>(*field_ptr);
-              rel_dif =
-                  fabs(it.first.second[0] - t_p(0)) / fabs(it.first.second[0]);
-            }
-            break;
           case 2:
             if (field_ptr->size1()) {
               auto t_p = getFTensor1FromMat<3>(*field_ptr);
-              rel_dif =
-                  fabs(it.first.second[0] - t_p(1)) / fabs(it.first.second[0]);
+              if (atom_test == 1) {
+                dif = fabs(it.first.second[0] - t_p(0));
+              } else {
+                dif = fabs(it.first.second[0] - t_p(1));
+              }
+              dif = calc_if_relative(dif, it.first.second[0]);
+              MOFEM_LOG("ATOM_TEST", Sev::verbose)
+                  << "(relative) difference disp: " << dif;
             }
             break;
+          case 3:
+          case 4:
+          case 5: {
+            double eps_dif =
+                fabs(it.first.second[0] -
+                     *getGradient(
+                         commonDataPtr->setOfBlocksData[1].behDataPtr->s1, 1));
+            eps_dif = calc_if_relative(eps_dif, it.first.second[0]);
+            double sig_dif =
+                fabs(it.first.second[1] -
+                     *getThermodynamicForce(
+                         commonDataPtr->setOfBlocksData[1].behDataPtr->s1, 1));
+            sig_dif = calc_if_relative(sig_dif, it.first.second[1]);
+            dif = (eps_dif > sig_dif) ? eps_dif : sig_dif;
+            MOFEM_LOG("WORLD", Sev::verbose)
+                << "(relative) difference eps: " << eps_dif
+                << " sig: " << sig_dif;
+          } break;
           default:
             break;
           }
 
-          MOFEM_LOG("ATOM_TEST", Sev::verbose)
-              << "Relative difference: " << rel_dif;
           MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
 
-          if (rel_dif > atom_test_threshold) {
-            SETERRQ2(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                     "Atom test failed for time %1.2f: relative difference is "
-                     "greater than %0.3f",
-                     it.first.first, atom_test_threshold);
+          if (dif > atom_test_threshold) {
+            SETERRQ2(
+                PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+                "Atom test failed for time %1.2f: (relative) difference is "
+                "greater than %0.3f",
+                it.first.first, atom_test_threshold);
           }
 
           break;
@@ -379,6 +431,9 @@ int main(int argc, char *argv[]) {
     switch (atom_test) {
     case 1:
     case 2:
+    case 3:
+    case 4:
+    case 5:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,

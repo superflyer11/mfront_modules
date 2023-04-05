@@ -1,0 +1,13 @@
+@DSL       Implicit;
+@Behaviour LinearElasticity;
+@Author    Andrei Shvarts;
+@Date      30/03/2023; 
+
+@Description{
+  "Linear Elasticity"
+}
+
+@Brick "StandardElasticity"{
+  young_modulus: 70e3,
+  poisson_ratio: 0.3
+};
