@@ -116,7 +116,7 @@ if(TFEL_DIR)
   message("TFEL_DIR FOUND")
 
   add_test(compile_behaviours_test
-    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront)
+    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SignoriniHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront)
 
   add_test(3D_necking_plate
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/3D_necking_coarse_4parts.h5m -mi_block_1 LogPlastNonlinHardNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -ts_max_time 1.0 -ts_dt 0.02 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 65  -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_theta_initial_guess_extrapolate 1 -ts_theta_theta 1  -ts_exact_final_time matchstep -atom_test 1 -field_eval_coords 6.2975,0,0 -mi_test_jacobian 1 -mi_random_field_scale 0.001 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
