@@ -1,4 +1,9 @@
 /** \file MFrontMoFEMInterface.hpp
+ * @brief
+ * @date 2023-01-25
+ *
+ * @copyright Copyright (c) 202
+ *
  */
 
 /* This file is part of MoFEM.
@@ -22,7 +27,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
       PETSC>::BiLinearForm<GAUSS>::OpGradTensorGrad<1, 3, 3, 1>;
   using OpAssembleLhsSmallStrains = FormsIntegrators<DomainEleOp>::Assembly<
       PETSC>::BiLinearForm<GAUSS>::OpGradSymTensorGrad<1, 3, 3, 0>;
-  
+
   MoFEM::Interface &mField;
   string optionsPrefix;
 
@@ -31,12 +36,14 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   PetscBool isQuasiStatic;
   PetscBool printGauss;
 
+  PetscBool testJacobian;
+  PetscReal randomFieldScale;
+
   PetscInt oRder;
-  int atomTest;
   bool isDisplacementField;
   bool isFiniteKinematics;
   BitRefLevel bIt;
-  
+
   boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
   boost::shared_ptr<DomainEle> updateIntVariablesElePtr;
 
@@ -46,7 +53,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   string positionField;
   string meshNodeField;
 
-//   moab::Core mb_postGauss;
+  //   moab::Core mb_postGauss;
   boost::shared_ptr<moab::Interface> moabGaussIntPtr;
 
   MFrontMoFEMInterface(MoFEM::Interface &m_field, string postion_field = "U",
@@ -58,12 +65,14 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode addElementFields() override;
   MoFEMErrorCode createElements() override;
   MoFEMErrorCode setOperators() override;
+  MoFEMErrorCode testOperators(); //FIXME: Add this funtion to GenericElementInterface
+
   MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
 
   MoFEMErrorCode setupSolverJacobianTS(const TSType type) override;
   MoFEMErrorCode setupSolverFunctionTS(const TSType type) override;
 
-  MoFEMErrorCode setupSolverJacobianSNES() override ;
+  MoFEMErrorCode setupSolverJacobianSNES() override;
   MoFEMErrorCode setupSolverFunctionSNES() override;
 
   MoFEMErrorCode updateElementVariables() override;

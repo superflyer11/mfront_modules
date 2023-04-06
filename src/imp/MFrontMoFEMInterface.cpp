@@ -1,12 +1,16 @@
+/** \file MFrontMoFEMInterface.cpp
+ * @brief
+ * @date 2023-01-25
+ *
+ * @copyright Copyright (c) 202
+ *
+ */
+
 
 #include <MoFEM.hpp>
 
 using namespace MoFEM;
 using namespace FTensor;
-
-using EntData = EntitiesFieldData::EntData;
-using DomainEle = VolumeElementForcesAndSourcesCore;
-using DomainEleOp = DomainEle::UserDataOperator;
 
 #include <BasicFiniteElements.hpp>
 #include <quad.h>
@@ -23,20 +27,20 @@ using namespace MFrontInterface;
 
 #include <MFrontMoFEMInterface.hpp>
 
-
 MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
-                                               string postion_field,
-                                               string mesh_posi_field_name,
-                                               bool is_displacement_field,
-                                               PetscBool is_quasi_static)
+                                           string postion_field,
+                                           string mesh_posi_field_name,
+                                           bool is_displacement_field,
+                                           PetscBool is_quasi_static)
     : mField(m_field), positionField(postion_field),
       meshNodeField(mesh_posi_field_name),
       isDisplacementField(is_displacement_field),
       isQuasiStatic(is_quasi_static) {
   oRder = -1;
-  atomTest = -1;
   isFiniteKinematics = true;
   printGauss = PETSC_FALSE;
+  testJacobian = PETSC_FALSE;
+  randomFieldScale = 1.0;
   optionsPrefix = "mi_";
 }
 
@@ -45,15 +49,20 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   isQuasiStatic = PETSC_FALSE;
   oRder = 2;
   CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, optionsPrefix.c_str(), "", "none");
-  //FIXME: make it possible to set a separate orders for contact, nonlinear elasticity, mfront... etc
+  // FIXME: make it possible to set a separate orders for contact, nonlinear
+  // elasticity, mfront... etc
   CHKERR PetscOptionsInt("-order", "approximation order", "", oRder, &oRder,
                          PETSC_NULL);
-  CHKERR PetscOptionsInt("-atom_test", "atom test number", "", atomTest,
-                         &atomTest, PETSC_NULL);
 
   CHKERR PetscOptionsBool("-print_gauss",
                           "print gauss pts (internal variables)", "",
                           printGauss, &printGauss, PETSC_NULL);
+
+  CHKERR PetscOptionsBool("-test_jacobian", "test Jacobian (LHS matrix)", "",
+                          testJacobian, &testJacobian, PETSC_NULL);
+  CHKERR PetscOptionsReal("-random_field_scale",
+                          "scale for the finite difference jacobian", "",
+                          randomFieldScale, &randomFieldScale, PETSC_NULL);
 
   if (printGauss)
     moabGaussIntPtr = boost::shared_ptr<moab::Interface>(new moab::Core());
@@ -86,7 +95,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
 
     auto &lm = LibrariesManager::get();
     flag = bool(lm.getBehaviourType(lib, beh_name) == 2) &&
-        (lm.getBehaviourKinematic(lib, beh_name) == 3);
+           (lm.getBehaviourKinematic(lib, beh_name) == 3);
     MoFEMFunctionReturnHot(0);
   };
 
@@ -142,8 +151,8 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
                                 my_param, &my_param, &is_set);
       if (!is_set)
         continue;
-      block.second.behDataPtr->s0.material_properties[dd] = my_param;
-      block.second.behDataPtr->s1.material_properties[dd] = my_param;
+      setMaterialProperty(block.second.behDataPtr->s0, dd, my_param);
+      setMaterialProperty(block.second.behDataPtr->s1, dd, my_param);
     }
 
     int nb = 0;
@@ -180,7 +189,6 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
       CHKERR PetscPrintf(PETSC_COMM_WORLD, "%d : %s\n", nb++, p.c_str());
   }
 
-
   ierr = PetscOptionsEnd();
   CHKERRQ(ierr);
 
@@ -191,7 +199,8 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     for (auto &block : commonDataPtr->setOfBlocksData) {
       if (block.second.isFiniteStrain != is_finite_kin)
         SETERRQ(PETSC_COMM_SELF, MOFEM_DATA_INCONSISTENCY,
-                "All used MFront behaviours have to be of same kinematics (small or "
+                "All used MFront behaviours have to be of same kinematics "
+                "(small or "
                 "large strains)");
     }
     MoFEMFunctionReturnHot(0);
@@ -202,280 +211,377 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   MoFEMFunctionReturn(0);
 };
 
-  MoFEMErrorCode MFrontMoFEMInterface::addElementFields() {
-    MoFEMFunctionBeginHot;
-    auto simple = mField.getInterface<Simple>();
-    if (!mField.check_field(positionField)) {
-      CHKERR simple->addDomainField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
-                                    3);
-      CHKERR simple->addBoundaryField(positionField, H1,
-                                      AINSWORTH_LEGENDRE_BASE, 3);
-      CHKERR simple->setFieldOrder(positionField, oRder);
-    }
-    if (!mField.check_field(meshNodeField)) {
-      CHKERR simple->addDataField(meshNodeField, H1, AINSWORTH_LEGENDRE_BASE,
+MoFEMErrorCode MFrontMoFEMInterface::addElementFields() {
+  MoFEMFunctionBeginHot;
+  auto simple = mField.getInterface<Simple>();
+  if (!mField.check_field(positionField)) {
+    CHKERR simple->addDomainField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
                                   3);
-      CHKERR simple->setFieldOrder(meshNodeField, 2);
-    }
-
-    MoFEMFunctionReturnHot(0);
-  };
-
-  MoFEMErrorCode MFrontMoFEMInterface::createElements() {
-    MoFEMFunctionBeginHot;
-
-    CHKERR mField.add_finite_element("MFRONT_EL", MF_ZERO);
-    CHKERR mField.modify_finite_element_add_field_row("MFRONT_EL",
-                                                      positionField);
-    CHKERR mField.modify_finite_element_add_field_col("MFRONT_EL",
-                                                      positionField);
-    CHKERR mField.modify_finite_element_add_field_data("MFRONT_EL",
-                                                       positionField);
-    if (mField.check_field(meshNodeField))
-      CHKERR mField.modify_finite_element_add_field_data("MFRONT_EL",
-                                                         meshNodeField);
-
-    mfrontPipelineRhsPtr = boost::make_shared<DomainEle>(mField);
-    mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
-    updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
-
-    //TODO: update it according to the newest MoFEM
-    CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineRhsPtr, true, false, false,
-                       false);
-    CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineLhsPtr, true, false, false,
-                       false);
-    CHKERR addHOOpsVol(meshNodeField, *updateIntVariablesElePtr, true, false,
-                       false, false);
-
-    for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
-      CHKERR mField.add_ents_to_finite_element_by_type(data.tEts, MBTET,
-                                                       "MFRONT_EL");
-      // if (oRder > 0) {
-
-      //   CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
-      //                                 positionField, oRder);
-      //   CHKERR
-      //   mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
-      //                          oRder);
-      //   CHKERR
-      //   mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
-      //                          oRder);
-      // }
-    }
-
-      MoFEMFunctionReturnHot(0);
-  };
-
-  MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
-    MoFEMFunctionBegin;
-
-    auto &moab_gauss = *moabGaussIntPtr;
-
-    auto integration_rule = [&](int, int, int approx_order) {
-      return 2 * approx_order + 1;
-    };
-
-    mfrontPipelineLhsPtr->getRuleHook = integration_rule;
-    mfrontPipelineRhsPtr->getRuleHook = integration_rule;
-    updateIntVariablesElePtr->getRuleHook = integration_rule;
-
-    updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpCalculateVectorFieldGradient<3, 3>(positionField,
-                                                 commonDataPtr->mGradPtr));
-    if (printGauss)
-      updateIntVariablesElePtr->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldValues<3>(positionField,
-                                              commonDataPtr->mDispPtr));
-    if (isFiniteKinematics)
-      updateIntVariablesElePtr->getOpPtrVector().push_back(
-          new OpUpdateVariablesFiniteStrains(positionField, commonDataPtr));
-    else
-      updateIntVariablesElePtr->getOpPtrVector().push_back(
-          new OpUpdateVariablesSmallStrains(positionField, commonDataPtr));
-    if (printGauss)
-      updateIntVariablesElePtr->getOpPtrVector().push_back(
-          new OpSaveGaussPts(positionField, moab_gauss, commonDataPtr));
-
-    auto add_domain_ops_lhs = [&](auto &pipeline) {
-      if (isFiniteKinematics) {
-        pipeline.push_back(
-            new OpTangentFiniteStrains(positionField, commonDataPtr));
-        pipeline.push_back(new OpAssembleLhsFiniteStrains(
-            positionField, positionField, commonDataPtr->materialTangentPtr));
-      } else {
-
-        pipeline.push_back(
-            new OpTangentSmallStrains(positionField, commonDataPtr));
-        pipeline.push_back(new OpAssembleLhsSmallStrains(
-            positionField, positionField, commonDataPtr->materialTangentPtr));
-      }
-    };
-
-    auto add_domain_ops_rhs = [&](auto &pipeline) {
-      if (isFiniteKinematics)
-        pipeline.push_back(new OpStressFiniteStrains(positionField, commonDataPtr));
-
-      else
-        pipeline.push_back(new OpStressSmallStrains(positionField, commonDataPtr));
-
-      pipeline.push_back(new OpInternalForce(positionField, commonDataPtr->mStressPtr));
-    };
-
-    auto add_domain_base_ops = [&](auto &pipeline) {
-      pipeline.push_back(new OpCalculateVectorFieldGradient<3, 3>(
-          positionField, commonDataPtr->mGradPtr));
-    };
-
-    add_domain_base_ops(mfrontPipelineLhsPtr->getOpPtrVector());
-    add_domain_base_ops(mfrontPipelineRhsPtr->getOpPtrVector());
-
-    add_domain_ops_lhs(mfrontPipelineLhsPtr->getOpPtrVector());
-    add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
-
-
-    MoFEMFunctionReturn(0);
+    CHKERR simple->addBoundaryField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
+                                    3);
+    CHKERR simple->setFieldOrder(positionField, oRder);
+  }
+  if (!mField.check_field(meshNodeField)) {
+    CHKERR simple->addDataField(meshNodeField, H1, AINSWORTH_LEGENDRE_BASE, 3);
+    CHKERR simple->setFieldOrder(meshNodeField, 2);
   }
 
-  // BitRefLevel MFrontMoFEMInterface::getBitRefLevel() { return bIt; };
-  MoFEMErrorCode MFrontMoFEMInterface::addElementsToDM(SmartPetscObj<DM> dm) {
-    MoFEMFunctionBeginHot;
-    this->dM = dm;
-    CHKERR DMMoFEMAddElement(dM, "MFRONT_EL");
-    mField.getInterface<Simple>()->getOtherFiniteElements().push_back(
-        "MFRONT_EL");
+  MoFEMFunctionReturnHot(0);
+};
 
-    MoFEMFunctionReturnHot(0);
+MoFEMErrorCode MFrontMoFEMInterface::createElements() {
+  MoFEMFunctionBeginHot;
+
+  CHKERR mField.add_finite_element("MFRONT_EL", MF_ZERO);
+  CHKERR mField.modify_finite_element_add_field_row("MFRONT_EL", positionField);
+  CHKERR mField.modify_finite_element_add_field_col("MFRONT_EL", positionField);
+  CHKERR mField.modify_finite_element_add_field_data("MFRONT_EL",
+                                                     positionField);
+  if (mField.check_field(meshNodeField))
+    CHKERR mField.modify_finite_element_add_field_data("MFRONT_EL",
+                                                       meshNodeField);
+
+  mfrontPipelineRhsPtr = boost::make_shared<DomainEle>(mField);
+  mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
+  updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
+
+  // TODO: update it according to the newest MoFEM
+  CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineRhsPtr, true, false, false,
+                     false);
+  CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineLhsPtr, true, false, false,
+                     false);
+  CHKERR addHOOpsVol(meshNodeField, *updateIntVariablesElePtr, true, false,
+                     false, false);
+
+  for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
+    CHKERR mField.add_ents_to_finite_element_by_type(data.tEts, MBTET,
+                                                     "MFRONT_EL");
+    // if (oRder > 0) {
+
+    //   CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
+    //                                 positionField, oRder);
+    //   CHKERR
+    //   mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
+    //                          oRder);
+    //   CHKERR
+    //   mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
+    //                          oRder);
+    // }
+  }
+
+  MoFEMFunctionReturnHot(0);
+};
+
+MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
+  MoFEMFunctionBegin;
+
+  auto &moab_gauss = *moabGaussIntPtr;
+
+  auto integration_rule = [&](int, int, int approx_order) {
+    return 2 * approx_order + 1;
   };
 
-  MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianSNES() {
-    MoFEMFunctionBegin;
-    CHKERR DMMoFEMSNESSetJacobian(dM, "MFRONT_EL", mfrontPipelineLhsPtr.get(),
-                                  NULL, NULL);
+  mfrontPipelineLhsPtr->getRuleHook = integration_rule;
+  mfrontPipelineRhsPtr->getRuleHook = integration_rule;
+  updateIntVariablesElePtr->getRuleHook = integration_rule;
 
-    MoFEMFunctionReturn(0);
-  };
-  MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionSNES() {
-    MoFEMFunctionBegin;
-    CHKERR DMMoFEMSNESSetFunction(dM, "MFRONT_EL", mfrontPipelineRhsPtr.get(),
-                                  PETSC_NULL, PETSC_NULL);
-    MoFEMFunctionReturn(0);
-  };
+  updateIntVariablesElePtr->getOpPtrVector().push_back(
+      new OpCalculateVectorFieldGradient<3, 3>(positionField,
+                                               commonDataPtr->mGradPtr));
+  if (printGauss)
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpCalculateVectorFieldValues<3>(positionField,
+                                            commonDataPtr->mDispPtr));
+  if (isFiniteKinematics)
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpUpdateVariablesFiniteStrains(positionField, commonDataPtr));
+  else
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpUpdateVariablesSmallStrains(positionField, commonDataPtr));
+  if (printGauss)
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpSaveGaussPts(positionField, moab_gauss, commonDataPtr));
 
-  MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianTS(const TSType type) {
-    MoFEMFunctionBegin;
-    auto &method = mfrontPipelineLhsPtr;
-    switch (type) {
-    case IM:
-      CHKERR DMMoFEMTSSetIJacobian(dM, "MFRONT_EL", method, method, method);
-      break;
-    case IM2:
-      CHKERR DMMoFEMTSSetI2Jacobian(dM, "MFRONT_EL", method, method, method);
-      break;
-    case EX:
-      CHKERR DMMoFEMTSSetRHSJacobian(dM, "MFRONT_EL", method, method, method);
-      break;
-    default:
-      SETERRQ(PETSC_COMM_SELF, MOFEM_NOT_IMPLEMENTED,
-              "This TS is not yet implemented");
-      break;
+  auto add_domain_ops_lhs = [&](auto &pipeline) {
+    if (isFiniteKinematics) {
+      pipeline.push_back(
+          new OpTangentFiniteStrains(positionField, commonDataPtr));
+      pipeline.push_back(new OpAssembleLhsFiniteStrains(
+          positionField, positionField, commonDataPtr->materialTangentPtr));
+    } else {
+
+      pipeline.push_back(
+          new OpTangentSmallStrains(positionField, commonDataPtr));
+      pipeline.push_back(new OpAssembleLhsSmallStrains(
+          positionField, positionField, commonDataPtr->materialTangentPtr));
     }
+  };
+
+  auto add_domain_ops_rhs = [&](auto &pipeline) {
+    if (isFiniteKinematics)
+      pipeline.push_back(
+          new OpStressFiniteStrains(positionField, commonDataPtr));
+
+    else
+      pipeline.push_back(
+          new OpStressSmallStrains(positionField, commonDataPtr));
+
+    pipeline.push_back(
+        new OpInternalForce(positionField, commonDataPtr->mStressPtr));
+  };
+
+  auto add_domain_base_ops = [&](auto &pipeline) {
+    pipeline.push_back(new OpCalculateVectorFieldGradient<3, 3>(
+        positionField, commonDataPtr->mGradPtr));
+  };
+
+  add_domain_base_ops(mfrontPipelineLhsPtr->getOpPtrVector());
+  add_domain_base_ops(mfrontPipelineRhsPtr->getOpPtrVector());
+
+  add_domain_ops_lhs(mfrontPipelineLhsPtr->getOpPtrVector());
+  add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
+
+  if (testJacobian) {
+    CHKERR testOperators();
+  }
+
+  MoFEMFunctionReturn(0);
+}
+
+MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
+  MoFEMFunctionBegin;
+
+  auto simple = mField.getInterface<Simple>();
+  auto opt = mField.getInterface<OperatorsTester>();
+
+  Range tets, verts, ho_ents;
+  for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
+    tets.merge(data.tEts);
+  }
+
+  CHKERR mField.get_moab().get_connectivity(tets, verts, true);
+  for (auto d : {1, 2, 3}) {
+    CHKERR mField.get_moab().get_adjacencies(verts, d, false, ho_ents,
+                                             moab::Interface::UNION);
+  }
+
+  auto set_random_field = [&](double scale_verts, double scale_ho_ents) {
+    auto x =
+        opt->setRandomFields(dM, {{positionField, {-scale_verts, scale_verts}}},
+                             boost::make_shared<Range>(verts));
+
+    auto x_ho_ents = opt->setRandomFields(
+        dM, {{positionField, {-scale_ho_ents, scale_ho_ents}}},
+        boost::make_shared<Range>(ho_ents));
+
+    CHKERR VecAXPY(x, 1., x_ho_ents);
+    CHKERR VecGhostUpdateBegin(x, INSERT_VALUES, SCATTER_FORWARD);
+    CHKERR VecGhostUpdateEnd(x, INSERT_VALUES, SCATTER_FORWARD);
+
+    return x;
+  };
+
+  auto x0 = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+
+  CHKERR DMoFEMMeshToLocalVector(dM, x0, INSERT_VALUES, SCATTER_REVERSE);
+  CHKERR updateElementVariables();
+
+  auto x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+  auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
+
+  // auto post_proc = [&](auto dm, auto f_res, auto out_name) {
+  //   MoFEMFunctionBegin;
+  //   auto post_proc_fe =
+  //       boost::make_shared<PostProcBrokenMeshInMoab<DomainEle>>(mField);
+
+  //   using OpPPMap = OpPostProcMapInMoab<3, 3>;
+
+  //   auto l_mat = boost::make_shared<MatrixDouble>();
+  //   post_proc_fe->getOpPtrVector().push_back(
+  //       new OpCalculateVectorFieldValues<3>(positionField, l_mat, f_res));
+
+  //   post_proc_fe->getOpPtrVector().push_back(
+
+  //       new OpPPMap(
+
+  //           post_proc_fe->getPostProcMesh(), post_proc_fe->getMapGaussPts(),
+
+  //           {},
+
+  //           {{positionField, l_mat}},
+
+  //           {}, {})
+
+  //   );
+
+  //   CHKERR DMoFEMLoopFiniteElements(dm, simple->getDomainFEName(),
+  //                                   post_proc_fe);
+
+  //   post_proc_fe->writeFile(out_name);
+  //   MoFEMFunctionReturn(0);
+  // };
+
+  // CHKERR post_proc(dM, x0, "x0.h5m");
+  // CHKERR post_proc(dM, x, "x.h5m");
+  // CHKERR post_proc(dM, diff_x, "x_diff.h5m");
+
+  auto res = opt->assembleVec(
+      dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,
+      SmartPetscObj<Vec>(), SmartPetscObj<Vec>(), 0, 1, CacheTupleSharedPtr());
+
+  double res_norm;
+  CHKERR VecNorm(res, NORM_2, &res_norm);
+
+  double eps = res_norm * 1e-10;
+
+  auto diff_res = opt->checkCentralFiniteDifference(
+      dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, mfrontPipelineLhsPtr,
+      x, SmartPetscObj<Vec>(), SmartPetscObj<Vec>(), diff_x, 0, 1, eps);
+
+  double diff_res_norm;
+  CHKERR VecNorm(diff_res, NORM_2, &diff_res_norm);
+
+  double rel_diff = diff_res_norm / res_norm;
+  MOFEM_LOG_C("WORLD", Sev::inform,
+              "Relative difference between hand-coded and finite difference "
+              "Jacobian: %3.4e",
+              rel_diff);
+
+  constexpr double err = 1e-7;
+  if (rel_diff > err)
+    SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+            "Relative norm of the difference between hand-coded and the "
+            "finite difference Jacobian is too high");
+
+  auto zero = set_random_field(0, 0);
+  CHKERR DMoFEMMeshToLocalVector(dM, zero, INSERT_VALUES, SCATTER_REVERSE);
+  commonDataPtr->clearTags();
+
+  MoFEMFunctionReturn(0);
+}
+
+// BitRefLevel MFrontMoFEMInterface::getBitRefLevel() { return bIt; };
+MoFEMErrorCode MFrontMoFEMInterface::addElementsToDM(SmartPetscObj<DM> dm) {
+  MoFEMFunctionBeginHot;
+  this->dM = dm;
+  CHKERR DMMoFEMAddElement(dM, "MFRONT_EL");
+  mField.getInterface<Simple>()->getOtherFiniteElements().push_back(
+      "MFRONT_EL");
+
+  MoFEMFunctionReturnHot(0);
+};
+
+MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianSNES() {
+  MoFEMFunctionBegin;
+  CHKERR DMMoFEMSNESSetJacobian(dM, "MFRONT_EL", mfrontPipelineLhsPtr.get(),
+                                NULL, NULL);
+
+  MoFEMFunctionReturn(0);
+};
+MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionSNES() {
+  MoFEMFunctionBegin;
+  CHKERR DMMoFEMSNESSetFunction(dM, "MFRONT_EL", mfrontPipelineRhsPtr.get(),
+                                PETSC_NULL, PETSC_NULL);
+  MoFEMFunctionReturn(0);
+};
+
+MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianTS(const TSType type) {
+  MoFEMFunctionBegin;
+  auto &method = mfrontPipelineLhsPtr;
+  switch (type) {
+  case IM:
+    CHKERR DMMoFEMTSSetIJacobian(dM, "MFRONT_EL", method, method, method);
+    break;
+  case IM2:
+    CHKERR DMMoFEMTSSetI2Jacobian(dM, "MFRONT_EL", method, method, method);
+    break;
+  case EX:
+    CHKERR DMMoFEMTSSetRHSJacobian(dM, "MFRONT_EL", method, method, method);
+    break;
+  default:
+    SETERRQ(PETSC_COMM_SELF, MOFEM_NOT_IMPLEMENTED,
+            "This TS is not yet implemented");
+    break;
+  }
+  MoFEMFunctionReturn(0);
+};
+
+MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionTS(const TSType type) {
+  MoFEMFunctionBegin;
+  auto &method = mfrontPipelineRhsPtr;
+  switch (type) {
+  case IM:
+    CHKERR DMMoFEMTSSetIFunction(dM, "MFRONT_EL", method, method, method);
+    break;
+  case IM2:
+    CHKERR DMMoFEMTSSetI2Function(dM, "MFRONT_EL", method, method, method);
+    break;
+  case EX:
+    CHKERR DMMoFEMTSSetRHSFunction(dM, "MFRONT_EL", method, method, method);
+    break;
+  default:
+    SETERRQ(PETSC_COMM_SELF, MOFEM_NOT_IMPLEMENTED, "Not implemented");
+    break;
+  }
+
+  MoFEMFunctionReturn(0);
+};
+
+MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
+  MoFEMFunctionBegin;
+
+  auto create_post_process_element = [&]() {
+    MoFEMFunctionBegin;
+    postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(mField);
+    postProcFe->generateReferenceElementMesh();
+
+    postProcFe->getOpPtrVector().push_back(
+        new OpCalculateVectorFieldGradient<3, 3>(positionField,
+                                                 commonDataPtr->mGradPtr));
+    postProcFe->getOpPtrVector().push_back(
+        new OpPostProcElastic(positionField, postProcFe->postProcMesh,
+                              postProcFe->mapGaussPts, commonDataPtr));
+
+    // FIXME: projection is not working correctly           
+    // FIXME: pushing this operator leads to MFront integration failure               
+    // int rule = 2 * oRder + 1;
+    // postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
+    //     positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
+    //     commonDataPtr, rule));
+
+    postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
     MoFEMFunctionReturn(0);
   };
 
-  MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionTS(const TSType type) {
+  if (!postProcFe)
+    CHKERR create_post_process_element();
+
+  auto make_vtks = [&]() {
     MoFEMFunctionBegin;
-    auto &method = mfrontPipelineRhsPtr;
-    switch (type) {
-    case IM:
-      CHKERR DMMoFEMTSSetIFunction(dM, "MFRONT_EL", method, method, method);
-      break;
-    case IM2:
-      CHKERR DMMoFEMTSSetI2Function(dM, "MFRONT_EL", method, method, method);
-      break;
-    case EX:
-      CHKERR DMMoFEMTSSetRHSFunction(dM, "MFRONT_EL", method, method, method);
-      break;
-    default:
-      SETERRQ(PETSC_COMM_SELF, MOFEM_NOT_IMPLEMENTED, "Not implemented");
-      break;
+    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", postProcFe);
+    CHKERR postProcFe->writeFile("out_" + optionsPrefix +
+                                 boost::lexical_cast<std::string>(step) +
+                                 ".h5m");
+    if (printGauss) {
+      string file_name = "out_" + optionsPrefix + "gauss_" +
+                         boost::lexical_cast<std::string>(step) + ".h5m";
+
+      CHKERR moabGaussIntPtr->write_file(file_name.c_str(), "MOAB",
+                                         "PARALLEL=WRITE_PART");
+      CHKERR moabGaussIntPtr->delete_mesh();
     }
 
     MoFEMFunctionReturn(0);
   };
 
-  MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
-    MoFEMFunctionBegin;
+  CHKERR make_vtks();
 
-    auto create_post_process_element = [&]() {
-      MoFEMFunctionBegin;
-      postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(mField);
-      postProcFe->generateReferenceElementMesh();
+  MoFEMFunctionReturn(0);
+};
 
-      postProcFe->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldGradient<3, 3>(positionField,
-                                                   commonDataPtr->mGradPtr));
-      postProcFe->getOpPtrVector().push_back(
-          new OpPostProcElastic(positionField, postProcFe->postProcMesh,
-                                postProcFe->mapGaussPts, commonDataPtr));
-      int rule = 2 * oRder + 1;
-      postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
-          positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
-          commonDataPtr, rule));
+MoFEMErrorCode MFrontMoFEMInterface::updateElementVariables() {
 
-      postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
-      MoFEMFunctionReturn(0);
-    };
-
-    if (!postProcFe)
-      CHKERR create_post_process_element();
-
-    auto make_vtks = [&]() {
-      MoFEMFunctionBegin;
-      CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", postProcFe);
-      CHKERR postProcFe->writeFile("out_" + optionsPrefix +
-                                   boost::lexical_cast<std::string>(step) +
-                                   ".h5m");
-      if (printGauss) {
-        string file_name = "out_" + optionsPrefix + "gauss_" +
-                           boost::lexical_cast<std::string>(step) + ".h5m";
-
-        CHKERR moabGaussIntPtr->write_file(file_name.c_str(), "MOAB",
-                                           "PARALLEL=WRITE_PART");
-        CHKERR moabGaussIntPtr->delete_mesh();
-      }
-
-      MoFEMFunctionReturn(0);
-    };
-
-    CHKERR make_vtks();
-
-    switch (atomTest) {
-    case 1:
-      if (step == 75) {
-        auto t_disp = getFTensor1FromMat<3>(*(commonDataPtr->mDispPtr));
-        auto min_gg_disp_x = t_disp(0);
-        MOFEM_LOG("WORLD", Sev::inform)
-            << "Displacement on the gauss point:" << min_gg_disp_x;
-        if (abs(0.2761 + min_gg_disp_x) > 1e-3)
-          SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
-                  "atom test diverged!");
-      }
-      break;
-
-    default:
-      if (atomTest > -1)
-        SETERRQ(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
-                "This atom test number is not yet implemented");
-      break;
-    }
-
-
-    MoFEMFunctionReturn(0);
-  };
-
-  MoFEMErrorCode MFrontMoFEMInterface::updateElementVariables() {
-
-    MoFEMFunctionBegin;
-    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
-    MoFEMFunctionReturn(0);
-  };
+  MoFEMFunctionBegin;
+  CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
+  MoFEMFunctionReturn(0);
+};

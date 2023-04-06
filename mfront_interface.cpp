@@ -1,3 +1,11 @@
+/**
+ * @file mfront_interface.cpp
+ * @brief
+ * @date 2023-01-25
+ *
+ * @copyright Copyright (c) 2023
+ *
+ */
 
 #include <MoFEM.hpp>
 
@@ -6,10 +14,6 @@ static char help[] = "mfront --obuild --interface=generic BEHAVIOUR.mfront \n";
 
 using namespace MoFEM;
 using namespace FTensor;
-
-using EntData = EntitiesFieldData::EntData;
-using DomainEle = VolumeElementForcesAndSourcesCore;
-using DomainEleOp = DomainEle::UserDataOperator;
 
 #include <BasicFiniteElements.hpp>
 #include <quad.h>
@@ -37,12 +41,15 @@ using namespace MFrontInterface;
 #include <MFrontMoFEMInterface.hpp>
 // #endif
 
+using Ele = ForcesAndSourcesCore;
+using EntData = EntitiesFieldData::EntData;
 using DomainEle = VolumeElementForcesAndSourcesCore;
 using DomainEleOp = DomainEle::UserDataOperator;
 using BoundaryEle = FaceElementForcesAndSourcesCore;
 using BoundaryEleOp = BoundaryEle::UserDataOperator;
 using PostProcEle = PostProcVolumeOnRefinedMesh;
 using PostProcSkinEle = PostProcFaceOnRefinedMesh;
+using SetPtsData = FieldEvaluatorInterface::SetPtsData;
 
 int main(int argc, char *argv[]) {
 
@@ -82,6 +89,11 @@ int main(int argc, char *argv[]) {
   LogManager::setLog("MoFEM_MFront_Interface");
   MOFEM_LOG_TAG("MoFEM_MFront_Interface", "module_manager");
 
+  core_log->add_sink(
+      LogManager::createSink(LogManager::getStrmSync(), "ATOM_TEST"));
+  LogManager::setLog("ATOM_TEST");
+  MOFEM_LOG_TAG("ATOM_TEST", "atom_test");
+
   try {
 
     moab::Core mb_instance;
@@ -94,6 +106,15 @@ int main(int argc, char *argv[]) {
     PetscBool is_quasi_static = PETSC_TRUE;
     PetscBool is_partitioned = PETSC_TRUE;
 
+    int atom_test = -1;
+    std::vector<std::pair<std::pair<double, std::vector<double>>, bool>>
+        atom_test_data;
+    double atom_test_threshold = 1;
+
+    PetscBool field_eval_flag = PETSC_FALSE;
+    std::array<double, 3> field_eval_coords;
+    boost::shared_ptr<SetPtsData> field_eval_data;
+
     SmartPetscObj<TS> tSolver;
     SmartPetscObj<DM> dM;
 
@@ -105,11 +126,71 @@ int main(int argc, char *argv[]) {
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-order", &order, PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-output_every", &save_every_nth_step,
                               PETSC_NULL);
+    CHKERR PetscOptionsGetInt(PETSC_NULL, "-atom_test", &atom_test, PETSC_NULL);
+    int dim = 3;
+    CHKERR PetscOptionsGetRealArray(NULL, NULL, "-field_eval_coords",
+                                    field_eval_coords.data(), &dim,
+                                    &field_eval_flag);
 
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_partitioned", &is_partitioned,
                                PETSC_NULL);
     MOFEM_LOG("WORLD", Sev::inform)
         << "Mesh Partition Flag Status: " << is_partitioned;
+
+    switch (atom_test) {
+    case 1:
+      atom_test_data = {{{0.1, {-0.1101}}, false}, {{0.2, {-0.2246}}, false},
+                        {{0.3, {-0.3380}}, false}, {{0.4, {-0.4528}}, false},
+                        {{0.5, {-0.5769}}, false}, {{0.6, {-0.7539}}, false},
+                        {{0.7, {-1.1205}}, false}, {{0.8, {-1.5959}}, false},
+                        {{0.9, {-2.1240}}, false}, {{1.0, {-2.6948}}, false}};
+      atom_test_threshold = 3e-3;
+      break;
+    case 2:
+      atom_test_data = {{{0.14, {0.0855}}, false}, {{0.28, {0.1706}}, false},
+                        {{0.42, {0.2612}}, false}, {{0.56, {0.3847}}, false},
+                        {{0.70, {0.6871}}, false}, {{0.84, {1.1362}}, false},
+                        {{0.98, {1.6878}}, false}, {{1.12, {2.3067}}, false},
+                        {{1.26, {2.8729}}, false}, {{1.40, {3.2957}}, false}};
+      atom_test_threshold = 6e-2;
+      break;
+    case 3:
+      atom_test_data = {
+          {{0.01, {0.001, 86.3746}}, false}, {{0.02, {0.001, 83.4064}}, false},
+          {{0.04, {0.001, 78.9866}}, false}, {{0.06, {0.001, 76.0239}}, false},
+          {{0.08, {0.001, 74.0379}}, false}, {{0.10, {0.001, 72.7067}}, false},
+          {{0.14, {0.001, 71.2162}}, false}, {{0.16, {0.001, 70.8152}}, false},
+          {{0.20, {0.001, 70.3663}}, false}, {{0.50, {0.001, 70.0009}}, false}};
+      atom_test_threshold = 1e-2;
+      break;
+    case 4:
+      atom_test_data = {
+          {{0.01, {0.001157, 100}}, false}, {{0.02, {0.001196, 100}}, false},
+          {{0.04, {0.001258, 100}}, false}, {{0.06, {0.001304, 100}}, false},
+          {{0.08, {0.001337, 100}}, false}, {{0.10, {0.001362, 100}}, false},
+          {{0.14, {0.001393, 100}}, false}, {{0.16, {0.001402, 100}}, false},
+          {{0.20, {0.001414, 100}}, false}, {{0.50, {0.001428, 100}}, false}};
+      atom_test_threshold = 1e-2;
+      break;
+    case 5:
+      atom_test_data = {
+          {{0.02, {0.0011960, 100}}, false}, {{0.04, {0.0012582, 100}}, false},
+          {{0.06, {0.0013037, 100}}, false}, {{0.08, {0.0013371, 100}}, false},
+          {{0.10, {0.0013616, 100}}, false}, {{0.20, {0.0014144, 100}}, false},
+          {{0.50, {0.0014284, 100}}, false}, {{0.52, {0.0002325, 0.0}}, false},
+          {{0.54, {0.0001703, 0.0}}, false}, {{0.56, {0.0001248, 0.0}}, false},
+          {{0.58, {0.0000914, 0.0}}, false}, {{0.60, {0.0000670, 0.0}}, false},
+          {{1.00, {0.133e-6, 0.0}}, false}};
+      atom_test_threshold = 5e-2;
+      break;
+    default:
+      if (atom_test > -1)
+        SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
+                 "Atom test number %d is not yet implemented", atom_test);
+      break;
+    }
+
+    
 
     Simple *simple = m_field.getInterface<Simple>();
     CHKERR simple->getOptions();
@@ -157,7 +238,7 @@ int main(int argc, char *argv[]) {
 
     m_modules.push_back(new MFrontMoFEMInterface(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
-    
+
     for (auto &&mod : m_modules) {
       CHKERR mod.getCommandLineParameters();
       CHKERR mod.addElementFields();
@@ -186,12 +267,36 @@ int main(int argc, char *argv[]) {
     CHKERR m_field.build_adjacencies(simple->getBitRefLevel());
 
     CHKERR DMSetUp(dM);
+
+    boost::shared_ptr<MatrixDouble> field_ptr;
+    if (field_eval_flag) {
+      field_eval_data =
+          m_field.getInterface<FieldEvaluatorInterface>()->getData<DomainEle>();
+      CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree3D(
+          field_eval_data, simple->getDomainFEName());
+      field_eval_data->setEvalPoints(field_eval_coords.data(), 1);
+
+      auto no_rule = [](int, int, int) { return -1; };
+
+      auto fe_ptr = field_eval_data->feMethodPtr.lock();
+      fe_ptr->getRuleHook = no_rule;
+
+      field_ptr = boost::make_shared<MatrixDouble>();
+      fe_ptr->getOpPtrVector().push_back(
+          new OpCalculateVectorFieldValues<3>("U", field_ptr));
+    }
+
     monitor_ptr = boost::make_shared<FEMethod>();
-    monitor_ptr->preProcessHook = []() { return 0; };
+    monitor_ptr->preProcessHook = [&]() { 
+      MoFEMFunctionBegin;
+      t_dt = monitor_ptr->ts_dt;
+      MoFEMFunctionReturn(0);
+      };
     monitor_ptr->operatorHook = []() { return 0; };
     monitor_ptr->postProcessHook = [&]() {
       MoFEMFunctionBegin;
-      // auto ts_time = monitor_ptr->ts_t;
+      
+      auto ts_time = monitor_ptr->ts_t;
       auto ts_step = monitor_ptr->ts_step;
 
       for (auto &&mod : m_modules) {
@@ -200,6 +305,76 @@ int main(int argc, char *argv[]) {
           CHKERR mod.postProcessElement(ts_step);
       }
 
+      auto calc_if_relative = [](auto diff, auto norm) {
+        if (fabs(norm) > 1e-15)
+          return diff / fabs(norm);
+        return diff;
+      };
+
+      for (auto &it : atom_test_data) {
+        if (fabs(ts_time - it.first.first) < 1e-3) {
+          it.second = true;
+
+          if (field_eval_flag) {
+            CHKERR m_field.getInterface<FieldEvaluatorInterface>()
+                ->evalFEAtThePoint3D(
+                    field_eval_coords.data(), 1e-12, simple->getProblemName(),
+                    simple->getDomainFEName(), field_eval_data,
+                    m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
+                    MF_EXIST, QUIET);
+          }
+
+          double dif = 0;
+          switch (atom_test) {
+          case 1:
+          case 2:
+            if (field_ptr->size1()) {
+              auto t_p = getFTensor1FromMat<3>(*field_ptr);
+              if (atom_test == 1) {
+                dif = fabs(it.first.second[0] - t_p(0));
+              } else {
+                dif = fabs(it.first.second[0] - t_p(1));
+              }
+              dif = calc_if_relative(dif, it.first.second[0]);
+              MOFEM_LOG("ATOM_TEST", Sev::verbose)
+                  << "(relative) difference disp: " << dif;
+            }
+            break;
+          case 3:
+          case 4:
+          case 5: {
+            double eps_dif =
+                fabs(it.first.second[0] -
+                     *getGradient(
+                         commonDataPtr->setOfBlocksData[1].behDataPtr->s1, 1));
+            eps_dif = calc_if_relative(eps_dif, it.first.second[0]);
+            double sig_dif =
+                fabs(it.first.second[1] -
+                     *getThermodynamicForce(
+                         commonDataPtr->setOfBlocksData[1].behDataPtr->s1, 1));
+            sig_dif = calc_if_relative(sig_dif, it.first.second[1]);
+            dif = (eps_dif > sig_dif) ? eps_dif : sig_dif;
+            MOFEM_LOG("WORLD", Sev::verbose)
+                << "(relative) difference eps: " << eps_dif
+                << " sig: " << sig_dif;
+          } break;
+          default:
+            break;
+          }
+
+          MOFEM_LOG_SYNCHRONISE(m_field.get_comm());
+
+          if (dif > atom_test_threshold) {
+            SETERRQ2(
+                PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+                "Atom test failed for time %1.2f: (relative) difference is "
+                "greater than %0.3f",
+                it.first.first, atom_test_threshold);
+          }
+
+          break;
+        }
+      }
       MoFEMFunctionReturn(0);
     };
 
@@ -252,6 +427,24 @@ int main(int argc, char *argv[]) {
 
     CHKERR TSSetUp(tSolver);
     CHKERR TSSolve(tSolver, NULL);
+
+    switch (atom_test) {
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+      for (auto it : atom_test_data) {
+        if (!it.second) {
+          SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+                   "Atom test failed: output for time %1.2f was not observed",
+                   it.first.first);
+        }
+      }
+      break;
+    default:
+      break;
+    }
   }
   CATCH_ERRORS;
 
