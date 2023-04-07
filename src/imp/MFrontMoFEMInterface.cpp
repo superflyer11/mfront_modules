@@ -22,7 +22,7 @@ using namespace FTensor;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <Operators.hpp>
+#include <MFrontMoFEMOperators.hpp>
 using namespace MFrontInterface;
 
 #include <MFrontMoFEMInterface.hpp>

@@ -1,5 +1,5 @@
 /**
- * @file Operators.cpp
+ * @file MFrontMoFEMOperators.cpp
  * @brief 
  * @date 2023-01-25
  * 
@@ -24,7 +24,7 @@ using DomainEleOp = DomainEle::UserDataOperator;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <Operators.hpp>
+#include <MFrontMoFEMOperators.hpp>
 
 namespace MFrontInterface {
 

@@ -1,4 +1,4 @@
-/** \file Operators.hpp
+/** \file MFrontMoFEMOperators.hpp
  * @brief
  * @date 2023-01-25
  *

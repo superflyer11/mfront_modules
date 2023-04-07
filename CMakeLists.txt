@@ -30,7 +30,7 @@ endif(NOT MGIS_DIR)
 if(MGIS_DIR)
   message("MGIS_DIR FOUND")
   find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.dylib libMFrontGenericInterface.so PATHS ${MGIS_DIR}/lib)
-  find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include/MGIS/)
+  # find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include/MGIS/)
   add_library(MFrontGenericInterface SHARED IMPORTED)
   set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_LIBRARY})
   message(STATUS ${MGIS_LIBRARY})
@@ -44,16 +44,18 @@ include_directories(
   
 add_executable(mfront_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMOperators.cpp
 )
 
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
 
 add_library(mfront_lib_all
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMOperators.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
+
+target_link_libraries(mfront_lib_all MFrontGenericInterface)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="dylib")
@@ -72,10 +74,7 @@ install(
   FILE mfront_lib_all_targets.cmake
   DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
 
-add_dependencies(mfront_interface MFrontGenericInterface)
-
 target_link_libraries(mfront_interface
-    MFrontGenericInterface
     mfront_lib_all
     users_modules
     mofem_finite_elements
