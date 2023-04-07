@@ -27,7 +27,7 @@ using namespace FTensor;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <MFrontMoFEMOperators.hpp>
+#include <MFrontOperators.hpp>
 
 using namespace MFrontInterface;
 
@@ -37,9 +37,7 @@ using namespace MFrontInterface;
 #include <BasicBoundaryConditionsInterface.hpp>
 #include <SurfacePressureComplexForLazy.hpp>
 
-// #ifdef WITH_MODULE_MFRONT_INTERFACE
 #include <MFrontMoFEMInterface.hpp>
-// #endif
 
 using Ele = ForcesAndSourcesCore;
 using EntData = EntitiesFieldData::EntData;
@@ -50,6 +48,9 @@ using BoundaryEleOp = BoundaryEle::UserDataOperator;
 using PostProcEle = PostProcVolumeOnRefinedMesh;
 using PostProcSkinEle = PostProcFaceOnRefinedMesh;
 using SetPtsData = FieldEvaluatorInterface::SetPtsData;
+
+// double t_dt;
+// double t_dt_prop;
 
 int main(int argc, char *argv[]) {
 

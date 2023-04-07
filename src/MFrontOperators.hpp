@@ -1,10 +1,12 @@
-/** \file MFrontMoFEMOperators.hpp
+/** \file MFrontOperators.hpp
  * @brief
  * @date 2023-01-25
  *
  * @copyright Copyright (c) 202
  *
  */
+
+#include <MFrontMoFEMInterface.hpp>
 
 namespace MFrontInterface {
 
@@ -20,8 +22,6 @@ using DomainEleOp = DomainEle::UserDataOperator;
 
 enum DataTags { RHS = 0, LHS };
 
-extern double t_dt;
-extern double t_dt_prop;
 
 struct BlockData {
   int iD;

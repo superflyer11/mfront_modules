@@ -1,5 +1,5 @@
 /**
- * @file MFrontMoFEMOperators.cpp
+ * @file MFrontOperators.cpp
  * @brief 
  * @date 2023-01-25
  * 
@@ -24,7 +24,11 @@ using DomainEleOp = DomainEle::UserDataOperator;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <MFrontMoFEMOperators.hpp>
+#include <MFrontOperators.hpp>
+#include <MFrontMoFEMInterface.hpp>
+
+double t_dt = 1;
+double t_dt_prop = 1;
 
 namespace MFrontInterface {
 
@@ -41,9 +45,6 @@ Index<'k', 3> k;
 Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
-
-double t_dt = 1;
-double t_dt_prop = 1;
 
 boost::shared_ptr<CommonData> commonDataPtr;
 

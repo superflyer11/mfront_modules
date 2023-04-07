@@ -44,14 +44,14 @@ include_directories(
   
 add_executable(mfront_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMOperators.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontOperators.cpp
 )
 
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
 
 add_library(mfront_lib_all
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMOperators.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontOperators.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
 

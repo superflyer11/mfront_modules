@@ -15,6 +15,9 @@
 #ifndef __MFRONTGENERICINTERFACE_HPP__
 #define __MFRONTGENERICINTERFACE_HPP__
 
+extern double t_dt;
+extern double t_dt_prop;
+
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using EntData = EntitiesFieldData::EntData;
