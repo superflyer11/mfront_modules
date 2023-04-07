@@ -298,7 +298,7 @@ int main(int argc, char *argv[]) {
     monitor_ptr = boost::make_shared<FEMethod>();
     monitor_ptr->preProcessHook = [&]() { 
       MoFEMFunctionBegin;
-      t_dt = monitor_ptr->ts_dt;
+      mfront_dt = monitor_ptr->ts_dt;
       MoFEMFunctionReturn(0);
       };
     monitor_ptr->operatorHook = []() { return 0; };
