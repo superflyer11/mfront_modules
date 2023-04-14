@@ -39,7 +39,7 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
   oRder = -1;
   isFiniteKinematics = true;
   saveGauss = PETSC_FALSE;
-  saveVolume = PETSC_FALSE;
+  saveVolume = PETSC_TRUE;
   testJacobian = PETSC_FALSE;
   randomFieldScale = 1.0;
   optionsPrefix = "mi_";
@@ -567,7 +567,7 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
                                    boost::lexical_cast<std::string>(step) +
                                    ".h5m");
     }
-    
+
     if (saveGauss) {
       string file_name = "out_" + optionsPrefix + "gauss_" +
                          boost::lexical_cast<std::string>(step) + ".h5m";
