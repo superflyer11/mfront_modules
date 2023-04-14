@@ -37,7 +37,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   SmartPetscObj<DM> dM;
 
   PetscBool isQuasiStatic;
-  PetscBool printGauss;
+  PetscBool saveGauss;
+  PetscBool saveVolume;
 
   PetscBool testJacobian;
   PetscReal randomFieldScale;
