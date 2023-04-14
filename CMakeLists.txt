@@ -109,6 +109,11 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMENT "Make linking to behaviours directory" VERBATIM)
 
+  if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
+    install(
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
+  endif()
+
 endif(MGIS_DIR)
 
 if(TFEL_DIR)
