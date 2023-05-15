@@ -7,7 +7,12 @@
   "Linear Elasticity"
 }
 
+@MaterialProperty stress young_modulus;
+young_modulus.setGlossaryName("YoungModulus");
+@MaterialProperty real poisson_ratio;
+poisson_ratio.setGlossaryName("PoissonRatio");
+
 @Brick "StandardElasticity"{
-  young_modulus: 70e3,
-  poisson_ratio: 0.3
+  young_modulus: young_modulus,
+  poisson_ratio: poisson_ratio
 };

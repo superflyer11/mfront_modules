@@ -15,6 +15,9 @@
 #ifndef __MFRONTGENERICINTERFACE_HPP__
 #define __MFRONTGENERICINTERFACE_HPP__
 
+extern double mfront_dt;
+extern double mfront_dt_prop;
+
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using EntData = EntitiesFieldData::EntData;
@@ -34,7 +37,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   SmartPetscObj<DM> dM;
 
   PetscBool isQuasiStatic;
-  PetscBool printGauss;
+  PetscBool saveGauss;
+  PetscBool saveVolume;
 
   PetscBool testJacobian;
   PetscReal randomFieldScale;

@@ -30,7 +30,7 @@ endif(NOT MGIS_DIR)
 if(MGIS_DIR)
   message("MGIS_DIR FOUND")
   find_library(MGIS_LIBRARY NAMES libMFrontGenericInterface.dylib libMFrontGenericInterface.so PATHS ${MGIS_DIR}/lib)
-  find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include/MGIS/)
+  # find_path(MGIS_HEADER PATHS ${MGIS_DIR}/include/MGIS/)
   add_library(MFrontGenericInterface SHARED IMPORTED)
   set_target_properties(MFrontGenericInterface PROPERTIES IMPORTED_LOCATION ${MGIS_LIBRARY})
   message(STATUS ${MGIS_LIBRARY})
@@ -44,16 +44,18 @@ include_directories(
   
 add_executable(mfront_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/mfront_interface.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontOperators.cpp
 )
 
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
 
 add_library(mfront_lib_all
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/Operators.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontOperators.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
+
+target_link_libraries(mfront_lib_all MFrontGenericInterface)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="dylib")
@@ -72,10 +74,7 @@ install(
   FILE mfront_lib_all_targets.cmake
   DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
 
-add_dependencies(mfront_interface MFrontGenericInterface)
-
 target_link_libraries(mfront_interface
-    MFrontGenericInterface
     mfront_lib_all
     users_modules
     mofem_finite_elements
@@ -110,33 +109,54 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMENT "Make linking to behaviours directory" VERBATIM)
 
+  if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
+    install(
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
+  endif()
+
 endif(MGIS_DIR)
 
 if(TFEL_DIR)
   message("TFEL_DIR FOUND")
 
   add_test(compile_behaviours_test
-    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront)
+    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SignoriniHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront)
 
   add_test(3D_necking_plate
-  ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/3D_necking_coarse_4parts.h5m -mi_block_1 LogPlastNonlinHardNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -ts_max_time 1.0 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 65  -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_theta_initial_guess_extrapolate 1 -ts_theta_theta 1  -ts_exact_final_time matchstep -atom_test 1 -field_eval_coords 6.2975,0,0 -mi_test_jacobian 1 -mi_random_field_scale 0.001 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/3D_necking_coarse_4parts.h5m -mi_block_1 LogPlastNonlinHardNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -ts_max_time 1.0 -ts_dt 0.02 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 65  -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_theta_initial_guess_extrapolate 1 -ts_theta_theta 1  -ts_exact_final_time matchstep -atom_test 1 -field_eval_coords 6.2975,0,0 -mi_test_jacobian 1 -mi_random_field_scale 0.001 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
   )
 
   add_test(necking_miehe
-  ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_miehe_fine_4parts.h5m -mi_block_1 LogPlastNonlinHard -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 450 -mi_param_1_1 129.24 -mi_param_1_2 265 -mi_param_1_3 16.93 -ts_max_time 1.4 -ts_dt 0.02 -snes_atol 1e-7 -snes_rtol 1e-7 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.001 -atom_test 2 -field_eval_coords 0,-6.298,0 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_miehe_fine_4parts.h5m -mi_block_1 LogPlastNonlinHard -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 450 -mi_param_1_1 129.24 -mi_param_1_2 265 -mi_param_1_3 16.93 -ts_max_time 1.4 -ts_dt 0.02 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.001 -atom_test 2 -field_eval_coords 0,-6.298,0 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
   )
 
   add_test(relaxation_sls_plate
-    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/relax_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/creep_test.in -ts_max_time 0.5 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 3 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/relax_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/creep_test.in -ts_max_time 0.5 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 3 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1 -snes_lag_jacobian -2
   )
 
   add_test(creep_sls_plate
-    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/creep_test.in -ts_max_time 0.5 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 4 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/creep_test.in -ts_max_time 0.5 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 4 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1 -snes_lag_jacobian -2
   )
 
   add_test(recovery_sls_plate
-    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/recovery_test.in -ts_max_time 1.0 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 5 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/recovery_test.in -ts_max_time 1.0 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 5 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1 -snes_lag_jacobian -2
   )
+
+  add_test(cook_beam_linear_elastic
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 LinearElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 240.565 -mi_param_1_1 0.4999 -mi_print_gauss -ts_max_time 1.0 -ts_dt 1.0 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 1 -is_partitioned 1 -atom_test 6 -field_eval_coords 48,60,0
+  )
+
+  add_test(cook_beam_neohookean
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 SignoriniHyperElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 40.0942e4 -mi_param_1_1 40.0969 -mi_param_1_2 0 -mi_param_1_3 0 -mi_print_gauss -ts_max_time 1.0 -ts_dt 0.2 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -is_partitioned 1 -atom_test 7 -field_eval_coords 48,60,0
+  )
+
+  add_test(cook_beam_mooney_rivlin
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 SignoriniHyperElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 40.0942e4 -mi_param_1_1 20.04845 -mi_param_1_2 20.04845 -mi_param_1_3 0 -mi_print_gauss -ts_max_time 1.0 -ts_dt 0.05 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -is_partitioned 1 -atom_test 8 -field_eval_coords 48,60,0
+  )
+
+  add_test(cook_beam_ogden
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 OgdenHyperElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 40.0942e4 -mi_param_1_1 80.1938 -mi_param_1_2 2.0 -mi_print_gauss -ts_max_time 1.0 -ts_dt 0.05 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -is_partitioned 1 -atom_test 9 -field_eval_coords 48,60,0
+)
 
 endif(TFEL_DIR)
 

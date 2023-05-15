@@ -22,7 +22,7 @@ using namespace FTensor;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <Operators.hpp>
+#include <MFrontOperators.hpp>
 using namespace MFrontInterface;
 
 #include <MFrontMoFEMInterface.hpp>
@@ -38,7 +38,8 @@ MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
       isQuasiStatic(is_quasi_static) {
   oRder = -1;
   isFiniteKinematics = true;
-  printGauss = PETSC_FALSE;
+  saveGauss = PETSC_FALSE;
+  saveVolume = PETSC_TRUE;
   testJacobian = PETSC_FALSE;
   randomFieldScale = 1.0;
   optionsPrefix = "mi_";
@@ -54,9 +55,10 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   CHKERR PetscOptionsInt("-order", "approximation order", "", oRder, &oRder,
                          PETSC_NULL);
 
-  CHKERR PetscOptionsBool("-print_gauss",
-                          "print gauss pts (internal variables)", "",
-                          printGauss, &printGauss, PETSC_NULL);
+  CHKERR PetscOptionsBool("-save_gauss", "save gauss pts (internal variables)",
+                          "", saveGauss, &saveGauss, PETSC_NULL);
+  CHKERR PetscOptionsBool("-save_volume", "save results on a volumetric mesh",
+                          "", saveVolume, &saveVolume, PETSC_NULL);
 
   CHKERR PetscOptionsBool("-test_jacobian", "test Jacobian (LHS matrix)", "",
                           testJacobian, &testJacobian, PETSC_NULL);
@@ -64,7 +66,7 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
                           "scale for the finite difference jacobian", "",
                           randomFieldScale, &randomFieldScale, PETSC_NULL);
 
-  if (printGauss)
+  if (saveGauss)
     moabGaussIntPtr = boost::shared_ptr<moab::Interface>(new moab::Core());
 
   commonDataPtr = boost::make_shared<CommonData>(mField);
@@ -288,7 +290,7 @@ MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
   updateIntVariablesElePtr->getOpPtrVector().push_back(
       new OpCalculateVectorFieldGradient<3, 3>(positionField,
                                                commonDataPtr->mGradPtr));
-  if (printGauss)
+  if (saveGauss)
     updateIntVariablesElePtr->getOpPtrVector().push_back(
         new OpCalculateVectorFieldValues<3>(positionField,
                                             commonDataPtr->mDispPtr));
@@ -298,7 +300,7 @@ MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
   else
     updateIntVariablesElePtr->getOpPtrVector().push_back(
         new OpUpdateVariablesSmallStrains(positionField, commonDataPtr));
-  if (printGauss)
+  if (saveGauss)
     updateIntVariablesElePtr->getOpPtrVector().push_back(
         new OpSaveGaussPts(positionField, moab_gauss, commonDataPtr));
 
@@ -558,11 +560,15 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
 
   auto make_vtks = [&]() {
     MoFEMFunctionBegin;
-    CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", postProcFe);
-    CHKERR postProcFe->writeFile("out_" + optionsPrefix +
-                                 boost::lexical_cast<std::string>(step) +
-                                 ".h5m");
-    if (printGauss) {
+
+    if (saveVolume) {
+      CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", postProcFe);
+      CHKERR postProcFe->writeFile("out_" + optionsPrefix +
+                                   boost::lexical_cast<std::string>(step) +
+                                   ".h5m");
+    }
+
+    if (saveGauss) {
       string file_name = "out_" + optionsPrefix + "gauss_" +
                          boost::lexical_cast<std::string>(step) + ".h5m";
 

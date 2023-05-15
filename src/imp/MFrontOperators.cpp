@@ -1,5 +1,5 @@
 /**
- * @file Operators.cpp
+ * @file MFrontOperators.cpp
  * @brief 
  * @date 2023-01-25
  * 
@@ -24,7 +24,11 @@ using DomainEleOp = DomainEle::UserDataOperator;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <Operators.hpp>
+#include <MFrontOperators.hpp>
+#include <MFrontMoFEMInterface.hpp>
+
+double mfront_dt = 1;
+double mfront_dt_prop = 1;
 
 namespace MFrontInterface {
 
@@ -41,9 +45,6 @@ Index<'k', 3> k;
 Index<'l', 3> l;
 Index<'m', 3> m;
 Index<'n', 3> n;
-
-double t_dt = 1;
-double t_dt_prop = 1;
 
 boost::shared_ptr<CommonData> commonDataPtr;
 
@@ -75,8 +76,8 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
   auto &mgis_bv = *dAta.mGisBehaviour;
 
   dAta.setTag(RHS);
-  dAta.behDataPtr->dt = t_dt;
-  dAta.bView.dt = t_dt;
+  dAta.behDataPtr->dt = mfront_dt;
+  dAta.bView.dt = mfront_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar);
@@ -121,7 +122,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN>::doWork(int side,
 
   if constexpr (UPDATE) {
     CHKERR commonDataPtr->setInternalVar(fe_ent);
-    // t_dt_prop = t_dt * b_view.rdt;
+    // mfront_dt_prop = mfront_dt * b_view.rdt;
   }
 
   MoFEMFunctionReturn(0);
@@ -145,8 +146,8 @@ MoFEMErrorCode OpTangent<T>::doWork(int side, EntityType type, EntData &data) {
   auto &mgis_bv = *dAta.mGisBehaviour;
 
   dAta.setTag(LHS);
-  dAta.behDataPtr->dt = t_dt;
-  dAta.bView.dt = t_dt;
+  dAta.behDataPtr->dt = mfront_dt;
+  dAta.bView.dt = mfront_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar);
@@ -381,8 +382,8 @@ MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
   auto &mgis_bv = *dAta.mGisBehaviour;
 
   dAta.setTag(RHS);
-  dAta.behDataPtr->dt = t_dt;
-  dAta.bView.dt = t_dt;
+  dAta.behDataPtr->dt = mfront_dt;
+  dAta.bView.dt = mfront_dt;
 
   int &size_of_vars = dAta.sizeIntVar;
   int &size_of_grad = dAta.sizeGradVar;

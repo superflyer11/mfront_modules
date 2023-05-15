@@ -27,7 +27,7 @@ using namespace FTensor;
 using namespace mgis;
 using namespace mgis::behaviour;
 
-#include <Operators.hpp>
+#include <MFrontOperators.hpp>
 
 using namespace MFrontInterface;
 
@@ -37,9 +37,7 @@ using namespace MFrontInterface;
 #include <BasicBoundaryConditionsInterface.hpp>
 #include <SurfacePressureComplexForLazy.hpp>
 
-// #ifdef WITH_MODULE_MFRONT_INTERFACE
 #include <MFrontMoFEMInterface.hpp>
-// #endif
 
 using Ele = ForcesAndSourcesCore;
 using EntData = EntitiesFieldData::EntData;
@@ -50,6 +48,9 @@ using BoundaryEleOp = BoundaryEle::UserDataOperator;
 using PostProcEle = PostProcVolumeOnRefinedMesh;
 using PostProcSkinEle = PostProcFaceOnRefinedMesh;
 using SetPtsData = FieldEvaluatorInterface::SetPtsData;
+
+// double t_dt;
+// double t_dt_prop;
 
 int main(int argc, char *argv[]) {
 
@@ -183,14 +184,22 @@ int main(int argc, char *argv[]) {
           {{1.00, {0.133e-6, 0.0}}, false}};
       atom_test_threshold = 5e-2;
       break;
+    case 6:
+      atom_test_data = {{{1.0, {8.0}}, false}};
+      atom_test_threshold = 1.3e-3;
+      break;
+    case 7:
+    case 8:
+    case 9:
+      atom_test_data = {{{1.0, {6.9}}, false}};
+      atom_test_threshold = 3.1e-3;
+      break;
     default:
       if (atom_test > -1)
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
                  "Atom test number %d is not yet implemented", atom_test);
       break;
     }
-
-    
 
     Simple *simple = m_field.getInterface<Simple>();
     CHKERR simple->getOptions();
@@ -289,7 +298,7 @@ int main(int argc, char *argv[]) {
     monitor_ptr = boost::make_shared<FEMethod>();
     monitor_ptr->preProcessHook = [&]() { 
       MoFEMFunctionBegin;
-      t_dt = monitor_ptr->ts_dt;
+      mfront_dt = monitor_ptr->ts_dt;
       MoFEMFunctionReturn(0);
       };
     monitor_ptr->operatorHook = []() { return 0; };
@@ -358,6 +367,18 @@ int main(int argc, char *argv[]) {
                 << "(relative) difference eps: " << eps_dif
                 << " sig: " << sig_dif;
           } break;
+          case 6:
+          case 7:
+          case 8:
+          case 9:
+          if (field_ptr->size1()) {
+              auto t_p = getFTensor1FromMat<3>(*field_ptr);
+              dif = fabs(it.first.second[0] - t_p(1));
+              dif = calc_if_relative(dif, it.first.second[0]);
+              MOFEM_LOG("ATOM_TEST", Sev::verbose)
+                  << "(relative) difference disp: " << dif;
+            }
+            break;
           default:
             break;
           }
@@ -434,6 +455,10 @@ int main(int argc, char *argv[]) {
     case 3:
     case 4:
     case 5:
+    case 6:
+    case 7:
+    case 8:
+    case 9:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
