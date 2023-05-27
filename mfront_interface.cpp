@@ -39,14 +39,14 @@ using namespace MFrontInterface;
 
 #include <MFrontMoFEMInterface.hpp>
 
-using Ele = ForcesAndSourcesCore;
-using EntData = EntitiesFieldData::EntData;
-using DomainEle = VolumeElementForcesAndSourcesCore;
-using DomainEleOp = DomainEle::UserDataOperator;
-using BoundaryEle = FaceElementForcesAndSourcesCore;
-using BoundaryEleOp = BoundaryEle::UserDataOperator;
-using PostProcEle = PostProcVolumeOnRefinedMesh;
-using PostProcSkinEle = PostProcFaceOnRefinedMesh;
+// using Ele = ForcesAndSourcesCore;
+// using EntData = EntitiesFieldData::EntData;
+// using DomainEle = VolumeElementForcesAndSourcesCore;
+// using DomainEleOp = DomainEle::UserDataOperator;
+// using BoundaryEle = FaceElementForcesAndSourcesCore;
+// using BoundaryEleOp = BoundaryEle::UserDataOperator;
+// using PostProcEle = PostProcVolumeOnRefinedMesh;
+// using PostProcSkinEle = PostProcFaceOnRefinedMesh;
 using SetPtsData = FieldEvaluatorInterface::SetPtsData;
 
 // double t_dt;
@@ -128,10 +128,11 @@ int main(int argc, char *argv[]) {
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-output_every", &save_every_nth_step,
                               PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-atom_test", &atom_test, PETSC_NULL);
-    int dim = 3;
+    int coords_dim = 2;
     CHKERR PetscOptionsGetRealArray(NULL, NULL, "-field_eval_coords",
-                                    field_eval_coords.data(), &dim,
+                                    field_eval_coords.data(), &coords_dim,
                                     &field_eval_flag);
+    cout <<  field_eval_flag << endl;                               
 
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_partitioned", &is_partitioned,
                                PETSC_NULL);
@@ -185,6 +186,7 @@ int main(int argc, char *argv[]) {
       atom_test_threshold = 5e-2;
       break;
     case 6:
+    case 10:
       atom_test_data = {{{1.0, {8.0}}, false}};
       atom_test_threshold = 1.3e-3;
       break;
@@ -212,16 +214,24 @@ int main(int argc, char *argv[]) {
     simple->getProblemName() = "MoFEM MFront Interface module";
     simple->getDomainFEName() = "MFRONT_EL";
 
+    int dim = 2;
+
     FieldApproximationBase base = AINSWORTH_LEGENDRE_BASE;
     // Add displacement field
-    CHKERR m_field.add_field("U", H1, base, 3);
+    CHKERR m_field.add_field("U", H1, base, dim);
 
     // Add field representing ho-geometry
-    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, base, 3);
+    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, base, dim);
 
     // Add entities to field
-    CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "U");
-    CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "MESH_NODE_POSITIONS");
+    if (dim == 3) {
+      CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "U");
+      CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "MESH_NODE_POSITIONS");
+    }
+    else if (dim == 2) {
+      CHKERR m_field.add_ents_to_field_by_type(0, MBTRI, "U");
+      CHKERR m_field.add_ents_to_field_by_type(0, MBTRI, "MESH_NODE_POSITIONS");
+    }
     CHKERR m_field.set_field_order(0, MBVERTEX, "U", 1);
     CHKERR m_field.set_field_order(0, MBEDGE, "U", order);
     CHKERR m_field.set_field_order(0, MBTRI, "U", order);
@@ -245,7 +255,7 @@ int main(int argc, char *argv[]) {
     m_modules.push_back(new NonlinearElasticElementInterface(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
-    m_modules.push_back(new MFrontMoFEMInterface(
+    m_modules.push_back(new MFrontMoFEMInterface<PLANESTRAIN>(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
     for (auto &&mod : m_modules) {
@@ -280,8 +290,8 @@ int main(int argc, char *argv[]) {
     boost::shared_ptr<MatrixDouble> field_ptr;
     if (field_eval_flag) {
       field_eval_data =
-          m_field.getInterface<FieldEvaluatorInterface>()->getData<DomainEle>();
-      CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree3D(
+          m_field.getInterface<FieldEvaluatorInterface>()->getData<MFrontMoFEMInterface<PLANESTRAIN>::DomainEle>();
+      CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree2D(
           field_eval_data, simple->getDomainFEName());
       field_eval_data->setEvalPoints(field_eval_coords.data(), 1);
 
@@ -292,7 +302,7 @@ int main(int argc, char *argv[]) {
 
       field_ptr = boost::make_shared<MatrixDouble>();
       fe_ptr->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldValues<3>("U", field_ptr));
+          new OpCalculateVectorFieldValues<2>("U", field_ptr));
     }
 
     monitor_ptr = boost::make_shared<FEMethod>();
@@ -326,7 +336,7 @@ int main(int argc, char *argv[]) {
 
           if (field_eval_flag) {
             CHKERR m_field.getInterface<FieldEvaluatorInterface>()
-                ->evalFEAtThePoint3D(
+                ->evalFEAtThePoint2D(
                     field_eval_coords.data(), 1e-12, simple->getProblemName(),
                     simple->getDomainFEName(), field_eval_data,
                     m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
@@ -371,8 +381,9 @@ int main(int argc, char *argv[]) {
           case 7:
           case 8:
           case 9:
+          case 10:
           if (field_ptr->size1()) {
-              auto t_p = getFTensor1FromMat<3>(*field_ptr);
+              auto t_p = getFTensor1FromMat<2>(*field_ptr);
               dif = fabs(it.first.second[0] - t_p(1));
               dif = calc_if_relative(dif, it.first.second[0]);
               MOFEM_LOG("ATOM_TEST", Sev::verbose)
@@ -459,6 +470,7 @@ int main(int argc, char *argv[]) {
     case 7:
     case 8:
     case 9:
+    case 10:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,

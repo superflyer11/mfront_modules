@@ -18,18 +18,82 @@
 extern double mfront_dt;
 extern double mfront_dt_prop;
 
-struct MFrontMoFEMInterface : public GenericElementInterface {
+using EntData = EntitiesFieldData::EntData;
 
-  using EntData = EntitiesFieldData::EntData;
+// using EntData = EntitiesFieldData::EntData;
+// using DomainEle = FaceElementForcesAndSourcesCore;
+// using DomainEleOp = DomainEle::UserDataOperator;
+
+// template <int DIM>
+// using OpInternalForce = FormsIntegrators<DomainEleOp>::Assembly<
+//     PETSC>::LinearForm<GAUSS>::OpGradTimesTensor<1, DIM, DIM>;
+// template <int DIM>
+// using OpAssembleLhsFiniteStrains = FormsIntegrators<DomainEleOp>::Assembly<
+//     PETSC>::BiLinearForm<GAUSS>::OpGradTensorGrad<1, DIM, DIM, 1>;
+// template <int DIM>
+// using OpAssembleLhsSmallStrains = FormsIntegrators<DomainEleOp>::Assembly<
+//     PETSC>::BiLinearForm<GAUSS>::OpGradSymTensorGrad<1, DIM, DIM, 0>;
+
+enum hypothesis { TRIDIMENSIONAL, PLANESTRAIN, AXISYMMETRICAL};
+
+template <int H> struct MFrontEleType;
+
+template <> struct MFrontEleType<TRIDIMENSIONAL> {
+
+  MFrontEleType() = delete;
+  ~MFrontEleType() = delete;
+
   using DomainEle = VolumeElementForcesAndSourcesCore;
   using DomainEleOp = DomainEle::UserDataOperator;
+  using PostProcDomainOnRefinedMesh = PostProcVolumeOnRefinedMesh;
 
-  using OpInternalForce = FormsIntegrators<DomainEleOp>::Assembly<
-      PETSC>::LinearForm<GAUSS>::OpGradTimesTensor<1, 3, 3>;
-  using OpAssembleLhsFiniteStrains = FormsIntegrators<DomainEleOp>::Assembly<
-      PETSC>::BiLinearForm<GAUSS>::OpGradTensorGrad<1, 3, 3, 1>;
-  using OpAssembleLhsSmallStrains = FormsIntegrators<DomainEleOp>::Assembly<
-      PETSC>::BiLinearForm<GAUSS>::OpGradSymTensorGrad<1, 3, 3, 0>;
+  static constexpr int SPACE_DIM = 3;
+};
+
+template <> struct MFrontEleType<PLANESTRAIN> {
+
+  MFrontEleType() = delete;
+  ~MFrontEleType() = delete;
+
+  using DomainEle = FaceElementForcesAndSourcesCore;
+  using DomainEleOp = DomainEle::UserDataOperator;
+  using PostProcDomainOnRefinedMesh = PostProcFaceOnRefinedMesh;
+  
+  static constexpr int SPACE_DIM = 2;
+};
+
+template <> struct MFrontEleType<AXISYMMETRICAL> {
+
+  MFrontEleType() = delete;
+  ~MFrontEleType() = delete;
+
+  using DomainEle = FaceElementForcesAndSourcesCore;
+  using DomainEleOp = DomainEle::UserDataOperator;
+  using PostProcDomainOnRefinedMesh = PostProcFaceOnRefinedMesh;
+
+  static constexpr int SPACE_DIM = 2;
+};
+
+// constexpr int MFrontEleType<PLANE_STEESS>::SPACE_DIM;
+
+template <int H>
+struct MFrontMoFEMInterface : public GenericElementInterface {
+
+  using DomainEle = typename MFrontEleType<H>::DomainEle;
+  using DomainEleOp = typename DomainEle::UserDataOperator;
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
+
+  using OpInternalForce =
+      typename FormsIntegrators<DomainEleOp>::template Assembly<PETSC>::
+          template LinearForm<GAUSS>::template OpGradTimesTensor<1, DIM, DIM>;
+  using OpAssembleLhsFiniteStrains =
+      typename FormsIntegrators<DomainEleOp>::template Assembly<PETSC>::
+          template BiLinearForm<GAUSS>::template OpGradTensorGrad<1, DIM, DIM,
+                                                                  1>;
+  using OpAssembleLhsSmallStrains =
+      typename FormsIntegrators<DomainEleOp>::template Assembly<PETSC>::
+          template BiLinearForm<GAUSS>::template OpGradSymTensorGrad<1, DIM,
+                                                                     DIM, 0>;
 
   MoFEM::Interface &mField;
   string optionsPrefix;
@@ -48,7 +112,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   bool isFiniteKinematics;
   BitRefLevel bIt;
 
-  boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
+  boost::shared_ptr<PostProcFaceOnRefinedMesh> postProcFe;
   boost::shared_ptr<DomainEle> updateIntVariablesElePtr;
 
   boost::shared_ptr<DomainEle> mfrontPipelineRhsPtr;
@@ -69,7 +133,9 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode addElementFields() override;
   MoFEMErrorCode createElements() override;
   MoFEMErrorCode setOperators() override;
-  MoFEMErrorCode testOperators(); //FIXME: Add this funtion to GenericElementInterface
+
+  // FIXME: Add this funtion to GenericElementInterface
+  MoFEMErrorCode testOperators();
 
   MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
 
@@ -81,6 +147,12 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
 
   MoFEMErrorCode updateElementVariables() override;
   MoFEMErrorCode postProcessElement(int step) override;
+
+  // template <bool UPDATE, bool IS_LARGE_STRAIN, int D> struct OpStressTmp;
+  // template <typename T, int D> struct OpTangent;
+  // struct OpPostProcElastic;
+  // struct OpPostProcInternalVariables;
+  // struct OpSaveGaussPts;
 };
 
 #endif // __MFRONTGENERICINTERFACE_HPP__

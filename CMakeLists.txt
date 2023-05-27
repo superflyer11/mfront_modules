@@ -142,20 +142,28 @@ if(TFEL_DIR)
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/creep_plate_4parts.h5m -mi_block_1 StandardLinearSolid -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 23333.33333333 -mi_param_1_1 35000.0 -mi_param_1_2 6666.6666 -mi_param_1_3 10000 -mi_param_1_4 0.05 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history/recovery_test.in -ts_max_time 1.0 -ts_dt 0.005 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_print_gauss -atom_test 5 -is_partitioned 1 -mi_test_jacobian 1 -mi_random_field_scale 0.1 -snes_lag_jacobian -2
   )
 
-  add_test(cook_beam_linear_elastic
+  add_test(cook_membrane_linear_elastic_3d
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 LinearElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 240.565 -mi_param_1_1 0.4999 -mi_print_gauss -ts_max_time 1.0 -ts_dt 1.0 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 1 -is_partitioned 1 -atom_test 6 -field_eval_coords 48,60,0
   )
 
-  add_test(cook_beam_neohookean
+  add_test(cook_membrane_linear_elastic
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 LinearElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 240.565 -mi_param_1_1 0.4999 -mi_print_gauss -ts_max_time 1.0 -ts_dt 1.0 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 1 -is_partitioned 1 -atom_test 6 -field_eval_coords 48,60,0
+  )
+
+  add_test(cook_membrane_neohookean
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 SignoriniHyperElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 40.0942e4 -mi_param_1_1 40.0969 -mi_param_1_2 0 -mi_param_1_3 0 -mi_print_gauss -ts_max_time 1.0 -ts_dt 0.2 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -is_partitioned 1 -atom_test 7 -field_eval_coords 48,60,0
   )
 
-  add_test(cook_beam_mooney_rivlin
+  add_test(cook_membrane_mooney_rivlin
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 SignoriniHyperElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 40.0942e4 -mi_param_1_1 20.04845 -mi_param_1_2 20.04845 -mi_param_1_3 0 -mi_print_gauss -ts_max_time 1.0 -ts_dt 0.05 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -is_partitioned 1 -atom_test 8 -field_eval_coords 48,60,0
   )
 
-  add_test(cook_beam_ogden
+  add_test(cook_membrane_ogden
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_4parts.h5m -mi_block_1 OgdenHyperElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 40.0942e4 -mi_param_1_1 80.1938 -mi_param_1_2 2.0 -mi_print_gauss -ts_max_time 1.0 -ts_dt 0.05 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.1 -is_partitioned 1 -atom_test 9 -field_eval_coords 48,60,0
+)
+
+add_test(cook_membrane_linear_elastic_2d
+${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 1 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface {CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/cook_membrane_2d.cub -mi_block_1 LinearElasticity -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -mi_param_1_0 240.565 -mi_param_1_1 0.4999 -mi_print_gauss -ts_max_time 1.0 -ts_dt 1.0 -snes_atol 1e-12 -snes_rtol 1e-12 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type basic -ts_type beuler -ts_theta_initial_guess_extrapolate 1 -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 1 -is_partitioned 1 -atom_test 10 -field_eval_coords 48,60 -mi_save_volume 1
 )
 
 endif(TFEL_DIR)
