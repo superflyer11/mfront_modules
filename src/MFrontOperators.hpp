@@ -546,7 +546,7 @@ struct CommonData {
         m_mat->resize(nb_gauss_pts, m_size, false);
         m_mat->clear();
         // initialize deformation gradient properly
-        if (is_def_grad && m_size == 9)
+        if (is_def_grad && m_size > 4)
           for (int gg = 0; gg != nb_gauss_pts; ++gg) {
             (*m_mat)(gg, 0) = 1;
             (*m_mat)(gg, 1) = 1;

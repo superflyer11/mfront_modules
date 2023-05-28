@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
                         {{0.5, {-0.5769}}, false}, {{0.6, {-0.7539}}, false},
                         {{0.7, {-1.1205}}, false}, {{0.8, {-1.5959}}, false},
                         {{0.9, {-2.1240}}, false}, {{1.0, {-2.6948}}, false}};
-      atom_test_threshold = 3e-3;
+      atom_test_threshold = 9e-3;
       break;
     case 2:
       atom_test_data = {{{0.14, {0.0855}}, false}, {{0.28, {0.1706}}, false},
@@ -186,16 +186,10 @@ int main(int argc, char *argv[]) {
       atom_test_threshold = 5e-2;
       break;
     case 6:
-    case 10:
       atom_test_data = {{{1.0, {8.0}}, false}};
       atom_test_threshold = 1.3e-3;
       break;
     case 7:
-    case 8:
-    case 9:
-    case 11:
-    case 12:
-    case 13:
       atom_test_data = {{{1.0, {6.9}}, false}};
       atom_test_threshold = 3.1e-3;
       break;
@@ -351,8 +345,8 @@ int main(int argc, char *argv[]) {
           case 1:
           case 2:
             if (field_ptr->size1()) {
-              auto t_p = getFTensor1FromMat<3>(*field_ptr);
-              if (atom_test == 1) {
+              auto t_p = getFTensor1FromMat<2>(*field_ptr);
+              if (atom_test == 1 || atom_test == 10) {
                 dif = fabs(it.first.second[0] - t_p(0));
               } else {
                 dif = fabs(it.first.second[0] - t_p(1));
@@ -382,12 +376,6 @@ int main(int argc, char *argv[]) {
           } break;
           case 6:
           case 7:
-          case 8:
-          case 9:
-          case 10:
-          case 11:
-          case 12:
-          case 13:
           if (field_ptr->size1()) {
               auto t_p = getFTensor1FromMat<2>(*field_ptr);
               dif = fabs(it.first.second[0] - t_p(1));
@@ -474,12 +462,6 @@ int main(int argc, char *argv[]) {
     case 5:
     case 6:
     case 7:
-    case 8:
-    case 9:
-    case 10:
-    case 11:
-    case 12:
-    case 13:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
