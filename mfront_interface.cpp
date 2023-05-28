@@ -193,6 +193,9 @@ int main(int argc, char *argv[]) {
     case 7:
     case 8:
     case 9:
+    case 11:
+    case 12:
+    case 13:
       atom_test_data = {{{1.0, {6.9}}, false}};
       atom_test_threshold = 3.1e-3;
       break;
@@ -382,6 +385,9 @@ int main(int argc, char *argv[]) {
           case 8:
           case 9:
           case 10:
+          case 11:
+          case 12:
+          case 13:
           if (field_ptr->size1()) {
               auto t_p = getFTensor1FromMat<2>(*field_ptr);
               dif = fabs(it.first.second[0] - t_p(1));
@@ -471,6 +477,9 @@ int main(int argc, char *argv[]) {
     case 8:
     case 9:
     case 10:
+    case 11:
+    case 12:
+    case 13:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,

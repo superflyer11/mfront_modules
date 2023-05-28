@@ -145,7 +145,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
     CHKERR check_lib_finite_strain(lib_path, name, is_finite_strain);
     if (is_finite_strain) {
       mgis_bv_ptr = boost::make_shared<Behaviour>(
-          load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL));
+          load(op, lib_path, name, Hypothesis::PLANESTRAIN));
       block.second.isFiniteStrain = true;
     } else
       mgis_bv_ptr = boost::make_shared<Behaviour>(
