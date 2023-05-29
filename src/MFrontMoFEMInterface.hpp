@@ -20,25 +20,11 @@ extern double mfront_dt_prop;
 
 using EntData = EntitiesFieldData::EntData;
 
-// using EntData = EntitiesFieldData::EntData;
-// using DomainEle = FaceElementForcesAndSourcesCore;
-// using DomainEleOp = DomainEle::UserDataOperator;
+using Hypothesis = mgis::behaviour::Hypothesis;
 
-// template <int DIM>
-// using OpInternalForce = FormsIntegrators<DomainEleOp>::Assembly<
-//     PETSC>::LinearForm<GAUSS>::OpGradTimesTensor<1, DIM, DIM>;
-// template <int DIM>
-// using OpAssembleLhsFiniteStrains = FormsIntegrators<DomainEleOp>::Assembly<
-//     PETSC>::BiLinearForm<GAUSS>::OpGradTensorGrad<1, DIM, DIM, 1>;
-// template <int DIM>
-// using OpAssembleLhsSmallStrains = FormsIntegrators<DomainEleOp>::Assembly<
-//     PETSC>::BiLinearForm<GAUSS>::OpGradSymTensorGrad<1, DIM, DIM, 0>;
+template <Hypothesis H> struct MFrontEleType;
 
-enum hypothesis { TRIDIMENSIONAL, PLANESTRAIN, AXISYMMETRICAL};
-
-template <int H> struct MFrontEleType;
-
-template <> struct MFrontEleType<TRIDIMENSIONAL> {
+template <> struct MFrontEleType<Hypothesis::TRIDIMENSIONAL> {
 
   MFrontEleType() = delete;
   ~MFrontEleType() = delete;
@@ -50,7 +36,7 @@ template <> struct MFrontEleType<TRIDIMENSIONAL> {
   static constexpr int SPACE_DIM = 3;
 };
 
-template <> struct MFrontEleType<PLANESTRAIN> {
+template <> struct MFrontEleType<Hypothesis::PLANESTRAIN> {
 
   MFrontEleType() = delete;
   ~MFrontEleType() = delete;
@@ -62,7 +48,7 @@ template <> struct MFrontEleType<PLANESTRAIN> {
   static constexpr int SPACE_DIM = 2;
 };
 
-template <> struct MFrontEleType<AXISYMMETRICAL> {
+template <> struct MFrontEleType<Hypothesis::AXISYMMETRICAL> {
 
   MFrontEleType() = delete;
   ~MFrontEleType() = delete;
@@ -76,7 +62,7 @@ template <> struct MFrontEleType<AXISYMMETRICAL> {
 
 // constexpr int MFrontEleType<PLANE_STEESS>::SPACE_DIM;
 
-template <int H>
+template <Hypothesis H>
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using DomainEle = typename MFrontEleType<H>::DomainEle;

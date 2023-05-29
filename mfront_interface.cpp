@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
     CHKERR PetscOptionsGetRealArray(NULL, NULL, "-field_eval_coords",
                                     field_eval_coords.data(), &coords_dim,
                                     &field_eval_flag);
-    cout <<  field_eval_flag << endl;                               
+    cout << field_eval_flag << endl;
 
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_partitioned", &is_partitioned,
                                PETSC_NULL);
@@ -224,8 +224,7 @@ int main(int argc, char *argv[]) {
     if (dim == 3) {
       CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "U");
       CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "MESH_NODE_POSITIONS");
-    }
-    else if (dim == 2) {
+    } else if (dim == 2) {
       CHKERR m_field.add_ents_to_field_by_type(0, MBTRI, "U");
       CHKERR m_field.add_ents_to_field_by_type(0, MBTRI, "MESH_NODE_POSITIONS");
     }
@@ -252,7 +251,7 @@ int main(int argc, char *argv[]) {
     m_modules.push_back(new NonlinearElasticElementInterface(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
-    m_modules.push_back(new MFrontMoFEMInterface<PLANESTRAIN>(
+    m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
     for (auto &&mod : m_modules) {
@@ -286,8 +285,9 @@ int main(int argc, char *argv[]) {
 
     boost::shared_ptr<MatrixDouble> field_ptr;
     if (field_eval_flag) {
-      field_eval_data =
-          m_field.getInterface<FieldEvaluatorInterface>()->getData<MFrontMoFEMInterface<PLANESTRAIN>::DomainEle>();
+      field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
+                            ->getData<MFrontMoFEMInterface<
+                                Hypothesis::AXISYMMETRICAL>::DomainEle>();
       CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree2D(
           field_eval_data, simple->getDomainFEName());
       field_eval_data->setEvalPoints(field_eval_coords.data(), 1);
@@ -303,15 +303,15 @@ int main(int argc, char *argv[]) {
     }
 
     monitor_ptr = boost::make_shared<FEMethod>();
-    monitor_ptr->preProcessHook = [&]() { 
+    monitor_ptr->preProcessHook = [&]() {
       MoFEMFunctionBegin;
       mfront_dt = monitor_ptr->ts_dt;
       MoFEMFunctionReturn(0);
-      };
+    };
     monitor_ptr->operatorHook = []() { return 0; };
     monitor_ptr->postProcessHook = [&]() {
       MoFEMFunctionBegin;
-      
+
       auto ts_time = monitor_ptr->ts_t;
       auto ts_step = monitor_ptr->ts_step;
 
@@ -376,7 +376,7 @@ int main(int argc, char *argv[]) {
           } break;
           case 6:
           case 7:
-          if (field_ptr->size1()) {
+            if (field_ptr->size1()) {
               auto t_p = getFTensor1FromMat<2>(*field_ptr);
               dif = fabs(it.first.second[0] - t_p(1));
               dif = calc_if_relative(dif, it.first.second[0]);

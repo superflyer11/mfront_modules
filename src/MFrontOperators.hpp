@@ -20,6 +20,9 @@ template <int DIM>
 using Tensor2Pack = Tensor2<PackPtr<double *, 1>, DIM, DIM>;
 
 template <int DIM>
+using Tensor1Pack = Tensor1<PackPtr<double *, 1>, DIM>;
+
+template <int DIM>
 using DdgPack = Ddg<PackPtr<double *, 1>, DIM, DIM>;
 
 // using EntData = EntitiesFieldData::EntData;
@@ -155,6 +158,18 @@ template <typename T> inline auto get_voigt_vec_symm_plane_strain(T &t_grad) {
 
   array<double, 4> vec_sym{t_strain(0, 0), t_strain(1, 1), 0,
                            sqr2 * t_strain(0, 1)};
+  return vec_sym;
+};
+
+template <typename T1, typename T2, typename T3>
+inline auto get_voigt_vec_symm_axisymm(T1 &t_grad, T2 &t_disp, T3 &t_coords) {
+  Tensor2_symmetric<double, 2> t_strain;
+  Index<'i', 2> i;
+  Index<'j', 2> j;
+  t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+
+  array<double, 5> vec_sym{t_strain(0, 0), t_strain(1, 1),
+                           t_disp(0) / t_coords(0), sqr2 * t_strain(0, 1)};
   return vec_sym;
 };
 
@@ -476,17 +491,61 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
   MoFEMFunctionReturnHot(0);
 };
 
+template <typename T1, typename T2>
+inline MoFEMErrorCode get_full_tensor4_from_voigt(const T1 &K, T2 &D) {
+  MoFEMFunctionBeginHot;
+
+  Number<0> N0;
+  Number<1> N1;
+  Number<2> N2;
+
+  if (std::is_same<T2, DdgPack<3>>::value) { // plane strain, small strain
+
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    D(N0, N0, N2, N2) = K[2];
+
+    D(N0, N0, N0, N1) = inv_sqr2 * K[3];
+
+    D(N1, N1, N0, N0) = K[4];
+    D(N1, N1, N1, N1) = K[5];
+    D(N1, N1, N2, N2) = K[6];
+
+    D(N1, N1, N0, N1) = inv_sqr2 * K[7];
+
+    D(N2, N2, N0, N0) = K[8];
+    D(N2, N2, N1, N1) = K[9];
+    D(N2, N2, N2, N2) = K[10];
+
+    D(N2, N2, N0, N1) = inv_sqr2 * K[11];
+
+    D(N0, N1, N0, N0) = inv_sqr2 * K[12];
+    D(N0, N1, N1, N1) = inv_sqr2 * K[13];
+    D(N0, N1, N2, N2) = inv_sqr2 * K[14];
+
+    D(N0, N1, N0, N1) = 0.5 * K[15];
+
+  }
+
+  // D(i, j, k, l) *= -1;
+
+  MoFEMFunctionReturnHot(0);
+};
+
+
 struct CommonData {
 
   MoFEM::Interface &mField;
   boost::shared_ptr<MatrixDouble> mGradPtr;
   boost::shared_ptr<MatrixDouble> mStressPtr;
+  boost::shared_ptr<MatrixDouble> mFullStressPtr;
 
   boost::shared_ptr<MatrixDouble> mPrevGradPtr;
   boost::shared_ptr<MatrixDouble> mPrevStressPtr;
 
   boost::shared_ptr<MatrixDouble> mDispPtr;
   boost::shared_ptr<MatrixDouble> materialTangentPtr;
+  boost::shared_ptr<MatrixDouble> mFullTangentPtr;
   boost::shared_ptr<MatrixDouble> internalVariablePtr;
 
   std::map<int, BlockData> setOfBlocksData;
@@ -628,10 +687,11 @@ extern boost::shared_ptr<CommonData> commonDataPtr;
 
 // MoFEMErrorCode saveOutputMesh(int step, bool print_gauss);
 
-template <bool IS_LARGE_STRAIN, int DIM>
-inline MoFEMErrorCode mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad,
-                                       CommonData &common_data,
-                                       BlockData &block_data) {
+template <bool IS_LARGE_STRAIN, int DIM, Hypothesis H>
+inline MoFEMErrorCode
+mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
+                 Tensor1<PackPtr<double *, 3>, 3> &t_coords, CommonData &common_data,
+                 BlockData &block_data) {
   MoFEMFunctionBegin;
   int check_integration;
   MatrixDouble &mat_int = *common_data.internalVariablePtr;
@@ -655,9 +715,15 @@ inline MoFEMErrorCode mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad,
     if (DIM == 3)
       setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                   &*get_voigt_vec_symm(t_grad).data());
-    if (DIM == 2)
-      setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
-                  &*get_voigt_vec_symm_plane_strain(t_grad).data());
+    if (DIM == 2) {
+      if (H == Hypothesis::AXISYMMETRICAL)
+        setGradient(
+            block_data.behDataPtr->s1, 0, size_of_grad,
+            &*get_voigt_vec_symm_axisymm(t_grad, t_disp, t_coords).data());
+      else
+        setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
+                    &*get_voigt_vec_symm_plane_strain(t_grad).data());
+    }
   }
 
   auto grad0_vec =
@@ -730,9 +796,9 @@ inline MoFEMErrorCode mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad,
 
 template <typename T> T get_tangent_tensor(MatrixDouble &mat);
 
-template <bool UPDATE, bool IS_LARGE_STRAIN>
-struct OpStressTmp : public MFrontMoFEMInterface<PLANESTRAIN>::DomainEleOp {
-  static constexpr int DIM = MFrontEleType<PLANESTRAIN>::SPACE_DIM;
+template <bool UPDATE, bool IS_LARGE_STRAIN, Hypothesis H>
+struct OpStressTmp : public MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<Hypothesis::AXISYMMETRICAL>::SPACE_DIM;
 
   OpStressTmp(const std::string field_name,
               boost::shared_ptr<CommonData> common_data_ptr);
@@ -742,8 +808,8 @@ private:
   boost::shared_ptr<CommonData> commonDataPtr;
 };
 
-template <typename T> struct OpTangent : public MFrontMoFEMInterface<PLANESTRAIN>::DomainEleOp {
-  static constexpr int DIM = MFrontEleType<PLANESTRAIN>::SPACE_DIM;
+template <typename T, Hypothesis H> struct OpTangent : public MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<Hypothesis::AXISYMMETRICAL>::SPACE_DIM;
   
   OpTangent(const std::string field_name,
             boost::shared_ptr<CommonData> common_data_ptr);
@@ -751,6 +817,30 @@ template <typename T> struct OpTangent : public MFrontMoFEMInterface<PLANESTRAIN
 
 private:
   boost::shared_ptr<CommonData> commonDataPtr;
+};
+
+struct OpAxisymmetricRhs
+    : public OpBaseImpl<PETSC, MFrontMoFEMInterface<
+                                   Hypothesis::AXISYMMETRICAL>::DomainEleOp> {
+  OpAxisymmetricRhs(const std::string field_name,
+                 boost::shared_ptr<CommonData> common_data_ptr);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+
+  MoFEMErrorCode iNtegrate(EntData &row_data);
+};
+
+struct OpAxisymmetricLhs
+    : public OpBaseImpl<PETSC, MFrontMoFEMInterface<
+                                   Hypothesis::AXISYMMETRICAL>::DomainEleOp> {
+  OpAxisymmetricLhs(const std::string field_name,
+                 boost::shared_ptr<CommonData> common_data_ptr);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+
+  MoFEMErrorCode iNtegrate(EntData &row_data, EntData &col_data);
 };
 
 // struct OpPostProcElastic : public MFrontMoFEMInterface::DomainEleOp {
@@ -824,26 +914,26 @@ struct FePrePostProcess : public FEMethod {
   MoFEMErrorCode postProcess() { return 0; }
 };
 
-template <int DIM>
-using OpTangentFiniteStrains = struct OpTangent<Tensor4Pack<DIM>>;
+template <int DIM, Hypothesis H>
+using OpTangentFiniteStrains = struct OpTangent<Tensor4Pack<DIM>, H>;
 
-template <int DIM>
-using OpTangentSmallStrains = struct OpTangent<DdgPack<DIM>>;
+template <int DIM, Hypothesis H>
+using OpTangentSmallStrains = struct OpTangent<DdgPack<DIM>, H>;
 
 // typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;
 // typedef struct OpTangent<DdgPack> OpTangentSmallStrains;
 
+template <Hypothesis H>
+using OpUpdateVariablesFiniteStrains = struct OpStressTmp<true, true, H>;
 
-using OpUpdateVariablesFiniteStrains = struct OpStressTmp<true, true>;
+template <Hypothesis H>
+using OpUpdateVariablesSmallStrains = struct OpStressTmp<true, false, H>;
 
+template <Hypothesis H>
+using OpStressFiniteStrains = struct OpStressTmp<false, true, H>;
 
-using OpUpdateVariablesSmallStrains = struct OpStressTmp<true, false>;
-
-
-using OpStressFiniteStrains = struct OpStressTmp<false, true>;
-
-
-using OpStressSmallStrains = struct OpStressTmp<false, false>;
+template <Hypothesis H>
+using OpStressSmallStrains = struct OpStressTmp<false, false, H>;
 
 // typedef struct OpStressTmp<true, true, 3> OpUpdateVariablesFiniteStrains;
 // typedef struct OpStressTmp<true, false, 3> OpUpdateVariablesSmallStrains;
