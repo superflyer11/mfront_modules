@@ -149,11 +149,11 @@ int main(int argc, char *argv[]) {
       atom_test_threshold = 9e-3;
       break;
     case 2:
-      atom_test_data = {{{0.14, {0.0855}}, false}, {{0.28, {0.1706}}, false},
-                        {{0.42, {0.2612}}, false}, {{0.56, {0.3847}}, false},
-                        {{0.70, {0.6871}}, false}, {{0.84, {1.1362}}, false},
-                        {{0.98, {1.6878}}, false}, {{1.12, {2.3067}}, false},
-                        {{1.26, {2.8729}}, false}, {{1.40, {3.2957}}, false}};
+      atom_test_data = {{{0.14, {-0.0855}}, false}, {{0.28, {-0.1706}}, false},
+                        {{0.42, {-0.2612}}, false}, {{0.56, {-0.3847}}, false},
+                        {{0.70, {-0.6871}}, false}, {{0.84, {-1.1362}}, false},
+                        {{0.98, {-1.6878}}, false}, {{1.12, {-2.3067}}, false},
+                        {{1.26, {-2.8729}}, false}, {{1.40, {-3.2957}}, false}};
       atom_test_threshold = 6e-2;
       break;
     case 3:
@@ -346,11 +346,7 @@ int main(int argc, char *argv[]) {
           case 2:
             if (field_ptr->size1()) {
               auto t_p = getFTensor1FromMat<2>(*field_ptr);
-              if (atom_test == 1 || atom_test == 10) {
-                dif = fabs(it.first.second[0] - t_p(0));
-              } else {
-                dif = fabs(it.first.second[0] - t_p(1));
-              }
+              dif = fabs(it.first.second[0] - t_p(0));
               dif = calc_if_relative(dif, it.first.second[0]);
               MOFEM_LOG("ATOM_TEST", Sev::verbose)
                   << "(relative) difference disp: " << dif;
