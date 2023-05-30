@@ -45,6 +45,9 @@ namespace MFrontInterface {
 
 #define VOIGT_VEC_FULL_PLANE_STRAIN(VEC) VEC[0], VEC[3], VEC[4], VEC[1]
 
+#define VOIGT_VEC_FULL_AXISYMMETRICAL(VEC)                                     \
+  VEC[0], VEC[3], 0, VEC[4], VEC[1], 0, 0, 0, VEC[2]
+
 Index<'i', 3> i;
 Index<'j', 3> j;
 Index<'k', 3> k;
@@ -135,6 +138,12 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
         Tensor2<double, 2, 2> forces(VOIGT_VEC_FULL_PLANE_STRAIN(
             getThermodynamicForce(dAta.behDataPtr->s1, 0)));
         t_stress(I, J) = forces(I, J);
+
+        if (H == Hypothesis::AXISYMMETRICAL) {
+          Tensor2<double, 3, 3> full_forces(VOIGT_VEC_FULL_AXISYMMETRICAL(
+              getThermodynamicForce(dAta.behDataPtr->s1, 0)));
+          t_full_stress(i, j) = full_forces(i, j);
+        }
       }
     } else {
       if (DIM == 3) {
@@ -217,13 +226,10 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
   size_t tens_size = 36;
   constexpr bool IS_LARGE_STRAIN = std::is_same<T, Tensor4Pack<3>>::value ||
                                    std::is_same<T, Tensor4Pack<2>>::value;
-  // constexpr int DIM = (std::is_same<T, Tensor4Pack<3>>::value ||
-  //                      std::is_same<T, DdgPack<3>>::value)
-  //                         ? 3
-  //                         : 2;
+
   if constexpr (DIM == 2) {
     // plane strain
-    if constexpr (IS_LARGE_STRAIN) 
+    if constexpr (IS_LARGE_STRAIN)
       tens_size = 16;
     else
       tens_size = 9;
@@ -235,11 +241,11 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
   S_E.resize(tens_size, nb_gauss_pts, false);
   auto D1 = get_tangent_tensor<T>(S_E);
 
-  size_t full_tens_size = 36;
+  size_t full_tens_size = 81;
   F_E.resize(full_tens_size, nb_gauss_pts, false);
   F_E.clear();
-  //FIXME: LARGE STRAIN
-  auto D2 = get_tangent_tensor<DdgPack<3>>(F_E);
+
+  auto D2 = get_tangent_tensor<Tensor4Pack<3>>(F_E);
 
   auto t_grad = getFTensor2FromMat<DIM, DIM>(*(commonDataPtr->mGradPtr));
   auto t_disp = getFTensor1FromMat<DIM>(*(commonDataPtr->mDispPtr));
@@ -251,7 +257,8 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
         gg, t_grad, t_disp, t_coords, *commonDataPtr, dAta);
 
     CHKERR get_tensor4_from_voigt(&*dAta.behDataPtr->K.begin(), D1);
-    CHKERR get_full_tensor4_from_voigt(&*dAta.behDataPtr->K.begin(), D2);
+    CHKERR get_full_tensor4_from_voigt<IS_LARGE_STRAIN>(
+        &*dAta.behDataPtr->K.begin(), D2);
 
     ++D1;
     ++D2;
@@ -351,20 +358,11 @@ MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,
   Number<1> N1;
   Number<2> N2;
 
-  // Elastic stiffness tensor (4th rank tensor with minor and major
-  // symmetry)
-  auto t_D = getFTensor4DdgFromMat<3, 3, 0>(*(commonDataPtr->mFullTangentPtr));
+  auto t_D =
+      getFTensor4FromMat<3, 3, 3, 3, 1>(*(commonDataPtr->mFullTangentPtr));
 
   // loop over integration points
   for (int gg = 0; gg != nbIntegrationPts; gg++) {
-
-    // cout << "0, 0, 2, 2: " << t_D(N0, N0, N2, N2) << endl;
-    // cout << "1, 1, 2, 2: " << t_D(N1, N1, N2, N2) << endl;
-    // cout << "2, 2, 0, 0: " << t_D(N2, N2, N0, N0) << endl;
-    // cout << "2, 2, 1, 1: " << t_D(N2, N2, N1, N1) << endl;
-    // cout << "2, 2, 2, 2: " << t_D(N2, N2, N2, N2) << endl;
-    // cout << "2, 2, 0, 1: " << t_D(N2, N2, N0, N1) << endl;
-    // cout << "0, 1, 2, 2: " << t_D(N0, N1, N2, N2) << endl;
 
     // Cylinder radius
     const double r_cylinder = t_coords(0);
@@ -398,35 +396,34 @@ MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,
 
         t_m(0, 1) += alpha * t_D(N2, N2, N1, N1) * t_col_diff_base(1) *
                      t_row_base / r_cylinder;
-                     
+
         t_m(0, 0) += alpha * t_D(N2, N2, N2, N2) * t_col_base / r_cylinder *
                      t_row_base / r_cylinder;
-
 
         t_m(0, 0) += alpha * t_D(N2, N2, N0, N1) * t_col_diff_base(1) *
                      t_row_base / r_cylinder;
 
-        t_m(0, 1) += alpha * t_D(N2, N2, N0, N1) * t_col_diff_base(0) *
+        t_m(0, 1) += alpha * t_D(N2, N2, N1, N0) * t_col_diff_base(0) *
                      t_row_base / r_cylinder;
 
         t_m(0, 0) += alpha * t_D(N0, N1, N2, N2) * t_col_base / r_cylinder *
                      t_row_diff_base(1);
-                     
-        t_m(1, 0) += alpha * t_D(N0, N1, N2, N2) * t_col_base / r_cylinder *
+
+        t_m(1, 0) += alpha * t_D(N1, N0, N2, N2) * t_col_base / r_cylinder *
                      t_row_diff_base(0);
 
         ++t_col_base;
         ++t_col_diff_base;
         ++t_m;
       }
-      
+
       ++t_row_base;
       ++t_row_diff_base;
     }
 
     for (; rr < nbRowBaseFunctions; ++rr) {
-        ++t_row_base;
-        ++t_row_diff_base;
+      ++t_row_base;
+      ++t_row_diff_base;
     }
 
     ++t_coords;

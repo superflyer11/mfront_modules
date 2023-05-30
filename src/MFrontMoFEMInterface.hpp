@@ -44,7 +44,7 @@ template <> struct MFrontEleType<Hypothesis::PLANESTRAIN> {
   using DomainEle = FaceElementForcesAndSourcesCore;
   using DomainEleOp = DomainEle::UserDataOperator;
   using PostProcDomainOnRefinedMesh = PostProcFaceOnRefinedMesh;
-  
+
   static constexpr int SPACE_DIM = 2;
 };
 
