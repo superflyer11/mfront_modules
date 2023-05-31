@@ -830,13 +830,17 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
 template <typename T> T get_tangent_tensor(MatrixDouble &mat);
 
 template <bool UPDATE, bool IS_LARGE_STRAIN, Hypothesis H>
-struct OpStressTmp
-    : public MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp {
-  static constexpr int DIM =
-      MFrontEleType<Hypothesis::AXISYMMETRICAL>::SPACE_DIM;
+struct OpStressTmp : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   OpStressTmp(const std::string field_name,
-              boost::shared_ptr<CommonData> common_data_ptr);
+              boost::shared_ptr<CommonData> common_data_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        commonDataPtr(common_data_ptr) {
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -844,13 +848,17 @@ private:
 };
 
 template <typename T, Hypothesis H>
-struct OpTangent
-    : public MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp {
-  static constexpr int DIM =
-      MFrontEleType<Hypothesis::AXISYMMETRICAL>::SPACE_DIM;
+struct OpTangent : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   OpTangent(const std::string field_name,
-            boost::shared_ptr<CommonData> common_data_ptr);
+            boost::shared_ptr<CommonData> common_data_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        commonDataPtr(common_data_ptr) {
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -858,8 +866,8 @@ private:
 };
 
 struct OpAxisymmetricRhs
-    : public OpBaseImpl<PETSC, MFrontMoFEMInterface<
-                                   Hypothesis::AXISYMMETRICAL>::DomainEleOp> {
+    : public OpBaseImpl<PETSC,
+                        FaceElementForcesAndSourcesCore::UserDataOperator> {
   OpAxisymmetricRhs(const std::string field_name,
                     boost::shared_ptr<CommonData> common_data_ptr);
 
@@ -870,8 +878,8 @@ private:
 };
 
 struct OpAxisymmetricLhs
-    : public OpBaseImpl<PETSC, MFrontMoFEMInterface<
-                                   Hypothesis::AXISYMMETRICAL>::DomainEleOp> {
+    : public OpBaseImpl<PETSC,
+                        FaceElementForcesAndSourcesCore::UserDataOperator> {
   OpAxisymmetricLhs(const std::string field_name,
                     boost::shared_ptr<CommonData> common_data_ptr);
 
@@ -973,10 +981,5 @@ using OpStressFiniteStrains = struct OpStressTmp<false, true, H>;
 
 template <Hypothesis H>
 using OpStressSmallStrains = struct OpStressTmp<false, false, H>;
-
-// typedef struct OpStressTmp<true, true, 3> OpUpdateVariablesFiniteStrains;
-// typedef struct OpStressTmp<true, false, 3> OpUpdateVariablesSmallStrains;
-// typedef struct OpStressTmp<false, true, 3> OpStressFiniteStrains;
-// typedef struct OpStressTmp<false, false, 3> OpStressSmallStrains;
 
 } // namespace MFrontInterface

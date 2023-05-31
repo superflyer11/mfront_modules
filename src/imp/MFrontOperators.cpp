@@ -78,15 +78,30 @@ template <> DdgPack<2> get_tangent_tensor<DdgPack<2>>(MatrixDouble &mat) {
   return getFTensor4DdgFromMat<2, 2>(mat);
 }
 
-template <bool UPDATE, bool IS_LARGE_STRAIN, Hypothesis H>
-OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::OpStressTmp(
-    const std::string field_name, boost::shared_ptr<CommonData> common_data_ptr)
-    : MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp(
-          field_name,
-          MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp::OPROW),
-      commonDataPtr(common_data_ptr) {
-  std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
-}
+template struct OpStressTmp<true, true, Hypothesis::TRIDIMENSIONAL>;
+template struct OpStressTmp<true, false, Hypothesis::TRIDIMENSIONAL>;
+template struct OpStressTmp<false, false, Hypothesis::TRIDIMENSIONAL>;
+template struct OpStressTmp<false, true, Hypothesis::TRIDIMENSIONAL>;
+
+template struct OpStressTmp<true, true, Hypothesis::PLANESTRAIN>;
+template struct OpStressTmp<true, false, Hypothesis::PLANESTRAIN>;
+template struct OpStressTmp<false, false, Hypothesis::PLANESTRAIN>;
+template struct OpStressTmp<false, true, Hypothesis::PLANESTRAIN>;
+
+template struct OpStressTmp<true, true, Hypothesis::AXISYMMETRICAL>;
+template struct OpStressTmp<true, false, Hypothesis::AXISYMMETRICAL>;
+template struct OpStressTmp<false, false, Hypothesis::AXISYMMETRICAL>;
+template struct OpStressTmp<false, true, Hypothesis::AXISYMMETRICAL>;
+
+template struct OpTangent<Tensor4Pack<3>, Hypothesis::TRIDIMENSIONAL>;
+template struct OpTangent<DdgPack<3>, Hypothesis::TRIDIMENSIONAL>;
+
+template struct OpTangent<Tensor4Pack<2>, Hypothesis::PLANESTRAIN>;
+template struct OpTangent<DdgPack<2>, Hypothesis::PLANESTRAIN>;
+
+template struct OpTangent<Tensor4Pack<2>, Hypothesis::AXISYMMETRICAL>;
+template struct OpTangent<DdgPack<2>, Hypothesis::AXISYMMETRICAL>;
+
 template <bool UPDATE, bool IS_LARGE_STRAIN, Hypothesis H>
 MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
                                                                EntityType type,
@@ -94,7 +109,8 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
   MoFEMFunctionBegin;
 
   const size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
-  auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
+  auto fe_ent =
+      MFrontEleType<H>::DomainEleOp::getNumeredEntFiniteElementPtr()->getEnt();
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
@@ -112,7 +128,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
 
   auto t_grad = getFTensor2FromMat<DIM, DIM>(*(commonDataPtr->mGradPtr));
   auto t_disp = getFTensor1FromMat<DIM>(*(commonDataPtr->mDispPtr));
-  auto t_coords = getFTensor1CoordsAtGaussPts();
+  auto t_coords = MFrontEleType<H>::DomainEleOp::getFTensor1CoordsAtGaussPts();
 
   commonDataPtr->mStressPtr->resize(DIM * DIM, nb_gauss_pts);
   commonDataPtr->mStressPtr->clear();
@@ -194,21 +210,13 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
 }
 
 template <typename T, Hypothesis H>
-OpTangent<T, H>::OpTangent(const std::string field_name,
-                           boost::shared_ptr<CommonData> common_data_ptr)
-    : MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp(
-          field_name,
-          MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp::OPROW),
-      commonDataPtr(common_data_ptr) {
-  std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
-}
-template <typename T, Hypothesis H>
 MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
                                        EntData &data) {
   MoFEMFunctionBegin;
 
   const size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
-  auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
+  auto fe_ent =
+      MFrontEleType<H>::DomainEleOp::getNumeredEntFiniteElementPtr()->getEnt();
   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
@@ -249,7 +257,7 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
 
   auto t_grad = getFTensor2FromMat<DIM, DIM>(*(commonDataPtr->mGradPtr));
   auto t_disp = getFTensor1FromMat<DIM>(*(commonDataPtr->mDispPtr));
-  auto t_coords = getFTensor1CoordsAtGaussPts();
+  auto t_coords = MFrontEleType<H>::DomainEleOp::getFTensor1CoordsAtGaussPts();
 
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
@@ -857,21 +865,5 @@ MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,
 // }
 
 //! [Body force]
-
-// template struct OpStressTmp<true, true, 3>;
-// template struct OpStressTmp<true, false, 3>;
-// template struct OpStressTmp<false, false, 3>;
-// template struct OpStressTmp<false, true, 3>;
-
-template struct OpStressTmp<true, true, Hypothesis::AXISYMMETRICAL>;
-template struct OpStressTmp<true, false, Hypothesis::AXISYMMETRICAL>;
-template struct OpStressTmp<false, false, Hypothesis::AXISYMMETRICAL>;
-template struct OpStressTmp<false, true, Hypothesis::AXISYMMETRICAL>;
-
-// template struct OpTangent<Tensor4Pack<3>,3>;
-// template struct OpTangent<DdgPack<3>,3>;
-
-template struct OpTangent<Tensor4Pack<2>, Hypothesis::AXISYMMETRICAL>;
-template struct OpTangent<DdgPack<2>, Hypothesis::AXISYMMETRICAL>;
 
 } // namespace MFrontInterface

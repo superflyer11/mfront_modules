@@ -66,7 +66,7 @@ template <Hypothesis H>
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using DomainEle = typename MFrontEleType<H>::DomainEle;
-  using DomainEleOp = typename DomainEle::UserDataOperator;
+  using DomainEleOp = typename MFrontEleType<H>::DomainEleOp;
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   using OpInternalForce =
@@ -133,12 +133,6 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
 
   MoFEMErrorCode updateElementVariables() override;
   MoFEMErrorCode postProcessElement(int step) override;
-
-  // template <bool UPDATE, bool IS_LARGE_STRAIN, int D> struct OpStressTmp;
-  // template <typename T, int D> struct OpTangent;
-  // struct OpPostProcElastic;
-  // struct OpPostProcInternalVariables;
-  // struct OpSaveGaussPts;
 };
 
 #endif // __MFRONTGENERICINTERFACE_HPP__

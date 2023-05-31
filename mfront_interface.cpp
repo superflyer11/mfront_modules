@@ -122,15 +122,24 @@ int main(int argc, char *argv[]) {
     boost::shared_ptr<std::vector<unsigned char>> boundaryMarker;
     boost::shared_ptr<FEMethod> monitor_ptr;
 
+    enum hypotheses { TRI_DIM, PLANE_STRAIN, AXISYMM, LAST };
+    const char *list_hypotheses[LAST] = {"3d", "plane_strain", "axisymmetry"};
+
+    PetscInt hypothesis = TRI_DIM;
+    CHKERR PetscOptionsGetEList(PETSC_NULL, NULL, "-hypothesis",
+                                list_hypotheses, TRI_DIM, &hypothesis,
+                                PETSC_NULL);
+    int space_dim = !hypothesis ? 3 : 2;
+
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_quasi_static", &is_quasi_static,
                                PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-order", &order, PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-output_every", &save_every_nth_step,
                               PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-atom_test", &atom_test, PETSC_NULL);
-    int coords_dim = 2;
+
     CHKERR PetscOptionsGetRealArray(NULL, NULL, "-field_eval_coords",
-                                    field_eval_coords.data(), &coords_dim,
+                                    field_eval_coords.data(), &space_dim,
                                     &field_eval_flag);
     cout << field_eval_flag << endl;
 
@@ -211,20 +220,19 @@ int main(int argc, char *argv[]) {
     simple->getProblemName() = "MoFEM MFront Interface module";
     simple->getDomainFEName() = "MFRONT_EL";
 
-    int dim = 2;
-
     FieldApproximationBase base = AINSWORTH_LEGENDRE_BASE;
+
     // Add displacement field
-    CHKERR m_field.add_field("U", H1, base, dim);
+    CHKERR m_field.add_field("U", H1, base, space_dim);
 
     // Add field representing ho-geometry
-    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, base, dim);
+    CHKERR m_field.add_field("MESH_NODE_POSITIONS", H1, base, space_dim);
 
     // Add entities to field
-    if (dim == 3) {
+    if (space_dim == 3) {
       CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "U");
       CHKERR m_field.add_ents_to_field_by_type(0, MBTET, "MESH_NODE_POSITIONS");
-    } else if (dim == 2) {
+    } else if (space_dim == 2) {
       CHKERR m_field.add_ents_to_field_by_type(0, MBTRI, "U");
       CHKERR m_field.add_ents_to_field_by_type(0, MBTRI, "MESH_NODE_POSITIONS");
     }
@@ -251,8 +259,29 @@ int main(int argc, char *argv[]) {
     m_modules.push_back(new NonlinearElasticElementInterface(
         m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
 
-    m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>(
-        m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+    switch (hypothesis) {
+    case TRI_DIM:
+      m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::TRIDIMENSIONAL>(
+          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+      MOFEM_LOG("WORLD", Sev::inform)
+          << "Setting MFront hypothesis TRIDIMENSIONAL";
+      break;
+    case PLANE_STRAIN:
+      m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::PLANESTRAIN>(
+          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+      MOFEM_LOG("WORLD", Sev::inform)
+          << "Setting MFront hypothesis PLANESTRAIN";
+      break;
+    case AXISYMM:
+      m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>(
+          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+      MOFEM_LOG("WORLD", Sev::inform)
+          << "Setting MFront hypothesis AXISYMMETRICAL";
+    default:
+      SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
+               "MFront hypothesis %d is not yet implemented", hypothesis);
+      break;
+    }
 
     for (auto &&mod : m_modules) {
       CHKERR mod.getCommandLineParameters();
@@ -285,9 +314,28 @@ int main(int argc, char *argv[]) {
 
     boost::shared_ptr<MatrixDouble> field_ptr;
     if (field_eval_flag) {
-      field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
-                            ->getData<MFrontMoFEMInterface<
-                                Hypothesis::AXISYMMETRICAL>::DomainEle>();
+      switch (hypothesis) {
+      case TRI_DIM:
+        field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
+                              ->getData<MFrontMoFEMInterface<
+                                  Hypothesis::TRIDIMENSIONAL>::DomainEle>();
+        break;
+      case PLANE_STRAIN:
+        field_eval_data =
+            m_field.getInterface<FieldEvaluatorInterface>()
+                ->getData<
+                    MFrontMoFEMInterface<Hypothesis::PLANESTRAIN>::DomainEle>();
+        break;
+      case AXISYMM:
+        field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
+                              ->getData<MFrontMoFEMInterface<
+                                  Hypothesis::AXISYMMETRICAL>::DomainEle>();
+      default:
+        SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
+                 "MFront hypothesis %d is not yet implemented", hypothesis);
+        break;
+      }
+
       CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree2D(
           field_eval_data, simple->getDomainFEName());
       field_eval_data->setEvalPoints(field_eval_coords.data(), 1);
@@ -298,8 +346,13 @@ int main(int argc, char *argv[]) {
       fe_ptr->getRuleHook = no_rule;
 
       field_ptr = boost::make_shared<MatrixDouble>();
-      fe_ptr->getOpPtrVector().push_back(
-          new OpCalculateVectorFieldValues<2>("U", field_ptr));
+      if (space_dim == 3) {
+        fe_ptr->getOpPtrVector().push_back(
+            new OpCalculateVectorFieldValues<3>("U", field_ptr));
+      } else if (space_dim == 2) {
+        fe_ptr->getOpPtrVector().push_back(
+            new OpCalculateVectorFieldValues<2>("U", field_ptr));
+      }
     }
 
     monitor_ptr = boost::make_shared<FEMethod>();

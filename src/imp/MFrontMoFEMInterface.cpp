@@ -26,11 +26,9 @@ using namespace mgis::behaviour;
 #include <MFrontOperators.hpp>
 using namespace MFrontInterface;
 
-// explicit instantiations
-
-// template struct MFrontMoFEMInterface<TRIDIMENSIONAL>;
+template struct MFrontMoFEMInterface<Hypothesis::TRIDIMENSIONAL>;
 template struct MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>;
-// template struct MFrontMoFEMInterface<AXISYMMETRICAL>;
+template struct MFrontMoFEMInterface<Hypothesis::PLANESTRAIN>;
 
 template <Hypothesis H>
 MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
@@ -378,10 +376,10 @@ template <Hypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   add_domain_ops_lhs(mfrontPipelineLhsPtr->getOpPtrVector());
   add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
 
-  if (DIM == 3 && testJacobian) {
-    // FIXME: implement 2D
-    CHKERR testOperators();
-  }
+  // if (DIM == 3 && testJacobian) {
+  //   // FIXME: implement 2D
+  //   CHKERR testOperators();
+  // }
 
   MoFEMFunctionReturn(0);
 }
