@@ -614,10 +614,11 @@ struct CommonData {
 
     MoFEMFunctionReturn(0);
   }
-  // FIXME: pass stress_size
+
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
                                 const int nb_gauss_pts, const int var_size,
-                                const int grad_size) {
+                                const int grad_size, const int stress_size,
+                                bool is_large_strain) {
     MoFEMFunctionBegin;
 
     auto mget_tag_data = [&](Tag &m_tag, boost::shared_ptr<MatrixDouble> &m_mat,
@@ -633,7 +634,7 @@ struct CommonData {
         m_mat->resize(nb_gauss_pts, m_size, false);
         m_mat->clear();
         // initialize deformation gradient properly
-        if (is_def_grad && m_size > 4)
+        if (is_def_grad && is_large_strain)
           for (int gg = 0; gg != nb_gauss_pts; ++gg) {
             (*m_mat)(gg, 0) = 1;
             (*m_mat)(gg, 1) = 1;
@@ -657,7 +658,7 @@ struct CommonData {
 
     CHKERR mget_tag_data(internalVariableTag, internalVariablePtr, var_size);
     CHKERR mget_tag_data(stressTag, mPrevStressPtr, grad_size);
-    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, grad_size, true);
+    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, stress_size, true);
 
     MoFEMFunctionReturn(0);
   }

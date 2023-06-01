@@ -67,6 +67,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using DomainEle = typename MFrontEleType<H>::DomainEle;
   using DomainEleOp = typename MFrontEleType<H>::DomainEleOp;
+  using PostProcDomainOnRefinedMesh = typename MFrontEleType<H>::PostProcDomainOnRefinedMesh; 
+
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   using OpInternalForce =
@@ -98,7 +100,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   bool isFiniteKinematics;
   BitRefLevel bIt;
 
-  boost::shared_ptr<PostProcFaceOnRefinedMesh> postProcFe;
+  boost::shared_ptr<PostProcDomainOnRefinedMesh> postProcFe;
   boost::shared_ptr<DomainEle> updateIntVariablesElePtr;
 
   boost::shared_ptr<DomainEle> mfrontPipelineRhsPtr;

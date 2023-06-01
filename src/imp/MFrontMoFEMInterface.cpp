@@ -144,12 +144,10 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
 
     CHKERR check_lib_finite_strain(lib_path, name, is_finite_strain);
     if (is_finite_strain) {
-      mgis_bv_ptr = boost::make_shared<Behaviour>(
-          load(op, lib_path, name, Hypothesis::AXISYMMETRICAL));
+      mgis_bv_ptr = boost::make_shared<Behaviour>(load(op, lib_path, name, H));
       block.second.isFiniteStrain = true;
     } else
-      mgis_bv_ptr = boost::make_shared<Behaviour>(
-          load(lib_path, name, Hypothesis::AXISYMMETRICAL));
+      mgis_bv_ptr = boost::make_shared<Behaviour>(load(lib_path, name, H));
 
     CHKERR block.second.setBlockBehaviourData(set_from_blocks);
     for (size_t dd = 0; dd < mgis_bv_ptr->mps.size(); ++dd) {
@@ -579,10 +577,8 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
 
   auto create_post_process_element = [&]() {
     MoFEMFunctionBegin;
-    // if (DIM == 3)
-    //   postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(mField);
-    if (DIM == 2)
-      postProcFe = boost::make_shared<PostProcFaceOnRefinedMesh>(mField);
+    
+    postProcFe = boost::make_shared<PostProcDomainOnRefinedMesh>(mField);
 
     postProcFe->generateReferenceElementMesh();
 

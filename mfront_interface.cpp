@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
 
     PetscInt hypothesis = TRI_DIM;
     CHKERR PetscOptionsGetEList(PETSC_NULL, NULL, "-hypothesis",
-                                list_hypotheses, TRI_DIM, &hypothesis,
+                                list_hypotheses, LAST, &hypothesis,
                                 PETSC_NULL);
     int space_dim = !hypothesis ? 3 : 2;
 
@@ -138,10 +138,10 @@ int main(int argc, char *argv[]) {
                               PETSC_NULL);
     CHKERR PetscOptionsGetInt(PETSC_NULL, "-atom_test", &atom_test, PETSC_NULL);
 
+    PetscInt coords_dim = space_dim;
     CHKERR PetscOptionsGetRealArray(NULL, NULL, "-field_eval_coords",
-                                    field_eval_coords.data(), &space_dim,
+                                    field_eval_coords.data(), &coords_dim,
                                     &field_eval_flag);
-    cout << field_eval_flag << endl;
 
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_partitioned", &is_partitioned,
                                PETSC_NULL);
@@ -277,6 +277,7 @@ int main(int argc, char *argv[]) {
           m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis AXISYMMETRICAL";
+      break;
     default:
       SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
                "MFront hypothesis %d is not yet implemented", hypothesis);
@@ -312,7 +313,8 @@ int main(int argc, char *argv[]) {
 
     CHKERR DMSetUp(dM);
 
-    boost::shared_ptr<MatrixDouble> field_ptr;
+    auto field_ptr = boost::make_shared<MatrixDouble>();
+
     if (field_eval_flag) {
       switch (hypothesis) {
       case TRI_DIM:
@@ -330,14 +332,21 @@ int main(int argc, char *argv[]) {
         field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
                               ->getData<MFrontMoFEMInterface<
                                   Hypothesis::AXISYMMETRICAL>::DomainEle>();
+        break;
       default:
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
                  "MFront hypothesis %d is not yet implemented", hypothesis);
         break;
       }
 
-      CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree2D(
-          field_eval_data, simple->getDomainFEName());
+      if (space_dim == 3) {
+        CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree3D(
+            field_eval_data, simple->getDomainFEName());
+      } else if (space_dim == 2) {
+        CHKERR m_field.getInterface<FieldEvaluatorInterface>()->buildTree2D(
+            field_eval_data, simple->getDomainFEName());
+      }
+
       field_eval_data->setEvalPoints(field_eval_coords.data(), 1);
 
       auto no_rule = [](int, int, int) { return -1; };
@@ -345,7 +354,6 @@ int main(int argc, char *argv[]) {
       auto fe_ptr = field_eval_data->feMethodPtr.lock();
       fe_ptr->getRuleHook = no_rule;
 
-      field_ptr = boost::make_shared<MatrixDouble>();
       if (space_dim == 3) {
         fe_ptr->getOpPtrVector().push_back(
             new OpCalculateVectorFieldValues<3>("U", field_ptr));
@@ -385,12 +393,21 @@ int main(int argc, char *argv[]) {
           it.second = true;
 
           if (field_eval_flag) {
+            if (space_dim == 3) {
+              CHKERR m_field.getInterface<FieldEvaluatorInterface>()
+                ->evalFEAtThePoint3D(
+                    field_eval_coords.data(), 1e-12, simple->getProblemName(),
+                    simple->getDomainFEName(), field_eval_data,
+                    m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
+                    MF_EXIST, QUIET);
+            } else if (space_dim == 2) {
             CHKERR m_field.getInterface<FieldEvaluatorInterface>()
                 ->evalFEAtThePoint2D(
                     field_eval_coords.data(), 1e-12, simple->getProblemName(),
                     simple->getDomainFEName(), field_eval_data,
                     m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
                     MF_EXIST, QUIET);
+            }
           }
 
           double dif = 0;
@@ -398,8 +415,13 @@ int main(int argc, char *argv[]) {
           case 1:
           case 2:
             if (field_ptr->size1()) {
-              auto t_p = getFTensor1FromMat<2>(*field_ptr);
-              dif = fabs(it.first.second[0] - t_p(0));
+              if (space_dim == 3) {
+                auto t_p = getFTensor1FromMat<3>(*field_ptr);
+                dif = fabs(it.first.second[0] - t_p(0));
+              } else if (space_dim == 2) {
+                auto t_p = getFTensor1FromMat<2>(*field_ptr);
+                dif = fabs(it.first.second[0] - t_p(0));
+              }
               dif = calc_if_relative(dif, it.first.second[0]);
               MOFEM_LOG("ATOM_TEST", Sev::verbose)
                   << "(relative) difference disp: " << dif;
@@ -426,8 +448,13 @@ int main(int argc, char *argv[]) {
           case 6:
           case 7:
             if (field_ptr->size1()) {
-              auto t_p = getFTensor1FromMat<2>(*field_ptr);
-              dif = fabs(it.first.second[0] - t_p(1));
+              if (space_dim == 3) {
+                auto t_p = getFTensor1FromMat<3>(*field_ptr);
+                dif = fabs(it.first.second[0] - t_p(1));
+              } else if (space_dim == 2) {
+                auto t_p = getFTensor1FromMat<2>(*field_ptr);
+                dif = fabs(it.first.second[0] - t_p(1));
+              }
               dif = calc_if_relative(dif, it.first.second[0]);
               MOFEM_LOG("ATOM_TEST", Sev::verbose)
                   << "(relative) difference disp: " << dif;

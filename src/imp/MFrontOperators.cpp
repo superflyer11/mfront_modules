@@ -120,7 +120,8 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
   dAta.bView.dt = mfront_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
-                                       dAta.sizeGradVar);
+                                       dAta.sizeGradVar, dAta.sizeStressVar,
+                                       IS_LARGE_STRAIN);
 
   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
   MatrixDouble &mat_grad0 = *commonDataPtr->mPrevGradPtr;
@@ -225,15 +226,17 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
   dAta.behDataPtr->dt = mfront_dt;
   dAta.bView.dt = mfront_dt;
 
+  constexpr bool IS_LARGE_STRAIN = std::is_same<T, Tensor4Pack<3>>::value ||
+                                   std::is_same<T, Tensor4Pack<2>>::value;
+
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
-                                       dAta.sizeGradVar);
+                                       dAta.sizeGradVar, dAta.sizeStressVar,
+                                       IS_LARGE_STRAIN);
 
   MatrixDouble &S_E = *(commonDataPtr->materialTangentPtr);
   MatrixDouble &F_E = *(commonDataPtr->mFullTangentPtr);
 
   size_t tens_size = 36;
-  constexpr bool IS_LARGE_STRAIN = std::is_same<T, Tensor4Pack<3>>::value ||
-                                   std::is_same<T, Tensor4Pack<2>>::value;
 
   if constexpr (DIM == 2) {
     // plane strain
