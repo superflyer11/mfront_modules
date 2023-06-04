@@ -20,11 +20,13 @@ extern double mfront_dt_prop;
 
 using EntData = EntitiesFieldData::EntData;
 
-using Hypothesis = mgis::behaviour::Hypothesis;
+enum ModelHypothesis {
+  TRIDIMENSIONAL, PLANESTRAIN, AXISYMMETRICAL
+};
 
-template <Hypothesis H> struct MFrontEleType;
+template <ModelHypothesis H> struct MFrontEleType;
 
-template <> struct MFrontEleType<Hypothesis::TRIDIMENSIONAL> {
+template <> struct MFrontEleType<TRIDIMENSIONAL> {
 
   MFrontEleType() = delete;
   ~MFrontEleType() = delete;
@@ -36,7 +38,7 @@ template <> struct MFrontEleType<Hypothesis::TRIDIMENSIONAL> {
   static constexpr int SPACE_DIM = 3;
 };
 
-template <> struct MFrontEleType<Hypothesis::PLANESTRAIN> {
+template <> struct MFrontEleType<PLANESTRAIN> {
 
   MFrontEleType() = delete;
   ~MFrontEleType() = delete;
@@ -48,7 +50,7 @@ template <> struct MFrontEleType<Hypothesis::PLANESTRAIN> {
   static constexpr int SPACE_DIM = 2;
 };
 
-template <> struct MFrontEleType<Hypothesis::AXISYMMETRICAL> {
+template <> struct MFrontEleType<AXISYMMETRICAL> {
 
   MFrontEleType() = delete;
   ~MFrontEleType() = delete;
@@ -60,9 +62,7 @@ template <> struct MFrontEleType<Hypothesis::AXISYMMETRICAL> {
   static constexpr int SPACE_DIM = 2;
 };
 
-// constexpr int MFrontEleType<PLANE_STEESS>::SPACE_DIM;
-
-template <Hypothesis H>
+template <ModelHypothesis H = TRIDIMENSIONAL>
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using DomainEle = typename MFrontEleType<H>::DomainEle;

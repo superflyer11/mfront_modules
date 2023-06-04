@@ -6,6 +6,14 @@
  *
  */
 
+#include <BasicFiniteElements.hpp>
+#include <quad.h>
+#include <MGIS/Behaviour/Behaviour.hxx>
+#include <MGIS/Behaviour/BehaviourData.hxx>
+#include "MGIS/Behaviour/Integrate.hxx"
+using namespace mgis;
+using namespace mgis::behaviour;
+
 #include <MFrontMoFEMInterface.hpp>
 
 namespace MFrontInterface {
@@ -716,7 +724,7 @@ extern boost::shared_ptr<CommonData> commonDataPtr;
 
 // MoFEMErrorCode saveOutputMesh(int step, bool print_gauss);
 
-template <bool IS_LARGE_STRAIN, int DIM, Hypothesis H>
+template <bool IS_LARGE_STRAIN, int DIM, ModelHypothesis H>
 inline MoFEMErrorCode
 mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
                  Tensor1<PackPtr<double *, 3>, 3> &t_coords,
@@ -738,7 +746,7 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
       setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                   &*get_voigt_vec(t_grad).data());
     if (DIM == 2) {
-      if (H == Hypothesis::AXISYMMETRICAL) {
+      if (H == AXISYMMETRICAL) {
         setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                     &*get_voigt_vec_axisymm(t_grad, t_disp, t_coords).data());
       } else
@@ -750,7 +758,7 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
       setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                   &*get_voigt_vec_symm(t_grad).data());
     if (DIM == 2) {
-      if (H == Hypothesis::AXISYMMETRICAL)
+      if (H == AXISYMMETRICAL)
         setGradient(
             block_data.behDataPtr->s1, 0, size_of_grad,
             &*get_voigt_vec_symm_axisymm(t_grad, t_disp, t_coords).data());
@@ -830,7 +838,7 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
 
 template <typename T> T get_tangent_tensor(MatrixDouble &mat);
 
-template <bool UPDATE, bool IS_LARGE_STRAIN, Hypothesis H>
+template <bool UPDATE, bool IS_LARGE_STRAIN, ModelHypothesis H>
 struct OpStressTmp : public MFrontEleType<H>::DomainEleOp {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
@@ -848,7 +856,7 @@ private:
   boost::shared_ptr<CommonData> commonDataPtr;
 };
 
-template <typename T, Hypothesis H>
+template <typename T, ModelHypothesis H>
 struct OpTangent : public MFrontEleType<H>::DomainEleOp {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
@@ -962,25 +970,25 @@ struct FePrePostProcess : public FEMethod {
   MoFEMErrorCode postProcess() { return 0; }
 };
 
-template <int DIM, Hypothesis H>
+template <int DIM, ModelHypothesis H>
 using OpTangentFiniteStrains = struct OpTangent<Tensor4Pack<DIM>, H>;
 
-template <int DIM, Hypothesis H>
+template <int DIM, ModelHypothesis H>
 using OpTangentSmallStrains = struct OpTangent<DdgPack<DIM>, H>;
 
 // typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;
 // typedef struct OpTangent<DdgPack> OpTangentSmallStrains;
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 using OpUpdateVariablesFiniteStrains = struct OpStressTmp<true, true, H>;
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 using OpUpdateVariablesSmallStrains = struct OpStressTmp<true, false, H>;
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 using OpStressFiniteStrains = struct OpStressTmp<false, true, H>;
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 using OpStressSmallStrains = struct OpStressTmp<false, false, H>;
 
 } // namespace MFrontInterface

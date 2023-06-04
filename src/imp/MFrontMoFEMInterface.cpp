@@ -26,11 +26,11 @@ using namespace mgis::behaviour;
 #include <MFrontOperators.hpp>
 using namespace MFrontInterface;
 
-template struct MFrontMoFEMInterface<Hypothesis::TRIDIMENSIONAL>;
-template struct MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>;
-template struct MFrontMoFEMInterface<Hypothesis::PLANESTRAIN>;
+template struct MFrontMoFEMInterface<TRIDIMENSIONAL>;
+template struct MFrontMoFEMInterface<AXISYMMETRICAL>;
+template struct MFrontMoFEMInterface<PLANESTRAIN>;
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
                                               string postion_field,
                                               string mesh_posi_field_name,
@@ -49,7 +49,7 @@ MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
   optionsPrefix = "mi_";
 }
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
   MoFEMFunctionBegin;
   isQuasiStatic = PETSC_FALSE;
@@ -143,11 +143,27 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
     bool is_finite_strain = false;
 
     CHKERR check_lib_finite_strain(lib_path, name, is_finite_strain);
+
+    mgis::behaviour::Hypothesis h;
+    switch (H) {
+    case TRIDIMENSIONAL:
+      h = mgis::behaviour::Hypothesis::TRIDIMENSIONAL;
+      break;
+    case PLANESTRAIN:
+      h = mgis::behaviour::Hypothesis::PLANESTRAIN;
+      break;
+    case AXISYMMETRICAL:
+      h = mgis::behaviour::Hypothesis::AXISYMMETRICAL;
+      break;
+    default:
+      break;
+    }
+
     if (is_finite_strain) {
-      mgis_bv_ptr = boost::make_shared<Behaviour>(load(op, lib_path, name, H));
+      mgis_bv_ptr = boost::make_shared<Behaviour>(load(op, lib_path, name, h));
       block.second.isFiniteStrain = true;
     } else
-      mgis_bv_ptr = boost::make_shared<Behaviour>(load(lib_path, name, H));
+      mgis_bv_ptr = boost::make_shared<Behaviour>(load(lib_path, name, h));
 
     CHKERR block.second.setBlockBehaviourData(set_from_blocks);
     for (size_t dd = 0; dd < mgis_bv_ptr->mps.size(); ++dd) {
@@ -218,7 +234,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
   MoFEMFunctionReturn(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::addElementFields() {
   MoFEMFunctionBeginHot;
   auto simple = mField.getInterface<Simple>();
@@ -238,7 +254,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::addElementFields() {
   MoFEMFunctionReturnHot(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   MoFEMFunctionBeginHot;
 
@@ -292,7 +308,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   MoFEMFunctionReturnHot(0);
 };
 
-template <Hypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
+template <ModelHypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   MoFEMFunctionBegin;
 
   auto &moab_gauss = *moabGaussIntPtr;
@@ -322,7 +338,7 @@ template <Hypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   //       new OpSaveGaussPts(positionField, moab_gauss, commonDataPtr));
 
   auto jacobian = [&](const double r, const double, const double) {
-    if (H == Hypothesis::AXISYMMETRICAL)
+    if (H == AXISYMMETRICAL)
       return 2. * M_PI * r;
     else
       return 1.;
@@ -342,7 +358,7 @@ template <Hypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
           positionField, positionField, commonDataPtr->materialTangentPtr,
           nullptr, jacobian));
     }
-    if (H == Hypothesis::AXISYMMETRICAL)
+    if (H == AXISYMMETRICAL)
       pipeline.push_back(new OpAxisymmetricLhs(positionField, commonDataPtr));
   };
 
@@ -357,7 +373,7 @@ template <Hypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
     pipeline.push_back(new OpInternalForce(
         positionField, commonDataPtr->mStressPtr, jacobian));
 
-    if (H == Hypothesis::AXISYMMETRICAL)
+    if (H == AXISYMMETRICAL)
       pipeline.push_back(new OpAxisymmetricRhs(positionField, commonDataPtr));
   };
 
@@ -382,7 +398,7 @@ template <Hypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   MoFEMFunctionReturn(0);
 }
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::testOperators() {
   MoFEMFunctionBegin;
 
@@ -497,7 +513,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::testOperators() {
 
 // BitRefLevel MFrontMoFEMInterface::getBitRefLevel() { return bIt; };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::addElementsToDM(SmartPetscObj<DM> dm) {
   MoFEMFunctionBeginHot;
   this->dM = dm;
@@ -508,7 +524,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::addElementsToDM(SmartPetscObj<DM> dm) {
   MoFEMFunctionReturnHot(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::setupSolverJacobianSNES() {
   MoFEMFunctionBegin;
   CHKERR DMMoFEMSNESSetJacobian(dM, "MFRONT_EL", mfrontPipelineLhsPtr.get(),
@@ -517,7 +533,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setupSolverJacobianSNES() {
   MoFEMFunctionReturn(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::setupSolverFunctionSNES() {
   MoFEMFunctionBegin;
   CHKERR DMMoFEMSNESSetFunction(dM, "MFRONT_EL", mfrontPipelineRhsPtr.get(),
@@ -525,7 +541,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setupSolverFunctionSNES() {
   MoFEMFunctionReturn(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode
 MFrontMoFEMInterface<H>::setupSolverJacobianTS(const TSType type) {
   MoFEMFunctionBegin;
@@ -548,7 +564,7 @@ MFrontMoFEMInterface<H>::setupSolverJacobianTS(const TSType type) {
   MoFEMFunctionReturn(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode
 MFrontMoFEMInterface<H>::setupSolverFunctionTS(const TSType type) {
   MoFEMFunctionBegin;
@@ -571,7 +587,7 @@ MFrontMoFEMInterface<H>::setupSolverFunctionTS(const TSType type) {
   MoFEMFunctionReturn(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
   MoFEMFunctionBegin;
 
@@ -630,7 +646,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
   MoFEMFunctionReturn(0);
 };
 
-template <Hypothesis H>
+template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::updateElementVariables() {
 
   MoFEMFunctionBegin;

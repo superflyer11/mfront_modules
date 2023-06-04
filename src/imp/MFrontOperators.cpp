@@ -16,14 +16,6 @@ using namespace FTensor;
 // using DomainEle = VolumeElementForcesAndSourcesCore;
 // using DomainEleOp = DomainEle::UserDataOperator;
 
-#include <BasicFiniteElements.hpp>
-#include <quad.h>
-#include <MGIS/Behaviour/Behaviour.hxx>
-#include <MGIS/Behaviour/BehaviourData.hxx>
-#include "MGIS/Behaviour/Integrate.hxx"
-using namespace mgis;
-using namespace mgis::behaviour;
-
 #include <MFrontOperators.hpp>
 #include <MFrontMoFEMInterface.hpp>
 
@@ -78,31 +70,31 @@ template <> DdgPack<2> get_tangent_tensor<DdgPack<2>>(MatrixDouble &mat) {
   return getFTensor4DdgFromMat<2, 2>(mat);
 }
 
-template struct OpStressTmp<true, true, Hypothesis::TRIDIMENSIONAL>;
-template struct OpStressTmp<true, false, Hypothesis::TRIDIMENSIONAL>;
-template struct OpStressTmp<false, false, Hypothesis::TRIDIMENSIONAL>;
-template struct OpStressTmp<false, true, Hypothesis::TRIDIMENSIONAL>;
+template struct OpStressTmp<true, true, TRIDIMENSIONAL>;
+template struct OpStressTmp<true, false, TRIDIMENSIONAL>;
+template struct OpStressTmp<false, false, TRIDIMENSIONAL>;
+template struct OpStressTmp<false, true, TRIDIMENSIONAL>;
 
-template struct OpStressTmp<true, true, Hypothesis::PLANESTRAIN>;
-template struct OpStressTmp<true, false, Hypothesis::PLANESTRAIN>;
-template struct OpStressTmp<false, false, Hypothesis::PLANESTRAIN>;
-template struct OpStressTmp<false, true, Hypothesis::PLANESTRAIN>;
+template struct OpStressTmp<true, true, PLANESTRAIN>;
+template struct OpStressTmp<true, false, PLANESTRAIN>;
+template struct OpStressTmp<false, false, PLANESTRAIN>;
+template struct OpStressTmp<false, true, PLANESTRAIN>;
 
-template struct OpStressTmp<true, true, Hypothesis::AXISYMMETRICAL>;
-template struct OpStressTmp<true, false, Hypothesis::AXISYMMETRICAL>;
-template struct OpStressTmp<false, false, Hypothesis::AXISYMMETRICAL>;
-template struct OpStressTmp<false, true, Hypothesis::AXISYMMETRICAL>;
+template struct OpStressTmp<true, true, AXISYMMETRICAL>;
+template struct OpStressTmp<true, false, AXISYMMETRICAL>;
+template struct OpStressTmp<false, false, AXISYMMETRICAL>;
+template struct OpStressTmp<false, true, AXISYMMETRICAL>;
 
-template struct OpTangent<Tensor4Pack<3>, Hypothesis::TRIDIMENSIONAL>;
-template struct OpTangent<DdgPack<3>, Hypothesis::TRIDIMENSIONAL>;
+template struct OpTangent<Tensor4Pack<3>, TRIDIMENSIONAL>;
+template struct OpTangent<DdgPack<3>, TRIDIMENSIONAL>;
 
-template struct OpTangent<Tensor4Pack<2>, Hypothesis::PLANESTRAIN>;
-template struct OpTangent<DdgPack<2>, Hypothesis::PLANESTRAIN>;
+template struct OpTangent<Tensor4Pack<2>, PLANESTRAIN>;
+template struct OpTangent<DdgPack<2>, PLANESTRAIN>;
 
-template struct OpTangent<Tensor4Pack<2>, Hypothesis::AXISYMMETRICAL>;
-template struct OpTangent<DdgPack<2>, Hypothesis::AXISYMMETRICAL>;
+template struct OpTangent<Tensor4Pack<2>, AXISYMMETRICAL>;
+template struct OpTangent<DdgPack<2>, AXISYMMETRICAL>;
 
-template <bool UPDATE, bool IS_LARGE_STRAIN, Hypothesis H>
+template <bool UPDATE, bool IS_LARGE_STRAIN, ModelHypothesis H>
 MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
                                                                EntityType type,
                                                                EntData &data) {
@@ -156,7 +148,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
             getThermodynamicForce(dAta.behDataPtr->s1, 0)));
         t_stress(I, J) = forces(I, J);
 
-        if (H == Hypothesis::AXISYMMETRICAL) {
+        if (H == AXISYMMETRICAL) {
           Tensor2<double, 3, 3> full_forces(VOIGT_VEC_FULL_AXISYMMETRICAL(
               getThermodynamicForce(dAta.behDataPtr->s1, 0)));
           t_full_stress(i, j) = full_forces(i, j);
@@ -174,7 +166,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
         auto forces = to_non_symm_plane_strain(nstress);
         t_stress(I, J) = forces(I, J);
 
-        if (H == Hypothesis::AXISYMMETRICAL) {
+        if (H == AXISYMMETRICAL) {
           Tensor2_symmetric<double, 3> fstress(VOIGT_VEC_SYMM_AXISYMMETRICAL(
               getThermodynamicForce(dAta.behDataPtr->s1, 0)));
           auto full_forces = to_non_symm(fstress);
@@ -210,7 +202,7 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
   MoFEMFunctionReturn(0);
 }
 
-template <typename T, Hypothesis H>
+template <typename T, ModelHypothesis H>
 MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
                                        EntData &data) {
   MoFEMFunctionBegin;
@@ -284,9 +276,9 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
 OpAxisymmetricRhs::OpAxisymmetricRhs(
     const std::string field_name, boost::shared_ptr<CommonData> common_data_ptr)
     : OpBaseImpl<PETSC,
-                 MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp>(
+                 MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp>(
           field_name, field_name,
-          MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp::OPROW),
+          MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp::OPROW),
       commonDataPtr(common_data_ptr){};
 
 MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
@@ -340,10 +332,10 @@ MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
 OpAxisymmetricLhs::OpAxisymmetricLhs(
     const std::string field_name, boost::shared_ptr<CommonData> common_data_ptr)
     : OpBaseImpl<PETSC,
-                 MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>::DomainEleOp>(
+                 MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp>(
           field_name, field_name,
           MFrontMoFEMInterface<
-              Hypothesis::AXISYMMETRICAL>::DomainEleOp::OPROWCOL),
+              AXISYMMETRICAL>::DomainEleOp::OPROWCOL),
       commonDataPtr(common_data_ptr){};
 
 MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,

@@ -18,18 +18,9 @@ using namespace FTensor;
 #include <BasicFiniteElements.hpp>
 #include <quad.h>
 
-#include <MGIS/Behaviour/Behaviour.hxx>
-#include <MGIS/Behaviour/BehaviourData.hxx>
-#include "MGIS/Behaviour/MaterialDataManager.h"
-#include "MGIS/Behaviour/Integrate.hxx"
-#include "MGIS/LibrariesManager.hxx"
-
-using namespace mgis;
-using namespace mgis::behaviour;
-
 #include <MFrontOperators.hpp>
-
 using namespace MFrontInterface;
+#include <MFrontMoFEMInterface.hpp>
 
 #include <ElasticMaterials.hpp>
 #include <NonlinearElasticElementInterface.hpp>
@@ -37,7 +28,7 @@ using namespace MFrontInterface;
 #include <BasicBoundaryConditionsInterface.hpp>
 #include <SurfacePressureComplexForLazy.hpp>
 
-#include <MFrontMoFEMInterface.hpp>
+
 
 // using Ele = ForcesAndSourcesCore;
 // using EntData = EntitiesFieldData::EntData;
@@ -261,19 +252,19 @@ int main(int argc, char *argv[]) {
 
     switch (hypothesis) {
     case TRI_DIM:
-      m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::TRIDIMENSIONAL>(
+      m_modules.push_back(new MFrontMoFEMInterface<TRIDIMENSIONAL>(
           m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis TRIDIMENSIONAL";
       break;
     case PLANE_STRAIN:
-      m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::PLANESTRAIN>(
+      m_modules.push_back(new MFrontMoFEMInterface<PLANESTRAIN>(
           m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis PLANESTRAIN";
       break;
     case AXISYMM:
-      m_modules.push_back(new MFrontMoFEMInterface<Hypothesis::AXISYMMETRICAL>(
+      m_modules.push_back(new MFrontMoFEMInterface<AXISYMMETRICAL>(
           m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis AXISYMMETRICAL";
@@ -320,18 +311,18 @@ int main(int argc, char *argv[]) {
       case TRI_DIM:
         field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
                               ->getData<MFrontMoFEMInterface<
-                                  Hypothesis::TRIDIMENSIONAL>::DomainEle>();
+                                  TRIDIMENSIONAL>::DomainEle>();
         break;
       case PLANE_STRAIN:
         field_eval_data =
             m_field.getInterface<FieldEvaluatorInterface>()
                 ->getData<
-                    MFrontMoFEMInterface<Hypothesis::PLANESTRAIN>::DomainEle>();
+                    MFrontMoFEMInterface<PLANESTRAIN>::DomainEle>();
         break;
       case AXISYMM:
         field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
                               ->getData<MFrontMoFEMInterface<
-                                  Hypothesis::AXISYMMETRICAL>::DomainEle>();
+                                  AXISYMMETRICAL>::DomainEle>();
         break;
       default:
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
