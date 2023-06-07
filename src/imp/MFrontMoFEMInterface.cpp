@@ -148,12 +148,18 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
     switch (H) {
     case TRIDIMENSIONAL:
       h = mgis::behaviour::Hypothesis::TRIDIMENSIONAL;
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "MFront material model: TRIDIMENSIONAL \n");
       break;
     case PLANESTRAIN:
       h = mgis::behaviour::Hypothesis::PLANESTRAIN;
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "MFront material model: PLANESTRAIN \n");
       break;
     case AXISYMMETRICAL:
       h = mgis::behaviour::Hypothesis::AXISYMMETRICAL;
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "MFront material model: AXISYMMETRICAL \n");
       break;
     default:
       break;
@@ -598,6 +604,33 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
 
     postProcFe->generateReferenceElementMesh();
 
+    auto &pip = postProcFe->getOpPtrVector();
+
+    pip.push_back(new OpCalculateVectorFieldValues<DIM>(
+        positionField, commonDataPtr->mDispPtr));
+     
+    if (isFiniteKinematics) {
+      pip.push_back(new OpSaveStress<true, H>(positionField, commonDataPtr));
+    } else {
+      pip.push_back(new OpSaveStress<false, H>(positionField, commonDataPtr));
+    }
+
+    using OpPPMap = OpPostProcMapInMoab<DIM, DIM>;
+
+    pip.push_back(new OpPPMap(
+
+        postProcFe->postProcMesh, postProcFe->mapGaussPts,
+
+        {},
+
+        {{"DISPLACEMENT", commonDataPtr->mDispPtr}},
+
+        {{"STRESS", commonDataPtr->mFullStressPtr}},
+
+        {}
+
+        ));
+
     // postProcFe->getOpPtrVector().push_back(
     //     new OpCalculateVectorFieldGradient<DIM, DIM>(positionField,
     //                                                  commonDataPtr->mGradPtr));
@@ -612,7 +645,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
     //     positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
     //     commonDataPtr, rule));
 
-    postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
+    // postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
     MoFEMFunctionReturn(0);
   };
 

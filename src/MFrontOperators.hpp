@@ -856,6 +856,24 @@ private:
   boost::shared_ptr<CommonData> commonDataPtr;
 };
 
+template <bool IS_LARGE_STRAIN, ModelHypothesis H>
+struct OpSaveStress: public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
+
+  OpSaveStress(const std::string field_name,
+              boost::shared_ptr<CommonData> common_data_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        commonDataPtr(common_data_ptr) {
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+};
+
 template <typename T, ModelHypothesis H>
 struct OpTangent : public MFrontEleType<H>::DomainEleOp {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;

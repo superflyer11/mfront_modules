@@ -85,6 +85,15 @@ template struct OpStressTmp<true, false, AXISYMMETRICAL>;
 template struct OpStressTmp<false, false, AXISYMMETRICAL>;
 template struct OpStressTmp<false, true, AXISYMMETRICAL>;
 
+template struct OpSaveStress<false, TRIDIMENSIONAL>;
+template struct OpSaveStress<true, TRIDIMENSIONAL>;
+
+template struct OpSaveStress<false, PLANESTRAIN>;
+template struct OpSaveStress<true, PLANESTRAIN>;
+
+template struct OpSaveStress<false, AXISYMMETRICAL>;
+template struct OpSaveStress<true, AXISYMMETRICAL>;
+
 template struct OpTangent<Tensor4Pack<3>, TRIDIMENSIONAL>;
 template struct OpTangent<DdgPack<3>, TRIDIMENSIONAL>;
 
@@ -93,6 +102,57 @@ template struct OpTangent<DdgPack<2>, PLANESTRAIN>;
 
 template struct OpTangent<Tensor4Pack<2>, AXISYMMETRICAL>;
 template struct OpTangent<DdgPack<2>, AXISYMMETRICAL>;
+
+template <bool IS_LARGE_STRAIN, ModelHypothesis H>
+MoFEMErrorCode OpSaveStress<IS_LARGE_STRAIN, H>::doWork(int side,
+                                                               EntityType type,
+                                                               EntData &data) {
+  MoFEMFunctionBegin;
+
+  const size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
+  auto fe_ent =
+      MFrontEleType<H>::DomainEleOp::getNumeredEntFiniteElementPtr()->getEnt();
+  auto id = commonDataPtr->blocksIDmap.at(fe_ent);
+  auto &dAta = commonDataPtr->setOfBlocksData.at(id);
+  auto &mgis_bv = *dAta.mGisBehaviour;
+
+  int &size_of_stress = dAta.sizeStressVar;
+
+  CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
+                                       dAta.sizeGradVar, dAta.sizeStressVar,
+                                       IS_LARGE_STRAIN);
+
+  MatrixDouble &mat_stress0 = *commonDataPtr->mPrevStressPtr;
+
+  commonDataPtr->mFullStressPtr->resize(DIM * DIM, nb_gauss_pts);
+  commonDataPtr->mFullStressPtr->clear();
+  auto t_full_stress =
+      getFTensor2FromMat<DIM, DIM>(*(commonDataPtr->mFullStressPtr));
+
+  for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
+
+    auto stress_vec = getVectorAdaptor(&mat_stress0.data()[gg * size_of_stress],
+                                       size_of_stress);
+    if (DIM == 2) {
+      if (IS_LARGE_STRAIN) {
+        Tensor2<double, 2, 2> full_forces(
+            VOIGT_VEC_FULL_PLANE_STRAIN(stress_vec));
+        t_full_stress(I, J) = full_forces(I, J);
+      } else {
+        Tensor2_symmetric<double, 2> fstress(
+            VOIGT_VEC_SYMM_PLANE_STRAIN(stress_vec));
+        auto full_forces = to_non_symm_plane_strain(fstress);
+        t_full_stress(I, J) = full_forces(I, J);
+      }
+    } else {
+      // FIXME: implement 3D
+    }
+
+    ++t_full_stress;
+  }
+
+  MoFEMFunctionReturn(0);
+}
 
 template <bool UPDATE, bool IS_LARGE_STRAIN, ModelHypothesis H>
 MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
