@@ -12,10 +12,6 @@
 using namespace MoFEM;
 using namespace FTensor;
 
-// using EntData = EntitiesFieldData::EntData;
-// using DomainEle = VolumeElementForcesAndSourcesCore;
-// using DomainEleOp = DomainEle::UserDataOperator;
-
 #include <MFrontOperators.hpp>
 #include <MFrontMoFEMInterface.hpp>
 
@@ -360,8 +356,6 @@ MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
 
   // loop over integration points
   for (int gg = 0; gg != nbIntegrationPts; gg++) {
-
-    // cout << "2, 2: " <<  t_full_stress(2, 2) << endl;
 
     auto t_nf = getNf<2>();
 

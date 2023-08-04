@@ -28,20 +28,7 @@ using namespace MFrontInterface;
 #include <BasicBoundaryConditionsInterface.hpp>
 #include <SurfacePressureComplexForLazy.hpp>
 
-
-
-// using Ele = ForcesAndSourcesCore;
-// using EntData = EntitiesFieldData::EntData;
-// using DomainEle = VolumeElementForcesAndSourcesCore;
-// using DomainEleOp = DomainEle::UserDataOperator;
-// using BoundaryEle = FaceElementForcesAndSourcesCore;
-// using BoundaryEleOp = BoundaryEle::UserDataOperator;
-// using PostProcEle = PostProcVolumeOnRefinedMesh;
-// using PostProcSkinEle = PostProcFaceOnRefinedMesh;
 using SetPtsData = FieldEvaluatorInterface::SetPtsData;
-
-// double t_dt;
-// double t_dt_prop;
 
 int main(int argc, char *argv[]) {
 
@@ -118,8 +105,7 @@ int main(int argc, char *argv[]) {
 
     PetscInt hypothesis = TRI_DIM;
     CHKERR PetscOptionsGetEList(PETSC_NULL, NULL, "-hypothesis",
-                                list_hypotheses, LAST, &hypothesis,
-                                PETSC_NULL);
+                                list_hypotheses, LAST, &hypothesis, PETSC_NULL);
     int space_dim = !hypothesis ? 3 : 2;
 
     CHKERR PetscOptionsGetBool(PETSC_NULL, "-is_quasi_static", &is_quasi_static,
@@ -309,20 +295,19 @@ int main(int argc, char *argv[]) {
     if (field_eval_flag) {
       switch (hypothesis) {
       case TRI_DIM:
-        field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
-                              ->getData<MFrontMoFEMInterface<
-                                  TRIDIMENSIONAL>::DomainEle>();
+        field_eval_data =
+            m_field.getInterface<FieldEvaluatorInterface>()
+                ->getData<MFrontMoFEMInterface<TRIDIMENSIONAL>::DomainEle>();
         break;
       case PLANE_STRAIN:
         field_eval_data =
             m_field.getInterface<FieldEvaluatorInterface>()
-                ->getData<
-                    MFrontMoFEMInterface<PLANESTRAIN>::DomainEle>();
+                ->getData<MFrontMoFEMInterface<PLANESTRAIN>::DomainEle>();
         break;
       case AXISYMM:
-        field_eval_data = m_field.getInterface<FieldEvaluatorInterface>()
-                              ->getData<MFrontMoFEMInterface<
-                                  AXISYMMETRICAL>::DomainEle>();
+        field_eval_data =
+            m_field.getInterface<FieldEvaluatorInterface>()
+                ->getData<MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEle>();
         break;
       default:
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
@@ -386,18 +371,18 @@ int main(int argc, char *argv[]) {
           if (field_eval_flag) {
             if (space_dim == 3) {
               CHKERR m_field.getInterface<FieldEvaluatorInterface>()
-                ->evalFEAtThePoint3D(
-                    field_eval_coords.data(), 1e-12, simple->getProblemName(),
-                    simple->getDomainFEName(), field_eval_data,
-                    m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
-                    MF_EXIST, QUIET);
+                  ->evalFEAtThePoint3D(
+                      field_eval_coords.data(), 1e-12, simple->getProblemName(),
+                      simple->getDomainFEName(), field_eval_data,
+                      m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
+                      MF_EXIST, QUIET);
             } else if (space_dim == 2) {
-            CHKERR m_field.getInterface<FieldEvaluatorInterface>()
-                ->evalFEAtThePoint2D(
-                    field_eval_coords.data(), 1e-12, simple->getProblemName(),
-                    simple->getDomainFEName(), field_eval_data,
-                    m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
-                    MF_EXIST, QUIET);
+              CHKERR m_field.getInterface<FieldEvaluatorInterface>()
+                  ->evalFEAtThePoint2D(
+                      field_eval_coords.data(), 1e-12, simple->getProblemName(),
+                      simple->getDomainFEName(), field_eval_data,
+                      m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
+                      MF_EXIST, QUIET);
             }
           }
 

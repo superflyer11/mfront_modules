@@ -30,10 +30,6 @@ template <int DIM> using Tensor1Pack = Tensor1<PackPtr<double *, 1>, DIM>;
 
 template <int DIM> using DdgPack = Ddg<PackPtr<double *, 1>, DIM, DIM>;
 
-// using EntData = EntitiesFieldData::EntData;
-// using DomainEle = VolumeElementForcesAndSourcesCore;
-// using DomainEleOp = DomainEle::UserDataOperator;
-
 enum DataTags { RHS = 0, LHS };
 
 struct BlockData {
@@ -183,9 +179,6 @@ template <typename T> inline auto get_voigt_vec(T &t_grad) {
   Index<'j', 3> j;
   F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
 
-  // bool flag = std::is_same<T, Tensor4Pack>::value;
-  // cout << flag << endl;
-
   // double det;
   // CHKERR determinantTensor3by3(F, det);
   // if (det < 0)
@@ -296,10 +289,6 @@ inline auto to_non_symm_plane_strain(const Tensor2_symmetric<T, 2> &symm) {
 template <typename T1, typename T2>
 inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
   MoFEMFunctionBeginHot;
-  // Index<'i', 3> i;
-  // Index<'j', 3> j;
-  // Index<'k', 3> k;
-  // Index<'l', 3> l;
 
   Number<0> N0;
   Number<1> N1;
@@ -418,7 +407,6 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
   }
 
   if (std::is_same<T2, DdgPack<3>>::value) { // 3D small strain
-
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -490,12 +478,11 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
 
     D(N0, N1, N0, N0) = inv_sqr2 * K[12];
     D(N0, N1, N1, N1) = inv_sqr2 * K[13];
+
     // D(N0, N1, N2, N2) = inv_sqr2 * K[14];
 
     D(N0, N1, N0, N1) = 0.5 * K[15];
   }
-
-  // D(i, j, k, l) *= -1;
 
   MoFEMFunctionReturnHot(0);
 };
@@ -511,31 +498,31 @@ inline MoFEMErrorCode get_full_tensor4_from_voigt(const T1 &K, T2 &D) {
   if constexpr (IS_LARGE_STRAIN) {
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
-    D(N0, N0, N2, N2) = K[2]; // 1
+    D(N0, N0, N2, N2) = K[2];
     D(N0, N0, N0, N1) = K[3];
     D(N0, N0, N1, N0) = K[4];
     D(N1, N1, N0, N0) = K[5];
     D(N1, N1, N1, N1) = K[6];
-    D(N1, N1, N2, N2) = K[7]; // 2
+    D(N1, N1, N2, N2) = K[7];
     D(N1, N1, N0, N1) = K[8];
     D(N1, N1, N1, N0) = K[9];
-    D(N2, N2, N0, N0) = K[10]; // 3
-    D(N2, N2, N1, N1) = K[11]; // 4
-    D(N2, N2, N2, N2) = K[12]; // 5
-    D(N2, N2, N0, N1) = K[13]; // 6
-    D(N2, N2, N1, N0) = K[14]; // 7
+    D(N2, N2, N0, N0) = K[10];
+    D(N2, N2, N1, N1) = K[11];
+    D(N2, N2, N2, N2) = K[12];
+    D(N2, N2, N0, N1) = K[13];
+    D(N2, N2, N1, N0) = K[14];
     D(N0, N1, N0, N0) = K[15];
     D(N0, N1, N1, N1) = K[16];
-    D(N0, N1, N2, N2) = K[17]; // 8
+    D(N0, N1, N2, N2) = K[17];
     D(N0, N1, N0, N1) = K[18];
     D(N0, N1, N1, N0) = K[19];
     D(N1, N0, N0, N0) = K[20];
     D(N1, N0, N1, N1) = K[21];
-    D(N1, N0, N2, N2) = K[22]; // 9
+    D(N1, N0, N2, N2) = K[22];
     D(N1, N0, N0, N1) = K[23];
     D(N1, N0, N1, N0) = K[24];
   } else {
-
+    
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -563,8 +550,6 @@ inline MoFEMErrorCode get_full_tensor4_from_voigt(const T1 &K, T2 &D) {
 
     D(N0, N1, N0, N1) = 0.5 * K[15];
   }
-
-  // D(i, j, k, l) *= -1;
 
   MoFEMFunctionReturnHot(0);
 };
@@ -857,11 +842,11 @@ private:
 };
 
 template <bool IS_LARGE_STRAIN, ModelHypothesis H>
-struct OpSaveStress: public MFrontEleType<H>::DomainEleOp {
+struct OpSaveStress : public MFrontEleType<H>::DomainEleOp {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   OpSaveStress(const std::string field_name,
-              boost::shared_ptr<CommonData> common_data_ptr)
+               boost::shared_ptr<CommonData> common_data_ptr)
       : MFrontEleType<H>::DomainEleOp(field_name,
                                       MFrontEleType<H>::DomainEleOp::OPROW),
         commonDataPtr(common_data_ptr) {
@@ -993,9 +978,6 @@ using OpTangentFiniteStrains = struct OpTangent<Tensor4Pack<DIM>, H>;
 
 template <int DIM, ModelHypothesis H>
 using OpTangentSmallStrains = struct OpTangent<DdgPack<DIM>, H>;
-
-// typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;
-// typedef struct OpTangent<DdgPack> OpTangentSmallStrains;
 
 template <ModelHypothesis H>
 using OpUpdateVariablesFiniteStrains = struct OpStressTmp<true, true, H>;

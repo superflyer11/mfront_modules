@@ -20,9 +20,7 @@ extern double mfront_dt_prop;
 
 using EntData = EntitiesFieldData::EntData;
 
-enum ModelHypothesis {
-  TRIDIMENSIONAL, PLANESTRAIN, AXISYMMETRICAL
-};
+enum ModelHypothesis { TRIDIMENSIONAL, PLANESTRAIN, AXISYMMETRICAL };
 
 template <ModelHypothesis H> struct MFrontEleType;
 
@@ -67,7 +65,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
 
   using DomainEle = typename MFrontEleType<H>::DomainEle;
   using DomainEleOp = typename MFrontEleType<H>::DomainEleOp;
-  using PostProcDomainOnRefinedMesh = typename MFrontEleType<H>::PostProcDomainOnRefinedMesh; 
+  using PostProcDomainOnRefinedMesh =
+      typename MFrontEleType<H>::PostProcDomainOnRefinedMesh;
 
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 

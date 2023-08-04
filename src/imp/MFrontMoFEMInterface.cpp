@@ -277,17 +277,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
   updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
 
-  // FIXME
-  //  TODO: update it according to the newest MoFEM
-  //  CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineRhsPtr, true, false,
-  //  false,
-  //                     false);
-  //  CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineLhsPtr, true, false,
-  //  false,
-  //                     false);
-  //  CHKERR addHOOpsVol(meshNodeField, *updateIntVariablesElePtr, true, false,
-  //                     false, false);
-
   CHKERR AddHOOps<DIM, DIM, DIM>::add(mfrontPipelineRhsPtr->getOpPtrVector(),
                                       {H1}, meshNodeField);
   CHKERR AddHOOps<DIM, DIM, DIM>::add(mfrontPipelineLhsPtr->getOpPtrVector(),
@@ -314,7 +303,8 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   MoFEMFunctionReturnHot(0);
 };
 
-template <ModelHypothesis H> MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   MoFEMFunctionBegin;
 
   auto &moab_gauss = *moabGaussIntPtr;
@@ -599,7 +589,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
 
   auto create_post_process_element = [&]() {
     MoFEMFunctionBegin;
-    
+
     postProcFe = boost::make_shared<PostProcDomainOnRefinedMesh>(mField);
 
     postProcFe->generateReferenceElementMesh();
@@ -608,7 +598,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
 
     pip.push_back(new OpCalculateVectorFieldValues<DIM>(
         positionField, commonDataPtr->mDispPtr));
-     
+
     if (isFiniteKinematics) {
       pip.push_back(new OpSaveStress<true, H>(positionField, commonDataPtr));
     } else {
