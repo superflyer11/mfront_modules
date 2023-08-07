@@ -55,7 +55,7 @@ struct BlockData {
   double storedEnergy;
   double externalVariable;
 
-  Range tEts;
+  Range eNts;
 
   BlockData()
       : oRder(-1), isFiniteStrain(false), behaviourPath("src/libBehaviour.so"),
@@ -593,8 +593,8 @@ struct CommonData {
         const int id = it->getMeshsetId();
         EntityHandle meshset = it->getMeshset();
         CHKERR mField.get_moab().get_entities_by_dimension(
-            meshset, dim, setOfBlocksData[id].tEts, true);
-        for (auto ent : setOfBlocksData[id].tEts)
+            meshset, dim, setOfBlocksData[id].eNts, true);
+        for (auto ent : setOfBlocksData[id].eNts)
           blocksIDmap[ent] = id;
 
         setOfBlocksData[id].iD = id;
@@ -697,10 +697,10 @@ struct CommonData {
     MoFEMFunctionBegin;
     double zero = 0;
     for (auto &[id, data] : setOfBlocksData) {
-      CHKERR mField.get_moab().tag_clear_data(internalVariableTag, data.tEts,
+      CHKERR mField.get_moab().tag_clear_data(internalVariableTag, data.eNts,
                                               &zero);
-      CHKERR mField.get_moab().tag_clear_data(stressTag, data.tEts, &zero);
-      CHKERR mField.get_moab().tag_clear_data(gradientTag, data.tEts, &zero);
+      CHKERR mField.get_moab().tag_clear_data(stressTag, data.eNts, &zero);
+      CHKERR mField.get_moab().tag_clear_data(gradientTag, data.eNts, &zero);
     }
     MoFEMFunctionReturn(0);
   }

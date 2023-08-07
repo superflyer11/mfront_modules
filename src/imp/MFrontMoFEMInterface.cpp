@@ -285,17 +285,17 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
       updateIntVariablesElePtr->getOpPtrVector(), {H1}, meshNodeField);
 
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
-    CHKERR mField.add_ents_to_finite_element_by_dim(data.tEts, DIM,
+    CHKERR mField.add_ents_to_finite_element_by_dim(data.eNts, DIM,
                                                     "MFRONT_EL");
     // if (oRder > 0) {
 
-    //   CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
+    //   CHKERR mField.set_field_order(data.eNts.subset_by_dimension(1),
     //                                 positionField, oRder);
     //   CHKERR
-    //   mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
+    //   mField.set_field_order(data.eNts.subset_by_dimension(2), positionField,
     //                          oRder);
     //   CHKERR
-    //   mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
+    //   mField.set_field_order(data.eNts.subset_by_dimension(3), positionField,
     //                          oRder);
     // }
   }
@@ -386,10 +386,10 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   add_domain_ops_lhs(mfrontPipelineLhsPtr->getOpPtrVector());
   add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
 
-  // if (DIM == 3 && testJacobian) {
-  //   // FIXME: implement 2D
-  //   CHKERR testOperators();
-  // }
+  if (testJacobian) {
+    // FIXME: implement 2D
+    CHKERR testOperators();
+  }
 
   MoFEMFunctionReturn(0);
 }
@@ -401,13 +401,13 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::testOperators() {
   auto simple = mField.getInterface<Simple>();
   auto opt = mField.getInterface<OperatorsTester>();
 
-  Range tets, verts, ho_ents;
+  Range ents, verts, ho_ents;
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
-    tets.merge(data.tEts);
+    ents.merge(data.eNts);
   }
 
-  CHKERR mField.get_moab().get_connectivity(tets, verts, true);
-  for (auto d : {1, 2, 3}) {
+  CHKERR mField.get_moab().get_connectivity(ents, verts, true);
+  for (int d = 1; d <= DIM; ++d) {
     CHKERR mField.get_moab().get_adjacencies(verts, d, false, ho_ents,
                                              moab::Interface::UNION);
   }
@@ -506,8 +506,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::testOperators() {
 
   MoFEMFunctionReturn(0);
 }
-
-// BitRefLevel MFrontMoFEMInterface::getBitRefLevel() { return bIt; };
 
 template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::addElementsToDM(SmartPetscObj<DM> dm) {
