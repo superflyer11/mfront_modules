@@ -214,54 +214,8 @@ inline auto get_voigt_vec_axisymm(T1 &t_grad, T2 &t_disp, T3 &t_coords) {
   return vec;
 };
 
-// template deduction
-// template <typename T, int DIM> struct GetVoightVecImpl;
-
-// template <typename T, int DIM> struct GetVoightVecImpl<FTensor::Tensor2<T, 3,
-// 3>> {
-//   static inline auto get(FTensor::Tensor2<T, 3, 3> &t_grad) {
-//     Tensor2<double, 3, 3> F;
-//     Index<'i', 3> i;
-//     Index<'j', 3> j;
-//     F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
-
-//     // double det;
-//     // CHKERR determinantTensor3by3(F, det);
-//     // if (det < 0)
-//     //   MOFEM_LOG("WORLD", Sev::error) << "NEGATIVE DET!!!" << det;
-
-//     array<double, 9> vec{F(0, 0), F(1, 1), F(2, 2), F(0, 1), F(1, 0),
-//                          F(0, 2), F(2, 0), F(1, 2), F(2, 1)};
-
-//     return vec;
-//   }
-// };
-
-// template <typename T, int DIM> inline auto get_voigt_vec(T &t_grad) {
-//   return GetVoightVecImpl<T, DIM>::get(t_grad);
-// };
-
-// // template <typename V>
-// // struct GetVoightVecImpl<FTensor::Tensor2<V,2, 2>> {
-// //   static inline auto get(FTensor::Tensor2<V,2, 2> &t_grad) {
-// //   Tensor2<double, 3, 3> F;
-// //   Index<'i', 3> i;
-// //   Index<'j', 3> j;
-// //   F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
-
-// //   // double det;
-// //   // CHKERR determinantTensor3by3(F, det);
-// //   // if (det < 0)
-// //   //   MOFEM_LOG("WORLD", Sev::error) << "NEGATIVE DET!!!" << det;
-
-// //   array<double, 9> vec{F(0, 0), F(1, 1), F(2, 2), F(0, 1), F(1, 0),
-// //                        F(0, 2), F(2, 0), F(1, 2), F(2, 1)};
-
-// //   return vec;
-// // }
-// // };
 template <typename T>
-inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
+inline auto to_non_symm_3d(const Tensor2_symmetric<T, 3> &symm) {
   Tensor2<double, 3, 3> non_symm;
   Number<0> N0;
   Number<1> N1;
@@ -276,7 +230,7 @@ inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
 };
 
 template <typename T>
-inline auto to_non_symm_plane_strain(const Tensor2_symmetric<T, 2> &symm) {
+inline auto to_non_symm_2d(const Tensor2_symmetric<T, 2> &symm) {
   Tensor2<double, 2, 2> non_symm;
   Number<0> N0;
   Number<1> N1;
@@ -378,7 +332,7 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
     D(N2, N1, N2, N1) = K[80];
   }
 
-  if (std::is_same<T2, Tensor4Pack<2>>::value) { // plane strain finite strain
+  if (std::is_same<T2, Tensor4Pack<2>>::value) { // plane strain, finite strain
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     // D(N0, N0, N2, N2) = K[2];
@@ -495,7 +449,7 @@ inline MoFEMErrorCode get_full_tensor4_from_voigt(const T1 &K, T2 &D) {
   Number<1> N1;
   Number<2> N2;
 
-  if constexpr (IS_LARGE_STRAIN) {
+  if constexpr (IS_LARGE_STRAIN) { // 2D finite strain, full tensor
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -521,7 +475,7 @@ inline MoFEMErrorCode get_full_tensor4_from_voigt(const T1 &K, T2 &D) {
     D(N1, N0, N2, N2) = K[22];
     D(N1, N0, N0, N1) = K[23];
     D(N1, N0, N1, N0) = K[24];
-  } else {
+  } else { // 2D small strain, full tensor
     
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
@@ -611,7 +565,7 @@ struct CommonData {
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
                                 const int nb_gauss_pts, const int var_size,
                                 const int grad_size, const int stress_size,
-                                bool is_large_strain) {
+                                bool is_large_strain = false) {
     MoFEMFunctionBegin;
 
     auto mget_tag_data = [&](Tag &m_tag, boost::shared_ptr<MatrixDouble> &m_mat,
@@ -637,7 +591,6 @@ struct CommonData {
         const int tag_size2 = m_mat->data().size();
         CHKERR mField.get_moab().tag_set_by_ptr(m_tag, &fe_ent, 1, tag_data2,
                                                 &tag_size2);
-
       } else {
         MatrixAdaptor tag_vec = MatrixAdaptor(
             nb_gauss_pts, m_size,
@@ -933,24 +886,32 @@ private:
 //   int globalRule;
 // };
 
-// struct OpSaveGaussPts : public MFrontMoFEMInterface::DomainEleOp {
-//   OpSaveGaussPts(const std::string field_name, moab::Interface &moab_mesh,
-//                  boost::shared_ptr<CommonData> common_data_ptr);
-//   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+template <ModelHypothesis H>
+struct OpSaveGaussPts : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
-// private:
-//   boost::shared_ptr<CommonData> commonDataPtr;
-//   moab::Interface &internalVarMesh;
-// };
+  OpSaveGaussPts(const std::string field_name, moab::Interface &moab_mesh,
+                 boost::shared_ptr<CommonData> common_data_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        internalVarMesh(moab_mesh), commonDataPtr(common_data_ptr) {
+    // Operator is only executed for vertices
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+  moab::Interface &internalVarMesh;
+};
+
+//FIXME: do we need this?
 struct FePrePostProcess : public FEMethod {
 
   boost::ptr_vector<MethodForForceScaling> methodsOp;
 
-  // FePrePostProcess(){}
-
   MoFEMErrorCode preProcess() {
-    //
     MoFEMFunctionBegin;
     switch (ts_ctx) {
     case CTX_TSSETIJACOBIAN: {

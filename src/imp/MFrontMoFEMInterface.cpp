@@ -329,9 +329,11 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   else
     updateIntVariablesElePtr->getOpPtrVector().push_back(
         new OpUpdateVariablesSmallStrains<H>(positionField, commonDataPtr));
-  // if (saveGauss)
-  //   updateIntVariablesElePtr->getOpPtrVector().push_back(
-  //       new OpSaveGaussPts(positionField, moab_gauss, commonDataPtr));
+  if (saveGauss && (H == TRIDIMENSIONAL)) {
+    //FIXME: decide if needed for 2D
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpSaveGaussPts<H>(positionField, moab_gauss, commonDataPtr));
+  }
 
   auto jacobian = [&](const double r, const double, const double) {
     if (H == AXISYMMETRICAL)
