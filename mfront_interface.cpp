@@ -179,6 +179,10 @@ int main(int argc, char *argv[]) {
       atom_test_data = {{{1.0, {6.9}}, false}};
       atom_test_threshold = 3.1e-3;
       break;
+    case 8:
+      atom_test_data = {{{1.0, {0.00585}}, false}};
+      atom_test_threshold = 1e-3;
+      break;
     default:
       if (atom_test > -1)
         SETERRQ1(PETSC_COMM_WORLD, MOFEM_NOT_IMPLEMENTED,
@@ -384,12 +388,30 @@ int main(int argc, char *argv[]) {
                       m_field.get_comm_rank(), m_field.get_comm_rank(), nullptr,
                       MF_EXIST, QUIET);
             }
+
+            auto eval_num_vec =
+                createVectorMPI(m_field.get_comm(), PETSC_DECIDE, 1);
+            CHKERR VecZeroEntries(eval_num_vec);
+            if (field_ptr->size1()) {
+              CHKERR VecSetValue(eval_num_vec, 0, 1, ADD_VALUES);
+            }
+            CHKERR VecAssemblyBegin(eval_num_vec);
+            CHKERR VecAssemblyEnd(eval_num_vec);
+
+            double eval_num;
+            CHKERR VecSum(eval_num_vec, &eval_num);
+            if (!(int)eval_num) {
+              SETERRQ(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
+                      "Did not find any elements to evaluate the field, check "
+                      "the coordinates");
+            }
           }
 
           double dif = 0;
           switch (atom_test) {
           case 1:
           case 2:
+          case 8:
             if (field_ptr->size1()) {
               if (space_dim == 3) {
                 auto t_p = getFTensor1FromMat<3>(*field_ptr);
@@ -514,6 +536,7 @@ int main(int argc, char *argv[]) {
     case 5:
     case 6:
     case 7:
+    case 8:
       for (auto it : atom_test_data) {
         if (!it.second) {
           SETERRQ1(PETSC_COMM_WORLD, MOFEM_ATOM_TEST_INVALID,
