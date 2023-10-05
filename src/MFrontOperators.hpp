@@ -513,6 +513,7 @@ struct CommonData {
   MoFEM::Interface &mField;
   boost::shared_ptr<MatrixDouble> mGradPtr;
   boost::shared_ptr<MatrixDouble> mStressPtr;
+  boost::shared_ptr<MatrixDouble> mFullStrainPtr;
   boost::shared_ptr<MatrixDouble> mFullStressPtr;
 
   boost::shared_ptr<MatrixDouble> mPrevGradPtr;

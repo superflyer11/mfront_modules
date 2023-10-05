@@ -121,7 +121,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode createElements() override;
   MoFEMErrorCode setOperators() override;
 
-  MoFEMErrorCode testOperators() override;
+  MoFEMErrorCode testOperators(); // override;
 
   MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
 

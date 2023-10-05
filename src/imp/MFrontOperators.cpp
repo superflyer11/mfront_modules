@@ -117,23 +117,35 @@ MoFEMErrorCode OpSaveStress<IS_LARGE_STRAIN, H>::doWork(int side,
   auto &mgis_bv = *dAta.mGisBehaviour;
 
   int &size_of_stress = dAta.sizeStressVar;
+  int &size_of_grad = dAta.sizeGradVar;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar, dAta.sizeStressVar,
                                        IS_LARGE_STRAIN);
 
-  MatrixDouble &mat_stress0 = *commonDataPtr->mPrevStressPtr;
-  // FIXME: handle axisymmetric case
-  commonDataPtr->mFullStressPtr->resize(DIM * DIM, nb_gauss_pts);
+  MatrixDouble &mat_stress = *commonDataPtr->mPrevStressPtr;
+  MatrixDouble &mat_grad = *commonDataPtr->mPrevGradPtr;
+
+  commonDataPtr->mFullStressPtr->resize(3 * 3, nb_gauss_pts);
   commonDataPtr->mFullStressPtr->clear();
   auto t_full_stress =
       getFTensor2FromMat<DIM, DIM>(*(commonDataPtr->mFullStressPtr));
 
+  commonDataPtr->mFullStrainPtr->resize(3 * 3, nb_gauss_pts);
+  commonDataPtr->mFullStrainPtr->clear();
+  auto t_full_strain =
+      getFTensor2FromMat<DIM, DIM>(*(commonDataPtr->mFullStrainPtr));
+
   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
 
-    auto stress_vec = getVectorAdaptor(&mat_stress0.data()[gg * size_of_stress],
+    auto stress_vec = getVectorAdaptor(&mat_stress.data()[gg * size_of_stress],
                                        size_of_stress);
+    auto grad_vec =
+        getVectorAdaptor(&mat_grad.data()[gg * size_of_grad], size_of_grad);
+
     if (DIM == 2) {
+      // FIXME: handle 2D
+
       if (IS_LARGE_STRAIN) {
         Tensor2<double, 2, 2> full_forces(VOIGT_VEC_2D(stress_vec));
         t_full_stress(I, J) = full_forces(I, J);
@@ -149,15 +161,20 @@ MoFEMErrorCode OpSaveStress<IS_LARGE_STRAIN, H>::doWork(int side,
         Tensor2<double, 3, 3> forces(
             VOIGT_VEC_3D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
         t_full_stress(i, j) = forces(i, j);
+        // FIXME: hanlde large strain
       } else {
-        Tensor2_symmetric<double, 3> nstress(
-            VOIGT_VEC_SYMM_3D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
+        Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM_3D(stress_vec));
         auto forces = to_non_symm_3d(nstress);
         t_full_stress(i, j) = forces(i, j);
+
+        Tensor2_symmetric<double, 3> t_grad(VOIGT_VEC_SYMM_3D(grad_vec));
+        auto t_grad_non_sym = to_non_symm_3d(t_grad);
+        t_full_strain(i, j) = t_grad_non_sym(i, j);
       }
     }
 
     ++t_full_stress;
+    ++t_full_strain;
   }
 
   MoFEMFunctionReturn(0);

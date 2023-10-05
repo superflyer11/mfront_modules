@@ -80,6 +80,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
 
   commonDataPtr->mGradPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
+  commonDataPtr->mFullStrainPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mFullStressPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mDispPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mPrevGradPtr = boost::make_shared<MatrixDouble>();
@@ -605,9 +606,10 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
       pip.push_back(new OpSaveStress<false, H>(positionField, commonDataPtr));
     }
 
-    using OpPPMap = OpPostProcMapInMoab<DIM, DIM>;
+    using OpPPMapVec = OpPostProcMapInMoab<DIM, DIM>;
+    using OpPPMapTen = OpPostProcMapInMoab<DIM, DIM>;
 
-    pip.push_back(new OpPPMap(
+    pip.push_back(new OpPPMapVec(
 
         postProcFe->postProcMesh, postProcFe->mapGaussPts,
 
@@ -615,7 +617,22 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
 
         {{"DISPLACEMENT", commonDataPtr->mDispPtr}},
 
-        {{"STRESS", commonDataPtr->mFullStressPtr}},
+        {},
+
+        {}
+
+        ));
+
+    pip.push_back(new OpPPMapTen(
+
+        postProcFe->postProcMesh, postProcFe->mapGaussPts,
+
+        {},
+
+        {},
+
+        {{"STRAIN", commonDataPtr->mFullStrainPtr},
+         {"STRESS", commonDataPtr->mFullStressPtr}},
 
         {}
 
