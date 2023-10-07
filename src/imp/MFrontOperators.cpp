@@ -143,33 +143,41 @@ MoFEMErrorCode OpSaveStress<IS_LARGE_STRAIN, H>::doWork(int side,
     auto grad_vec =
         getVectorAdaptor(&mat_grad.data()[gg * size_of_grad], size_of_grad);
 
-    if (DIM == 2) {
-      // FIXME: handle 2D
+    if constexpr (IS_LARGE_STRAIN) {
+      if (DIM == 3) {
+        Tensor2<double, 3, 3> t_forces(VOIGT_VEC_3D(stress_vec));
+        t_full_stress(i, j) = t_forces(i, j);
+        Tensor2<double, 3, 3> t_grad(VOIGT_VEC_3D(grad_vec));
+        t_full_strain(i, j) = t_grad(i, j);
+      } else if (DIM == 2) {
+        // FIXME: handle 2D
+        // Tensor2<double, 2, 2> forces(
+        //     VOIGT_VEC_2D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
+        // t_stress(I, J) = forces(I, J);
 
-      if (IS_LARGE_STRAIN) {
-        Tensor2<double, 2, 2> full_forces(VOIGT_VEC_2D(stress_vec));
-        t_full_stress(I, J) = full_forces(I, J);
-        // FIXME: handle axisymmetric case
-      } else {
-        Tensor2_symmetric<double, 2> fstress(VOIGT_VEC_SYMM_2D(stress_vec));
-        auto full_forces = to_non_symm_2d(fstress);
-        t_full_stress(I, J) = full_forces(I, J);
-        // FIXME: handle axisymmetric case
+        // Tensor2<double, 3, 3> full_forces(
+        //     VOIGT_VEC_2D_FULL(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
+        // t_full_stress(i, j) = full_forces(i, j);
       }
     } else {
-      if (IS_LARGE_STRAIN) {
-        Tensor2<double, 3, 3> forces(
-            VOIGT_VEC_3D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
-        t_full_stress(i, j) = forces(i, j);
-        // FIXME: hanlde large strain
-      } else {
+      if (DIM == 3) {
         Tensor2_symmetric<double, 3> nstress(VOIGT_VEC_SYMM_3D(stress_vec));
         auto forces = to_non_symm_3d(nstress);
         t_full_stress(i, j) = forces(i, j);
-
         Tensor2_symmetric<double, 3> t_grad(VOIGT_VEC_SYMM_3D(grad_vec));
         auto t_grad_non_sym = to_non_symm_3d(t_grad);
         t_full_strain(i, j) = t_grad_non_sym(i, j);
+      } else if (DIM == 2) {
+        // FIXME: handle 2D
+        // Tensor2_symmetric<double, 2> nstress(
+        //     VOIGT_VEC_SYMM_2D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
+        // auto forces = to_non_symm_2d(nstress);
+        // t_stress(I, J) = forces(I, J);
+
+        // Tensor2_symmetric<double, 3> fstress(VOIGT_VEC_SYMM_2D_FULL(
+        //     getThermodynamicForce(dAta.behDataPtr->s1, 0)));
+        // auto full_forces = to_non_symm_3d(fstress);
+        // t_full_stress(i, j) = full_forces(i, j);
       }
     }
 
