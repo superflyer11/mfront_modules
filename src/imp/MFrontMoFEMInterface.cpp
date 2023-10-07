@@ -35,12 +35,12 @@ MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
                                               string postion_field,
                                               string mesh_posi_field_name,
                                               bool is_displacement_field,
-                                              PetscBool is_quasi_static)
+                                              PetscBool is_quasi_static,
+                                              PetscInt order)
     : mField(m_field), positionField(postion_field),
       meshNodeField(mesh_posi_field_name),
       isDisplacementField(is_displacement_field),
-      isQuasiStatic(is_quasi_static) {
-  oRder = -1;
+      isQuasiStatic(is_quasi_static), oRder(order) {
   isFiniteKinematics = true;
   saveGauss = PETSC_FALSE;
   saveVolume = PETSC_TRUE;
@@ -53,7 +53,8 @@ template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
   MoFEMFunctionBegin;
   isQuasiStatic = PETSC_FALSE;
-  oRder = 2;
+  if (oRder == -1)
+    oRder = 2;
   CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, optionsPrefix.c_str(), "", "none");
   // FIXME: make it possible to set a separate orders for contact, nonlinear
   // elasticity, mfront... etc
@@ -288,17 +289,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
     CHKERR mField.add_ents_to_finite_element_by_dim(data.eNts, DIM,
                                                     "MFRONT_EL");
-    // if (oRder > 0) {
-
-    //   CHKERR mField.set_field_order(data.eNts.subset_by_dimension(1),
-    //                                 positionField, oRder);
-    //   CHKERR
-    //   mField.set_field_order(data.eNts.subset_by_dimension(2), positionField,
-    //                          oRder);
-    //   CHKERR
-    //   mField.set_field_order(data.eNts.subset_by_dimension(3), positionField,
-    //                          oRder);
-    // }
   }
 
   MoFEMFunctionReturnHot(0);
@@ -310,7 +300,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
 
   auto &moab_gauss = *moabGaussIntPtr;
 
-  auto integration_rule = [&](int, int, int approx_order) {
+  auto integration_rule = [](int, int, int approx_order) {
     return 2 * approx_order + 1;
   };
 
@@ -390,7 +380,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
 
   if (testJacobian) {
-    // FIXME: implement 2D
     CHKERR testOperators();
   }
 
@@ -438,42 +427,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::testOperators() {
 
   auto x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
   auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
-
-  // auto post_proc = [&](auto dm, auto f_res, auto out_name) {
-  //   MoFEMFunctionBegin;
-  //   auto post_proc_fe =
-  //       boost::make_shared<PostProcBrokenMeshInMoab<DomainEle>>(mField);
-
-  //   using OpPPMap = OpPostProcMapInMoab<3, 3>;
-
-  //   auto l_mat = boost::make_shared<MatrixDouble>();
-  //   post_proc_fe->getOpPtrVector().push_back(
-  //       new OpCalculateVectorFieldValues<3>(positionField, l_mat, f_res));
-
-  //   post_proc_fe->getOpPtrVector().push_back(
-
-  //       new OpPPMap(
-
-  //           post_proc_fe->getPostProcMesh(), post_proc_fe->getMapGaussPts(),
-
-  //           {},
-
-  //           {{positionField, l_mat}},
-
-  //           {}, {})
-
-  //   );
-
-  //   CHKERR DMoFEMLoopFiniteElements(dm, simple->getDomainFEName(),
-  //                                   post_proc_fe);
-
-  //   post_proc_fe->writeFile(out_name);
-  //   MoFEMFunctionReturn(0);
-  // };
-
-  // CHKERR post_proc(dM, x0, "x0.h5m");
-  // CHKERR post_proc(dM, x, "x.h5m");
-  // CHKERR post_proc(dM, diff_x, "x_diff.h5m");
 
   auto res = opt->assembleVec(
       dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,
@@ -591,6 +544,8 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
   auto create_post_process_element = [&]() {
     MoFEMFunctionBegin;
 
+    auto simple = mField.getInterface<Simple>();
+
     postProcFe = boost::make_shared<PostProcDomainOnRefinedMesh>(mField);
 
     postProcFe->generateReferenceElementMesh();
@@ -600,11 +555,38 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
     pip.push_back(new OpCalculateVectorFieldValues<DIM>(
         positionField, commonDataPtr->mDispPtr));
 
+    auto entity_data_l2 = boost::make_shared<EntitiesFieldData>(MBENTITYSET);
+    auto mass_ptr = boost::make_shared<MatrixDouble>();
+    auto strain_coeffs_ptr = boost::make_shared<MatrixDouble>();
+    auto stress_coeffs_ptr = boost::make_shared<MatrixDouble>();
+
+    auto op_this = new OpLoopThis<DomainEle>(mField, simple->getDomainFEName(),
+                                             Sev::noisy);
+    pip.push_back(op_this);
+    pip.push_back(new OpDGProjectionEvaluation(
+        commonDataPtr->mFullStrainPtr, strain_coeffs_ptr, entity_data_l2,
+        AINSWORTH_LEGENDRE_BASE, L2));
+    pip.push_back(new OpDGProjectionEvaluation(
+        commonDataPtr->mFullStressPtr, stress_coeffs_ptr, entity_data_l2,
+        AINSWORTH_LEGENDRE_BASE, L2));
+
+    auto fe_physics_ptr = op_this->getThisFEPtr();
+    fe_physics_ptr->getRuleHook = [](int, int, int p) { return 2 * p + 1; };
+    fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionMassMatrix(
+        oRder, mass_ptr, entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
     if (isFiniteKinematics) {
-      pip.push_back(new OpSaveStress<true, H>(positionField, commonDataPtr));
+      fe_physics_ptr->getOpPtrVector().push_back(
+          new OpSaveStress<true, H>(positionField, commonDataPtr));
     } else {
-      pip.push_back(new OpSaveStress<false, H>(positionField, commonDataPtr));
+      fe_physics_ptr->getOpPtrVector().push_back(
+          new OpSaveStress<false, H>(positionField, commonDataPtr));
     }
+    fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionCoefficients(
+        commonDataPtr->mFullStrainPtr, strain_coeffs_ptr, mass_ptr,
+        entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+    fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionCoefficients(
+        commonDataPtr->mFullStressPtr, stress_coeffs_ptr, mass_ptr,
+        entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
 
     using OpPPMapVec = OpPostProcMapInMoab<DIM, DIM>;
     using OpPPMapTen = OpPostProcMapInMoab<DIM, DIM>;

@@ -114,7 +114,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MFrontMoFEMInterface(MoFEM::Interface &m_field, string postion_field = "U",
                        string mesh_posi_field_name = "MESH_NODE_POSITIONS",
                        bool is_displacement_field = true,
-                       PetscBool is_quasi_static = PETSC_TRUE);
+                       PetscBool is_quasi_static = PETSC_TRUE,
+                       PetscInt order = -1);
 
   MoFEMErrorCode getCommandLineParameters() override;
   MoFEMErrorCode addElementFields() override;

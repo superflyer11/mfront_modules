@@ -243,19 +243,19 @@ int main(int argc, char *argv[]) {
     switch (hypothesis) {
     case TRI_DIM:
       m_modules.push_back(new MFrontMoFEMInterface<TRIDIMENSIONAL>(
-          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static, order));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis TRIDIMENSIONAL";
       break;
     case PLANE_STRAIN:
       m_modules.push_back(new MFrontMoFEMInterface<PLANESTRAIN>(
-          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static, order));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis PLANESTRAIN";
       break;
     case AXISYMM:
       m_modules.push_back(new MFrontMoFEMInterface<AXISYMMETRICAL>(
-          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static));
+          m_field, "U", "MESH_NODE_POSITIONS", true, is_quasi_static, order));
       MOFEM_LOG("WORLD", Sev::inform)
           << "Setting MFront hypothesis AXISYMMETRICAL";
       break;
