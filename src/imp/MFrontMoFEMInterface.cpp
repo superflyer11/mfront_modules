@@ -589,7 +589,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
         entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
 
     using OpPPMapVec = OpPostProcMapInMoab<DIM, DIM>;
-    using OpPPMapTen = OpPostProcMapInMoab<DIM, DIM>;
+    using OpPPMapTen = OpPostProcMapInMoab<3, 3>;
 
     pip.push_back(new OpPPMapVec(
 
