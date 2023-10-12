@@ -47,6 +47,7 @@ MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
   testJacobian = PETSC_FALSE;
   randomFieldScale = 1.0;
   optionsPrefix = "mi_";
+  monitorPtr = nullptr;
 }
 
 template <ModelHypothesis H>
@@ -316,12 +317,14 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
                                             commonDataPtr->mDispPtr));
   if (isFiniteKinematics)
     updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpUpdateVariablesFiniteStrains<H>(positionField, commonDataPtr));
+        new OpUpdateVariablesFiniteStrains<H>(positionField, commonDataPtr,
+                                              monitorPtr));
   else
     updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpUpdateVariablesSmallStrains<H>(positionField, commonDataPtr));
+        new OpUpdateVariablesSmallStrains<H>(positionField, commonDataPtr,
+                                             monitorPtr));
   if (saveGauss && (H == TRIDIMENSIONAL)) {
-    //FIXME: decide if needed for 2D
+    // FIXME: decide if needed for 2D
     updateIntVariablesElePtr->getOpPtrVector().push_back(
         new OpSaveGaussPts<H>(positionField, moab_gauss, commonDataPtr));
   }
@@ -335,14 +338,14 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
 
   auto add_domain_ops_lhs = [&](auto &pipeline) {
     if (isFiniteKinematics) {
-      pipeline.push_back(
-          new OpTangentFiniteStrains<DIM, H>(positionField, commonDataPtr));
+      pipeline.push_back(new OpTangentFiniteStrains<DIM, H>(
+          positionField, commonDataPtr, monitorPtr));
       pipeline.push_back(new OpAssembleLhsFiniteStrains(
           positionField, positionField, commonDataPtr->materialTangentPtr,
           jacobian));
     } else {
-      pipeline.push_back(
-          new OpTangentSmallStrains<DIM, H>(positionField, commonDataPtr));
+      pipeline.push_back(new OpTangentSmallStrains<DIM, H>(
+          positionField, commonDataPtr, monitorPtr));
       pipeline.push_back(new OpAssembleLhsSmallStrains(
           positionField, positionField, commonDataPtr->materialTangentPtr,
           nullptr, jacobian));
@@ -353,11 +356,11 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
 
   auto add_domain_ops_rhs = [&](auto &pipeline) {
     if (isFiniteKinematics)
-      pipeline.push_back(
-          new OpStressFiniteStrains<H>(positionField, commonDataPtr));
+      pipeline.push_back(new OpStressFiniteStrains<H>(
+          positionField, commonDataPtr, monitorPtr));
     else
-      pipeline.push_back(
-          new OpStressSmallStrains<H>(positionField, commonDataPtr));
+      pipeline.push_back(new OpStressSmallStrains<H>(
+          positionField, commonDataPtr, monitorPtr));
 
     pipeline.push_back(new OpInternalForce(
         positionField, commonDataPtr->mStressPtr, jacobian));

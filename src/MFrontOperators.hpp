@@ -11,6 +11,7 @@
 #include <MGIS/Behaviour/Behaviour.hxx>
 #include <MGIS/Behaviour/BehaviourData.hxx>
 #include "MGIS/Behaviour/Integrate.hxx"
+
 using namespace mgis;
 using namespace mgis::behaviour;
 
@@ -661,8 +662,6 @@ struct CommonData {
 };
 extern boost::shared_ptr<CommonData> commonDataPtr;
 
-// MoFEMErrorCode saveOutputMesh(int step, bool print_gauss);
-
 template <bool IS_LARGE_STRAIN, int DIM, ModelHypothesis H>
 inline MoFEMErrorCode
 mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
@@ -741,40 +740,6 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
   MoFEMFunctionReturn(0);
 }
 
-// struct Monitor : public FEMethod {
-
-//   Monitor(SmartPetscObj<DM> &dm,
-//           boost::shared_ptr<PostProcVolumeOnRefinedMesh> post_proc_fe,
-//           boost::shared_ptr<DomainEle> update_history,
-//           moab::Interface &moab_mesh, bool print_gauss)
-//       : dM(dm), postProcFe(post_proc_fe), updateHist(update_history),
-//         internalVarMesh(moab_mesh), printGauss(print_gauss){};
-
-//   MoFEMErrorCode preProcess() {
-
-//     CHKERR TSGetTimeStep(ts, &t_dt);
-//     return 0;
-//   }
-//   MoFEMErrorCode operator()() { return 0; }
-
-//   MoFEMErrorCode postProcess() {
-//     MoFEMFunctionBegin;
-
-//     // CHKERR saveOutputMesh(ts_step);
-
-//     CHKERR TSSetTimeStep(ts, t_dt_prop);
-
-//     MoFEMFunctionReturn(0);
-//   }
-
-// private:
-//   SmartPetscObj<DM> dM;
-//   boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
-//   boost::shared_ptr<DomainEle> updateHist;
-//   moab::Interface &internalVarMesh;
-//   bool printGauss;
-// };
-
 template <typename T> T get_tangent_tensor(MatrixDouble &mat);
 
 template <bool UPDATE, bool IS_LARGE_STRAIN, ModelHypothesis H>
@@ -782,10 +747,11 @@ struct OpStressTmp : public MFrontEleType<H>::DomainEleOp {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   OpStressTmp(const std::string field_name,
-              boost::shared_ptr<CommonData> common_data_ptr)
+              boost::shared_ptr<CommonData> common_data_ptr,
+              boost::shared_ptr<FEMethod> monitor_ptr)
       : MFrontEleType<H>::DomainEleOp(field_name,
                                       MFrontEleType<H>::DomainEleOp::OPROW),
-        commonDataPtr(common_data_ptr) {
+        commonDataPtr(common_data_ptr), monitorPtr(monitor_ptr) {
     std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
               &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
   }
@@ -793,6 +759,7 @@ struct OpStressTmp : public MFrontEleType<H>::DomainEleOp {
 
 private:
   boost::shared_ptr<CommonData> commonDataPtr;
+  boost::shared_ptr<FEMethod> monitorPtr;
 };
 
 template <bool IS_LARGE_STRAIN, ModelHypothesis H>
@@ -818,10 +785,11 @@ struct OpTangent : public MFrontEleType<H>::DomainEleOp {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   OpTangent(const std::string field_name,
-            boost::shared_ptr<CommonData> common_data_ptr)
+            boost::shared_ptr<CommonData> common_data_ptr,
+            boost::shared_ptr<FEMethod> monitor_ptr)
       : MFrontEleType<H>::DomainEleOp(field_name,
                                       MFrontEleType<H>::DomainEleOp::OPROW),
-        commonDataPtr(common_data_ptr) {
+        commonDataPtr(common_data_ptr), monitorPtr(monitor_ptr) {
     std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
               &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
   }
@@ -829,6 +797,7 @@ struct OpTangent : public MFrontEleType<H>::DomainEleOp {
 
 private:
   boost::shared_ptr<CommonData> commonDataPtr;
+  boost::shared_ptr<FEMethod> monitorPtr;
 };
 
 struct OpAxisymmetricRhs
@@ -854,38 +823,6 @@ private:
 
   MoFEMErrorCode iNtegrate(EntData &row_data, EntData &col_data);
 };
-
-// struct OpPostProcElastic : public MFrontMoFEMInterface::DomainEleOp {
-//   OpPostProcElastic(const std::string field_name,
-//                     moab::Interface &post_proc_mesh,
-//                     std::vector<EntityHandle> &map_gauss_pts,
-//                     boost::shared_ptr<CommonData> common_data_ptr);
-//   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-
-// private:
-//   moab::Interface &postProcMesh;
-//   std::vector<EntityHandle> &mapGaussPts;
-//   boost::shared_ptr<CommonData> commonDataPtr;
-// };
-
-// struct OpPostProcInternalVariables : public MFrontMoFEMInterface::DomainEleOp
-// {
-//   OpPostProcInternalVariables(const std::string field_name,
-//                               moab::Interface &post_proc_mesh,
-//                               std::vector<EntityHandle> &map_gauss_pts,
-//                               boost::shared_ptr<CommonData> common_data_ptr,
-//                               int global_rule);
-//   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-//   // MoFEMErrorCode doWork(int row_side, int col_side, EntityType row_type,
-//   //                       EntityType col_type, EntData &row_data,
-//   //                       EntData &col_data);
-
-// private:
-//   moab::Interface &postProcMesh;
-//   std::vector<EntityHandle> &mapGaussPts;
-//   boost::shared_ptr<CommonData> commonDataPtr;
-//   int globalRule;
-// };
 
 template <ModelHypothesis H>
 struct OpSaveGaussPts : public MFrontEleType<H>::DomainEleOp {

@@ -15,9 +15,6 @@
 #ifndef __MFRONTGENERICINTERFACE_HPP__
 #define __MFRONTGENERICINTERFACE_HPP__
 
-extern double mfront_dt;
-extern double mfront_dt_prop;
-
 using EntData = EntitiesFieldData::EntData;
 
 enum ModelHypothesis { TRIDIMENSIONAL, PLANESTRAIN, AXISYMMETRICAL };
@@ -122,7 +119,7 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode createElements() override;
   MoFEMErrorCode setOperators() override;
 
-  MoFEMErrorCode testOperators(); // override;
+  MoFEMErrorCode testOperators() override;
 
   MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
 

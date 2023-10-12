@@ -344,11 +344,7 @@ int main(int argc, char *argv[]) {
     }
 
     monitor_ptr = boost::make_shared<FEMethod>();
-    monitor_ptr->preProcessHook = [&]() {
-      MoFEMFunctionBegin;
-      mfront_dt = monitor_ptr->ts_dt;
-      MoFEMFunctionReturn(0);
-    };
+    monitor_ptr->preProcessHook = []() { return 0; };
     monitor_ptr->operatorHook = []() { return 0; };
     monitor_ptr->postProcessHook = [&]() {
       MoFEMFunctionBegin;
@@ -482,6 +478,7 @@ int main(int argc, char *argv[]) {
     if (is_quasi_static)
       t_type = GenericElementInterface::IM;
     for (auto &&mod : m_modules) {
+      CHKERR mod.setMonitorPtr(monitor_ptr);
       CHKERR mod.setOperators();
       CHKERR mod.setupSolverFunctionTS(t_type);
       CHKERR mod.setupSolverJacobianTS(t_type);

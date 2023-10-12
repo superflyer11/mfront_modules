@@ -15,9 +15,6 @@ using namespace FTensor;
 #include <MFrontOperators.hpp>
 #include <MFrontMoFEMInterface.hpp>
 
-double mfront_dt = 1;
-double mfront_dt_prop = 1;
-
 namespace MFrontInterface {
 
 #define VOIGT_VEC_SYMM_3D(VEC)                                                 \
@@ -198,9 +195,15 @@ MoFEMErrorCode OpStressTmp<UPDATE, IS_LARGE_STRAIN, H>::doWork(int side,
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
 
+  if (monitorPtr == nullptr)
+    SETERRQ(PETSC_COMM_WORLD, MOFEM_NOT_FOUND,
+            "Time Monitor (FEMethod) has not been set for MFrontInterface. "
+            "Make sure to call setMonitorPtr(monitor_ptr) before calling "
+            "setOperators().");
+
   dAta.setTag(RHS);
-  dAta.behDataPtr->dt = mfront_dt;
-  dAta.bView.dt = mfront_dt;
+  dAta.behDataPtr->dt = monitorPtr->ts_dt;
+  dAta.bView.dt = monitorPtr->ts_dt;
 
   CHKERR commonDataPtr->getInternalVar(fe_ent, nb_gauss_pts, dAta.sizeIntVar,
                                        dAta.sizeGradVar, dAta.sizeStressVar,
@@ -300,9 +303,15 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
   auto &mgis_bv = *dAta.mGisBehaviour;
 
+  if (monitorPtr == nullptr)
+    SETERRQ(PETSC_COMM_WORLD, MOFEM_NOT_FOUND,
+            "Time Monitor (FEMethod) has not been set for MFrontInterface. "
+            "Make sure to call setMonitorPtr(monitor_ptr) before calling "
+            "setOperators().");
+
   dAta.setTag(LHS);
-  dAta.behDataPtr->dt = mfront_dt;
-  dAta.bView.dt = mfront_dt;
+  dAta.behDataPtr->dt = monitorPtr->ts_dt;
+  dAta.bView.dt = monitorPtr->ts_dt;
 
   constexpr bool IS_LARGE_STRAIN = std::is_same<T, Tensor4Pack<3>>::value ||
                                    std::is_same<T, Tensor4Pack<2>>::value;
@@ -518,71 +527,6 @@ MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,
   MoFEMFunctionReturn(0);
 }
 
-// OpPostProcElastic::OpPostProcElastic(
-//     const std::string field_name, moab::Interface &post_proc_mesh,
-//     std::vector<EntityHandle> &map_gauss_pts,
-//     boost::shared_ptr<CommonData> common_data_ptr)
-//     : DomainEleOp(field_name, DomainEleOp::OPROW),
-//     postProcMesh(post_proc_mesh),
-//       mapGaussPts(map_gauss_pts), commonDataPtr(common_data_ptr) {
-//   // Operator is only executed for vertices
-//   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
-// }
-
-//! [Postprocessing]
-// MoFEMErrorCode OpPostProcElastic::doWork(int side, EntityType type,
-//                                          EntData &data) {
-//   MoFEMFunctionBegin;
-//   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
-//   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
-//   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
-//   auto &mgis_bv = *dAta.mGisBehaviour;
-
-//   int &size_of_vars = dAta.sizeIntVar;
-//   int &size_of_grad = dAta.sizeGradVar;
-//   auto get_tag = [&](std::string name, size_t size) {
-//     std::array<double, 9> def;
-//     std::fill(def.begin(), def.end(), 0);
-//     Tag th;
-//     CHKERR postProcMesh.tag_get_handle(name.c_str(), size, MB_TYPE_DOUBLE,
-//     th,
-//                                        MB_TAG_CREAT | MB_TAG_SPARSE,
-//                                        def.data());
-//     return th;
-//   };
-
-//   MatrixDouble3by3 mat(3, 3);
-
-//   auto set_matrix = [&](auto &t) -> MatrixDouble3by3 & {
-//     mat.clear();
-//     for (size_t r = 0; r != 3; ++r)
-//       for (size_t c = 0; c != 3; ++c)
-//         mat(r, c) = t(r, c);
-//     return mat;
-//   };
-
-//   auto set_tag = [&](auto th, auto gg, auto &mat) {
-//     return postProcMesh.tag_set_data(th, &mapGaussPts[gg], 1,
-//                                      &*mat.data().begin());
-//   };
-
-//   auto th_grad = get_tag(mgis_bv.gradients[0].name, 9);
-
-//   size_t nb_gauss_pts1 = data.getN().size1();
-//   size_t nb_gauss_pts = commonDataPtr->mGradPtr->size2();
-//   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-//   Tensor2<double, 3, 3> t_stress;
-
-//   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
-
-//     CHKERR set_tag(th_grad, gg, set_matrix(t_grad));
-
-//     ++t_grad;
-//   }
-
-//   MoFEMFunctionReturn(0);
-// }
-
 template <ModelHypothesis H>
 MoFEMErrorCode OpSaveGaussPts<H>::doWork(int side, EntityType type,
                                          EntData &data) {
@@ -693,244 +637,5 @@ MoFEMErrorCode OpSaveGaussPts<H>::doWork(int side, EntityType type,
 
   MoFEMFunctionReturn(0);
 }
-
-// // MoFEMErrorCode saveOutputMesh(int step, bool print_gauss) {
-// //   MoFEMFunctionBegin;
-// //   MoFEMFunctionReturn(0);
-// // }
-
-// OpPostProcInternalVariables::OpPostProcInternalVariables(
-//     const std::string field_name, moab::Interface &post_proc_mesh,
-//     std::vector<EntityHandle> &map_gauss_pts,
-//     boost::shared_ptr<CommonData> common_data_ptr, int global_rule)
-//     : DomainEleOp(field_name, DomainEleOp::OPROW),
-//     postProcMesh(post_proc_mesh),
-//       mapGaussPts(map_gauss_pts), commonDataPtr(common_data_ptr),
-//       globalRule(global_rule) {
-//   // Operator is only executed for vertices
-//   std::fill(&doEntities[MBEDGE], &doEntities[MBMAXTYPE], false);
-// }
-
-// MoFEMErrorCode OpPostProcInternalVariables::doWork(int side, EntityType type,
-//                                                    EntData &row_data) {
-//   MoFEMFunctionBegin;
-//   auto fe_ent = getNumeredEntFiniteElementPtr()->getEnt();
-//   auto id = commonDataPtr->blocksIDmap.at(fe_ent);
-//   auto &dAta = commonDataPtr->setOfBlocksData.at(id);
-//   auto &mgis_bv = *dAta.mGisBehaviour;
-
-//   dAta.setTag(RHS);
-//   dAta.behDataPtr->dt = mfront_dt;
-//   dAta.bView.dt = mfront_dt;
-
-//   int &size_of_vars = dAta.sizeIntVar;
-//   int &size_of_grad = dAta.sizeGradVar;
-//   bool is_large_strain = dAta.isFiniteStrain;
-
-//   int nb_rows = row_data.getIndices().size() / 3;
-//   int nb_cols = row_data.getIndices().size() / 3;
-
-//   auto get_tag = [&](std::string name, size_t size) {
-//     std::array<double, 9> def;
-//     std::fill(def.begin(), def.end(), 0);
-//     Tag th;
-//     CHKERR postProcMesh.tag_get_handle(name.c_str(), size, MB_TYPE_DOUBLE,
-//     th,
-//                                        MB_TAG_CREAT | MB_TAG_SPARSE,
-//                                        def.data());
-//     return th;
-//   };
-//   vector<Tag> tags_vec;
-//   for (auto c : mgis_bv.isvs) {
-//     auto vsize = getVariableSize(c, mgis_bv.hypothesis);
-//     const size_t parav_siz = get_paraview_size(vsize);
-//     tags_vec.emplace_back(get_tag(c.name, parav_siz));
-//   }
-
-//   MatrixDouble3by3 mat(3, 3);
-
-//   auto set_matrix = [&](auto &t) -> MatrixDouble3by3 & {
-//     mat.clear();
-//     for (size_t r = 0; r != 3; ++r)
-//       for (size_t c = 0; c != 3; ++c)
-//         mat(r, c) = t(r, c);
-//     return mat;
-//   };
-
-//   auto inverse = [](double *A, int N) {
-//     int *ipv = new int[N];
-//     int lwork = N * N;
-//     double *work = new double[lwork];
-//     int info;
-//     info = lapack_dgetrf(N, N, A, N, ipv);
-//     info = lapack_dgetri(N, A, N, ipv, work, lwork);
-
-//     delete[] ipv;
-//     delete[] work;
-//   };
-
-//   int rule = globalRule;
-//   auto &gaussPts = commonDataPtr->gaussPts;
-//   auto &myN = commonDataPtr->myN;
-//   size_t nb_gauss_pts = QUAD_3D_TABLE[rule]->npoints;
-
-//   //FIXME: implement this for hex as well
-//   if (gaussPts.size2() != nb_gauss_pts || myN.size1() != nb_gauss_pts) {
-
-//     gaussPts.resize(4, nb_gauss_pts, false);
-//     gaussPts.clear();
-//     cblas_dcopy(nb_gauss_pts, &QUAD_3D_TABLE[rule]->points[1], 4,
-//                 &gaussPts(0, 0), 1);
-//     cblas_dcopy(nb_gauss_pts, &QUAD_3D_TABLE[rule]->points[2], 4,
-//                 &gaussPts(1, 0), 1);
-//     cblas_dcopy(nb_gauss_pts, &QUAD_3D_TABLE[rule]->points[3], 4,
-//                 &gaussPts(2, 0), 1);
-//     cblas_dcopy(nb_gauss_pts, QUAD_3D_TABLE[rule]->weights, 1, &gaussPts(3,
-//     0),
-//                 1);
-//     myN.resize(nb_gauss_pts, 4, false);
-//     myN.clear();
-//     double *shape_ptr = &*myN.data().begin();
-//     cblas_dcopy(4 * nb_gauss_pts, QUAD_3D_TABLE[rule]->points, 1, shape_ptr,
-//     1);
-
-//   }
-
-//   auto set_tag = [&](auto th, auto gg, auto &mat) {
-//     return postProcMesh.tag_set_data(th, &mapGaussPts[gg], 1,
-//                                      &*mat.data().begin());
-//   };
-
-//   MatrixDouble &mat_int = *commonDataPtr->internalVariablePtr;
-//   auto th_stress = get_tag(mgis_bv.thermodynamic_forces[0].name, 9);
-//   commonDataPtr->mStressPtr->resize(9, nb_gauss_pts, false);
-//   auto t_stress = getFTensor2FromMat<3, 3>(*(commonDataPtr->mStressPtr));
-//   auto &stress_mat = *commonDataPtr->mStressPtr;
-//   auto t_grad = getFTensor2FromMat<3, 3>(*(commonDataPtr->mGradPtr));
-
-//   auto nbg = mat_int.size1();
-//   CHKERR commonDataPtr->getInternalVar(fe_ent, nbg, dAta.sizeIntVar,
-//                                        dAta.sizeGradVar);
-
-//   MatrixDouble mat_int_fs(size_of_vars, nb_rows, false);
-//   MatrixDouble mat_stress_fs(9, nb_rows, false);
-//   mat_int_fs.clear();
-//   mat_stress_fs.clear();
-//   auto &L = commonDataPtr->lsMat;
-
-//   // calculate inverse of N^T N   only once
-//   if (L.size1() != nb_rows || L.size2() != nb_cols) {
-//     MatrixDouble LU(nb_rows, nb_cols, false);
-//     LU.clear();
-//     L = LU;
-
-//     for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
-//       double alpha = getMeasure() * gaussPts(3, gg);
-//       auto shape_function =
-//           getVectorAdaptor(&myN.data()[gg * nb_rows], nb_rows);
-
-//       LU += alpha * outer_prod(shape_function, shape_function);
-//     }
-
-//     cholesky_decompose(LU, L);
-//   }
-
-//   for (size_t gg = 0; gg != nb_gauss_pts; ++gg) {
-//     double alpha = getMeasure() * gaussPts(3, gg);
-//     auto shape_function = getVectorAdaptor(&myN.data()[gg * nb_rows],
-//     nb_rows); if (size_of_vars != 0) {
-
-//       auto internal_var =
-//           getVectorAdaptor(&mat_int.data()[gg * size_of_vars], size_of_vars);
-//       int cc = 0;
-//       for (auto int_var : internal_var) {
-
-//         auto ls_vec_c = row(mat_int_fs, cc);
-//         ls_vec_c += alpha * int_var * shape_function;
-//         cc++;
-//       }
-//     }
-
-//     if (is_large_strain) {
-//       CHKERR mgis_integration<true, 3>(gg, t_grad, *commonDataPtr, dAta);
-//       Tensor2<double, 3, 3> forces(
-//           VOIGT_VEC_3D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
-//       t_stress(i, j) = forces(i, j);
-
-//     } else {
-//       CHKERR mgis_integration<false, 3>(gg, t_grad, *commonDataPtr, dAta);
-//       Tensor2_symmetric<double, 3> nstress(
-//           VOIGT_VEC_SYMM_3D(getThermodynamicForce(dAta.behDataPtr->s1, 0)));
-//       auto forces = to_non_symm_3d(nstress);
-//       t_stress(i, j) = forces(i, j);
-//     }
-
-//     for (int ii = 0; ii != 3; ++ii)
-//       for (int jj = 0; jj != 3; ++jj) {
-//         auto ls_vec_c = row(mat_stress_fs, 3 * ii + jj);
-//         ls_vec_c += alpha * t_stress(ii, jj) * shape_function;
-//       }
-
-//     ++t_stress;
-//   }
-
-//   MatrixDouble stress_at_gauss(mapGaussPts.size(), 9, false);
-//   MatrixDouble internal_var_at_gauss(mapGaussPts.size(), size_of_vars,
-//   false); internal_var_at_gauss.clear(); stress_at_gauss.clear(); for (size_t
-//   gg = 0; gg != mapGaussPts.size(); ++gg) {
-
-//     if (size_of_vars != 0) {
-//       for (int cc = 0; cc != size_of_vars; ++cc) {
-//         auto ls_vec_c = row(mat_int_fs, cc);
-//         VectorDouble field_c_vec = ls_vec_c;
-//         cholesky_solve(L, field_c_vec, ublas::lower());
-//         internal_var_at_gauss(gg, cc) +=
-//             inner_prod(trans(row_data.getN(gg)), field_c_vec);
-//       }
-//     }
-
-//     for (int ii = 0; ii != 3; ++ii)
-//       for (int jj = 0; jj != 3; ++jj) {
-//         auto ls_vec_c = row(mat_stress_fs, 3 * ii + jj);
-//         // VectorDouble field_c_vec = prod(ls_mat, ls_vec_c);
-//         VectorDouble field_c_vec = ls_vec_c;
-//         cholesky_solve(L, field_c_vec, ublas::lower());
-//         stress_at_gauss(gg, 3 * ii + jj) +=
-//             inner_prod(trans(row_data.getN(gg)), ls_vec_c);
-//         ;
-//       }
-//   }
-//   for (size_t gg = 0; gg != mapGaussPts.size(); ++gg) {
-
-//     auto it = tags_vec.begin();
-//     for (auto c : mgis_bv.isvs) {
-//       auto vsize = getVariableSize(c, mgis_bv.hypothesis);
-//       const size_t parav_siz = get_paraview_size(vsize);
-//       const auto offset =
-//           getVariableOffset(mgis_bv.isvs, c.name, mgis_bv.hypothesis);
-//       auto vec = getVectorAdaptor(
-//           &internal_var_at_gauss.data()[gg * size_of_vars], size_of_vars);
-//       VectorDouble tag_vec = getVectorAdaptor(&vec[offset], vsize);
-//       tag_vec.resize(parav_siz);
-//       CHKERR postProcMesh.tag_set_data(*it, &mapGaussPts[gg], 1,
-//                                        &*tag_vec.begin());
-//       it++;
-//     }
-
-//     // keep the convention consistent for postprocessing
-//     array<double, 9> my_stress_vec{
-//         stress_at_gauss(gg, 0), stress_at_gauss(gg, 1), stress_at_gauss(gg,
-//         2), stress_at_gauss(gg, 3), stress_at_gauss(gg, 4),
-//         stress_at_gauss(gg, 5), stress_at_gauss(gg, 6), stress_at_gauss(gg,
-//         7), stress_at_gauss(gg, 8)};
-
-//     CHKERR postProcMesh.tag_set_data(th_stress, &mapGaussPts[gg], 1,
-//                                      my_stress_vec.data());
-//   }
-
-//   MoFEMFunctionReturn(0);
-// }
-
-//! [Body force]
 
 } // namespace MFrontInterface
