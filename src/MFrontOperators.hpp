@@ -679,12 +679,12 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
 
   auto &mgis_bv = *block_data.mGisBehaviour;
 
-  if (IS_LARGE_STRAIN) {
-    if (DIM == 3)
+  if constexpr (IS_LARGE_STRAIN) {
+    if constexpr (DIM == 3)
       setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                   &*get_voigt_vec(t_grad).data());
-    if (DIM == 2) {
-      if (H == AXISYMMETRICAL) {
+    if constexpr (DIM == 2) {
+      if constexpr (H == AXISYMMETRICAL) {
         setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                     &*get_voigt_vec_axisymm(t_grad, t_disp, t_coords).data());
       } else
@@ -692,11 +692,11 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
                     &*get_voigt_vec_plane_strain(t_grad).data());
     }
   } else {
-    if (DIM == 3)
+    if constexpr (DIM == 3)
       setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
                   &*get_voigt_vec_symm(t_grad).data());
-    if (DIM == 2) {
-      if (H == AXISYMMETRICAL)
+    if constexpr (DIM == 2) {
+      if constexpr (H == AXISYMMETRICAL)
         setGradient(
             block_data.behDataPtr->s1, 0, size_of_grad,
             &*get_voigt_vec_symm_axisymm(t_grad, t_disp, t_coords).data());
