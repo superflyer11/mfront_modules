@@ -124,7 +124,7 @@ if(TFEL_DIR)
   ##############################
 
   add_test(compile_behaviours_test
-    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SignoriniHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront)
+    ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SignoriniHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SaintVenantKirchhoffElasticity.mfront)
 
   ####################
   ##### 3D TESTS #####
