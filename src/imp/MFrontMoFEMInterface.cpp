@@ -6,7 +6,6 @@
  *
  */
 
-
 #include <MoFEM.hpp>
 
 using namespace MoFEM;
@@ -22,33 +21,41 @@ using namespace FTensor;
 using namespace mgis;
 using namespace mgis::behaviour;
 
+#include <MFrontMoFEMInterface.hpp>
+
 #include <MFrontOperators.hpp>
 using namespace MFrontInterface;
 
-#include <MFrontMoFEMInterface.hpp>
+template struct MFrontMoFEMInterface<TRIDIMENSIONAL>;
+template struct MFrontMoFEMInterface<AXISYMMETRICAL>;
+template struct MFrontMoFEMInterface<PLANESTRAIN>;
 
-MFrontMoFEMInterface::MFrontMoFEMInterface(MoFEM::Interface &m_field,
-                                           string postion_field,
-                                           string mesh_posi_field_name,
-                                           bool is_displacement_field,
-                                           PetscBool is_quasi_static)
+template <ModelHypothesis H>
+MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
+                                              string postion_field,
+                                              string mesh_posi_field_name,
+                                              bool is_displacement_field,
+                                              PetscBool is_quasi_static,
+                                              PetscInt order)
     : mField(m_field), positionField(postion_field),
       meshNodeField(mesh_posi_field_name),
       isDisplacementField(is_displacement_field),
-      isQuasiStatic(is_quasi_static) {
-  oRder = -1;
+      isQuasiStatic(is_quasi_static), oRder(order) {
   isFiniteKinematics = true;
   saveGauss = PETSC_FALSE;
   saveVolume = PETSC_TRUE;
   testJacobian = PETSC_FALSE;
   randomFieldScale = 1.0;
   optionsPrefix = "mi_";
+  monitorPtr = nullptr;
 }
 
-MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
   MoFEMFunctionBegin;
   isQuasiStatic = PETSC_FALSE;
-  oRder = 2;
+  if (oRder == -1)
+    oRder = 2;
   CHKERR PetscOptionsBegin(PETSC_COMM_WORLD, optionsPrefix.c_str(), "", "none");
   // FIXME: make it possible to set a separate orders for contact, nonlinear
   // elasticity, mfront... etc
@@ -70,15 +77,18 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     moabGaussIntPtr = boost::shared_ptr<moab::Interface>(new moab::Core());
 
   commonDataPtr = boost::make_shared<CommonData>(mField);
-  commonDataPtr->setBlocks();
+  commonDataPtr->setBlocks(DIM);
   commonDataPtr->createTags();
 
   commonDataPtr->mGradPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mStressPtr = boost::make_shared<MatrixDouble>();
+  commonDataPtr->mFullStrainPtr = boost::make_shared<MatrixDouble>();
+  commonDataPtr->mFullStressPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mDispPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mPrevGradPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->mPrevStressPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->materialTangentPtr = boost::make_shared<MatrixDouble>();
+  commonDataPtr->mFullTangentPtr = boost::make_shared<MatrixDouble>();
   commonDataPtr->internalVariablePtr = boost::make_shared<MatrixDouble>();
 
   if (commonDataPtr->setOfBlocksData.empty())
@@ -136,13 +146,33 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
     bool is_finite_strain = false;
 
     CHKERR check_lib_finite_strain(lib_path, name, is_finite_strain);
+
+    mgis::behaviour::Hypothesis h;
+    switch (H) {
+    case TRIDIMENSIONAL:
+      h = mgis::behaviour::Hypothesis::TRIDIMENSIONAL;
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "MFront material model: TRIDIMENSIONAL \n");
+      break;
+    case PLANESTRAIN:
+      h = mgis::behaviour::Hypothesis::PLANESTRAIN;
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "MFront material model: PLANESTRAIN \n");
+      break;
+    case AXISYMMETRICAL:
+      h = mgis::behaviour::Hypothesis::AXISYMMETRICAL;
+      CHKERR PetscPrintf(PETSC_COMM_WORLD,
+                         "MFront material model: AXISYMMETRICAL \n");
+      break;
+    default:
+      break;
+    }
+
     if (is_finite_strain) {
-      mgis_bv_ptr = boost::make_shared<Behaviour>(
-          load(op, lib_path, name, Hypothesis::TRIDIMENSIONAL));
+      mgis_bv_ptr = boost::make_shared<Behaviour>(load(op, lib_path, name, h));
       block.second.isFiniteStrain = true;
     } else
-      mgis_bv_ptr = boost::make_shared<Behaviour>(
-          load(lib_path, name, Hypothesis::TRIDIMENSIONAL));
+      mgis_bv_ptr = boost::make_shared<Behaviour>(load(lib_path, name, h));
 
     CHKERR block.second.setBlockBehaviourData(set_from_blocks);
     for (size_t dd = 0; dd < mgis_bv_ptr->mps.size(); ++dd) {
@@ -213,25 +243,28 @@ MoFEMErrorCode MFrontMoFEMInterface::getCommandLineParameters() {
   MoFEMFunctionReturn(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::addElementFields() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::addElementFields() {
   MoFEMFunctionBeginHot;
   auto simple = mField.getInterface<Simple>();
   if (!mField.check_field(positionField)) {
     CHKERR simple->addDomainField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
-                                  3);
+                                  DIM);
     CHKERR simple->addBoundaryField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
-                                    3);
+                                    DIM);
     CHKERR simple->setFieldOrder(positionField, oRder);
   }
   if (!mField.check_field(meshNodeField)) {
-    CHKERR simple->addDataField(meshNodeField, H1, AINSWORTH_LEGENDRE_BASE, 3);
+    CHKERR simple->addDataField(meshNodeField, H1, AINSWORTH_LEGENDRE_BASE,
+                                DIM);
     CHKERR simple->setFieldOrder(meshNodeField, 2);
   }
 
   MoFEMFunctionReturnHot(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::createElements() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   MoFEMFunctionBeginHot;
 
   CHKERR mField.add_finite_element("MFRONT_EL", MF_ZERO);
@@ -247,39 +280,28 @@ MoFEMErrorCode MFrontMoFEMInterface::createElements() {
   mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
   updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
 
-  // TODO: update it according to the newest MoFEM
-  CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineRhsPtr, true, false, false,
-                     false);
-  CHKERR addHOOpsVol(meshNodeField, *mfrontPipelineLhsPtr, true, false, false,
-                     false);
-  CHKERR addHOOpsVol(meshNodeField, *updateIntVariablesElePtr, true, false,
-                     false, false);
+  CHKERR AddHOOps<DIM, DIM, DIM>::add(mfrontPipelineRhsPtr->getOpPtrVector(),
+                                      {H1}, meshNodeField);
+  CHKERR AddHOOps<DIM, DIM, DIM>::add(mfrontPipelineLhsPtr->getOpPtrVector(),
+                                      {H1}, meshNodeField);
+  CHKERR AddHOOps<DIM, DIM, DIM>::add(
+      updateIntVariablesElePtr->getOpPtrVector(), {H1}, meshNodeField);
 
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
-    CHKERR mField.add_ents_to_finite_element_by_type(data.tEts, MBTET,
-                                                     "MFRONT_EL");
-    // if (oRder > 0) {
-
-    //   CHKERR mField.set_field_order(data.tEts.subset_by_dimension(1),
-    //                                 positionField, oRder);
-    //   CHKERR
-    //   mField.set_field_order(data.tEts.subset_by_dimension(2), positionField,
-    //                          oRder);
-    //   CHKERR
-    //   mField.set_field_order(data.tEts.subset_by_dimension(3), positionField,
-    //                          oRder);
-    // }
+    CHKERR mField.add_ents_to_finite_element_by_dim(data.eNts, DIM,
+                                                    "MFRONT_EL");
   }
 
   MoFEMFunctionReturnHot(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
   MoFEMFunctionBegin;
 
   auto &moab_gauss = *moabGaussIntPtr;
 
-  auto integration_rule = [&](int, int, int approx_order) {
+  auto integration_rule = [](int, int, int approx_order) {
     return 2 * approx_order + 1;
   };
 
@@ -288,52 +310,69 @@ MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
   updateIntVariablesElePtr->getRuleHook = integration_rule;
 
   updateIntVariablesElePtr->getOpPtrVector().push_back(
-      new OpCalculateVectorFieldGradient<3, 3>(positionField,
-                                               commonDataPtr->mGradPtr));
-  if (saveGauss)
-    updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpCalculateVectorFieldValues<3>(positionField,
+      new OpCalculateVectorFieldGradient<DIM, DIM>(positionField,
+                                                   commonDataPtr->mGradPtr));
+  updateIntVariablesElePtr->getOpPtrVector().push_back(
+      new OpCalculateVectorFieldValues<DIM>(positionField,
                                             commonDataPtr->mDispPtr));
   if (isFiniteKinematics)
     updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpUpdateVariablesFiniteStrains(positionField, commonDataPtr));
+        new OpUpdateVariablesFiniteStrains<H>(positionField, commonDataPtr,
+                                              monitorPtr));
   else
     updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpUpdateVariablesSmallStrains(positionField, commonDataPtr));
-  if (saveGauss)
+        new OpUpdateVariablesSmallStrains<H>(positionField, commonDataPtr,
+                                             monitorPtr));
+  if (saveGauss && (H == TRIDIMENSIONAL)) {
+    // FIXME: decide if needed for 2D
     updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpSaveGaussPts(positionField, moab_gauss, commonDataPtr));
+        new OpSaveGaussPts<H>(positionField, moab_gauss, commonDataPtr));
+  }
+
+  auto jacobian = [&](const double r, const double, const double) {
+    if (H == AXISYMMETRICAL)
+      return 2. * M_PI * r;
+    else
+      return 1.;
+  };
 
   auto add_domain_ops_lhs = [&](auto &pipeline) {
     if (isFiniteKinematics) {
-      pipeline.push_back(
-          new OpTangentFiniteStrains(positionField, commonDataPtr));
+      pipeline.push_back(new OpTangentFiniteStrains<DIM, H>(
+          positionField, commonDataPtr, monitorPtr));
       pipeline.push_back(new OpAssembleLhsFiniteStrains(
-          positionField, positionField, commonDataPtr->materialTangentPtr));
+          positionField, positionField, commonDataPtr->materialTangentPtr,
+          jacobian));
     } else {
-
-      pipeline.push_back(
-          new OpTangentSmallStrains(positionField, commonDataPtr));
+      pipeline.push_back(new OpTangentSmallStrains<DIM, H>(
+          positionField, commonDataPtr, monitorPtr));
       pipeline.push_back(new OpAssembleLhsSmallStrains(
-          positionField, positionField, commonDataPtr->materialTangentPtr));
+          positionField, positionField, commonDataPtr->materialTangentPtr,
+          nullptr, jacobian));
     }
+    if (H == AXISYMMETRICAL)
+      pipeline.push_back(new OpAxisymmetricLhs(positionField, commonDataPtr));
   };
 
   auto add_domain_ops_rhs = [&](auto &pipeline) {
     if (isFiniteKinematics)
-      pipeline.push_back(
-          new OpStressFiniteStrains(positionField, commonDataPtr));
-
+      pipeline.push_back(new OpStressFiniteStrains<H>(
+          positionField, commonDataPtr, monitorPtr));
     else
-      pipeline.push_back(
-          new OpStressSmallStrains(positionField, commonDataPtr));
+      pipeline.push_back(new OpStressSmallStrains<H>(
+          positionField, commonDataPtr, monitorPtr));
 
-    pipeline.push_back(
-        new OpInternalForce(positionField, commonDataPtr->mStressPtr));
+    pipeline.push_back(new OpInternalForce(
+        positionField, commonDataPtr->mStressPtr, jacobian));
+
+    if (H == AXISYMMETRICAL)
+      pipeline.push_back(new OpAxisymmetricRhs(positionField, commonDataPtr));
   };
 
   auto add_domain_base_ops = [&](auto &pipeline) {
-    pipeline.push_back(new OpCalculateVectorFieldGradient<3, 3>(
+    pipeline.push_back(new OpCalculateVectorFieldValues<DIM>(
+        positionField, commonDataPtr->mDispPtr));
+    pipeline.push_back(new OpCalculateVectorFieldGradient<DIM, DIM>(
         positionField, commonDataPtr->mGradPtr));
   };
 
@@ -350,19 +389,20 @@ MoFEMErrorCode MFrontMoFEMInterface::setOperators() {
   MoFEMFunctionReturn(0);
 }
 
-MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::testOperators() {
   MoFEMFunctionBegin;
 
   auto simple = mField.getInterface<Simple>();
   auto opt = mField.getInterface<OperatorsTester>();
 
-  Range tets, verts, ho_ents;
+  Range ents, verts, ho_ents;
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
-    tets.merge(data.tEts);
+    ents.merge(data.eNts);
   }
 
-  CHKERR mField.get_moab().get_connectivity(tets, verts, true);
-  for (auto d : {1, 2, 3}) {
+  CHKERR mField.get_moab().get_connectivity(ents, verts, true);
+  for (int d = 1; d <= DIM; ++d) {
     CHKERR mField.get_moab().get_adjacencies(verts, d, false, ho_ents,
                                              moab::Interface::UNION);
   }
@@ -390,42 +430,6 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
 
   auto x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
   auto diff_x = set_random_field(randomFieldScale, randomFieldScale * 0.1);
-
-  // auto post_proc = [&](auto dm, auto f_res, auto out_name) {
-  //   MoFEMFunctionBegin;
-  //   auto post_proc_fe =
-  //       boost::make_shared<PostProcBrokenMeshInMoab<DomainEle>>(mField);
-
-  //   using OpPPMap = OpPostProcMapInMoab<3, 3>;
-
-  //   auto l_mat = boost::make_shared<MatrixDouble>();
-  //   post_proc_fe->getOpPtrVector().push_back(
-  //       new OpCalculateVectorFieldValues<3>(positionField, l_mat, f_res));
-
-  //   post_proc_fe->getOpPtrVector().push_back(
-
-  //       new OpPPMap(
-
-  //           post_proc_fe->getPostProcMesh(), post_proc_fe->getMapGaussPts(),
-
-  //           {},
-
-  //           {{positionField, l_mat}},
-
-  //           {}, {})
-
-  //   );
-
-  //   CHKERR DMoFEMLoopFiniteElements(dm, simple->getDomainFEName(),
-  //                                   post_proc_fe);
-
-  //   post_proc_fe->writeFile(out_name);
-  //   MoFEMFunctionReturn(0);
-  // };
-
-  // CHKERR post_proc(dM, x0, "x0.h5m");
-  // CHKERR post_proc(dM, x, "x.h5m");
-  // CHKERR post_proc(dM, diff_x, "x_diff.h5m");
 
   auto res = opt->assembleVec(
       dM, simple->getDomainFEName(), mfrontPipelineRhsPtr, x,
@@ -462,8 +466,8 @@ MoFEMErrorCode MFrontMoFEMInterface::testOperators() {
   MoFEMFunctionReturn(0);
 }
 
-// BitRefLevel MFrontMoFEMInterface::getBitRefLevel() { return bIt; };
-MoFEMErrorCode MFrontMoFEMInterface::addElementsToDM(SmartPetscObj<DM> dm) {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::addElementsToDM(SmartPetscObj<DM> dm) {
   MoFEMFunctionBeginHot;
   this->dM = dm;
   CHKERR DMMoFEMAddElement(dM, "MFRONT_EL");
@@ -473,21 +477,26 @@ MoFEMErrorCode MFrontMoFEMInterface::addElementsToDM(SmartPetscObj<DM> dm) {
   MoFEMFunctionReturnHot(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianSNES() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setupSolverJacobianSNES() {
   MoFEMFunctionBegin;
   CHKERR DMMoFEMSNESSetJacobian(dM, "MFRONT_EL", mfrontPipelineLhsPtr.get(),
                                 NULL, NULL);
 
   MoFEMFunctionReturn(0);
 };
-MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionSNES() {
+
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setupSolverFunctionSNES() {
   MoFEMFunctionBegin;
   CHKERR DMMoFEMSNESSetFunction(dM, "MFRONT_EL", mfrontPipelineRhsPtr.get(),
                                 PETSC_NULL, PETSC_NULL);
   MoFEMFunctionReturn(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianTS(const TSType type) {
+template <ModelHypothesis H>
+MoFEMErrorCode
+MFrontMoFEMInterface<H>::setupSolverJacobianTS(const TSType type) {
   MoFEMFunctionBegin;
   auto &method = mfrontPipelineLhsPtr;
   switch (type) {
@@ -508,7 +517,9 @@ MoFEMErrorCode MFrontMoFEMInterface::setupSolverJacobianTS(const TSType type) {
   MoFEMFunctionReturn(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionTS(const TSType type) {
+template <ModelHypothesis H>
+MoFEMErrorCode
+MFrontMoFEMInterface<H>::setupSolverFunctionTS(const TSType type) {
   MoFEMFunctionBegin;
   auto &method = mfrontPipelineRhsPtr;
   switch (type) {
@@ -529,29 +540,104 @@ MoFEMErrorCode MFrontMoFEMInterface::setupSolverFunctionTS(const TSType type) {
   MoFEMFunctionReturn(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
   MoFEMFunctionBegin;
 
   auto create_post_process_element = [&]() {
     MoFEMFunctionBegin;
-    postProcFe = boost::make_shared<PostProcVolumeOnRefinedMesh>(mField);
+
+    auto simple = mField.getInterface<Simple>();
+
+    postProcFe = boost::make_shared<PostProcDomainOnRefinedMesh>(mField);
+
     postProcFe->generateReferenceElementMesh();
 
-    postProcFe->getOpPtrVector().push_back(
-        new OpCalculateVectorFieldGradient<3, 3>(positionField,
-                                                 commonDataPtr->mGradPtr));
-    postProcFe->getOpPtrVector().push_back(
-        new OpPostProcElastic(positionField, postProcFe->postProcMesh,
-                              postProcFe->mapGaussPts, commonDataPtr));
+    auto &pip = postProcFe->getOpPtrVector();
 
-    // FIXME: projection is not working correctly           
-    // FIXME: pushing this operator leads to MFront integration failure               
+    pip.push_back(new OpCalculateVectorFieldValues<DIM>(
+        positionField, commonDataPtr->mDispPtr));
+
+    auto entity_data_l2 = boost::make_shared<EntitiesFieldData>(MBENTITYSET);
+    auto mass_ptr = boost::make_shared<MatrixDouble>();
+    auto strain_coeffs_ptr = boost::make_shared<MatrixDouble>();
+    auto stress_coeffs_ptr = boost::make_shared<MatrixDouble>();
+
+    auto op_this = new OpLoopThis<DomainEle>(mField, simple->getDomainFEName(),
+                                             Sev::noisy);
+    pip.push_back(op_this);
+    pip.push_back(new OpDGProjectionEvaluation(
+        commonDataPtr->mFullStrainPtr, strain_coeffs_ptr, entity_data_l2,
+        AINSWORTH_LEGENDRE_BASE, L2));
+    pip.push_back(new OpDGProjectionEvaluation(
+        commonDataPtr->mFullStressPtr, stress_coeffs_ptr, entity_data_l2,
+        AINSWORTH_LEGENDRE_BASE, L2));
+
+    auto fe_physics_ptr = op_this->getThisFEPtr();
+    fe_physics_ptr->getRuleHook = [](int, int, int p) { return 2 * p + 1; };
+    fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionMassMatrix(
+        oRder, mass_ptr, entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+    if (isFiniteKinematics) {
+      fe_physics_ptr->getOpPtrVector().push_back(
+          new OpSaveStress<true, H>(positionField, commonDataPtr));
+    } else {
+      fe_physics_ptr->getOpPtrVector().push_back(
+          new OpSaveStress<false, H>(positionField, commonDataPtr));
+    }
+    fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionCoefficients(
+        commonDataPtr->mFullStrainPtr, strain_coeffs_ptr, mass_ptr,
+        entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+    fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionCoefficients(
+        commonDataPtr->mFullStressPtr, stress_coeffs_ptr, mass_ptr,
+        entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+
+    using OpPPMapVec = OpPostProcMapInMoab<DIM, DIM>;
+    using OpPPMapTen = OpPostProcMapInMoab<3, 3>;
+
+    pip.push_back(new OpPPMapVec(
+
+        postProcFe->postProcMesh, postProcFe->mapGaussPts,
+
+        {},
+
+        {{"DISPLACEMENT", commonDataPtr->mDispPtr}},
+
+        {},
+
+        {}
+
+        ));
+
+    pip.push_back(new OpPPMapTen(
+
+        postProcFe->postProcMesh, postProcFe->mapGaussPts,
+
+        {},
+
+        {},
+
+        {{"STRAIN", commonDataPtr->mFullStrainPtr},
+         {"STRESS", commonDataPtr->mFullStressPtr}},
+
+        {}
+
+        ));
+
+    // postProcFe->getOpPtrVector().push_back(
+    //     new OpCalculateVectorFieldGradient<DIM, DIM>(positionField,
+    //                                                  commonDataPtr->mGradPtr));
+    // postProcFe->getOpPtrVector().push_back(
+    //     new OpPostProcElastic(positionField, postProcFe->postProcMesh,
+    //                           postProcFe->mapGaussPts, commonDataPtr));
+
+    // FIXME: projection is not working correctly
+    // FIXME: pushing this operator leads to MFront integration failure
     // int rule = 2 * oRder + 1;
     // postProcFe->getOpPtrVector().push_back(new OpPostProcInternalVariables(
     //     positionField, postProcFe->postProcMesh, postProcFe->mapGaussPts,
     //     commonDataPtr, rule));
 
-    postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
+    // postProcFe->addFieldValuesPostProc(positionField, "DISPLACEMENT");
     MoFEMFunctionReturn(0);
   };
 
@@ -585,7 +671,8 @@ MoFEMErrorCode MFrontMoFEMInterface::postProcessElement(int step) {
   MoFEMFunctionReturn(0);
 };
 
-MoFEMErrorCode MFrontMoFEMInterface::updateElementVariables() {
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::updateElementVariables() {
 
   MoFEMFunctionBegin;
   CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);

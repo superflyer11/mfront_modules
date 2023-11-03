@@ -6,6 +6,15 @@
  *
  */
 
+#include <BasicFiniteElements.hpp>
+#include <quad.h>
+#include <MGIS/Behaviour/Behaviour.hxx>
+#include <MGIS/Behaviour/BehaviourData.hxx>
+#include "MGIS/Behaviour/Integrate.hxx"
+
+using namespace mgis;
+using namespace mgis::behaviour;
+
 #include <MFrontMoFEMInterface.hpp>
 
 namespace MFrontInterface {
@@ -13,15 +22,16 @@ namespace MFrontInterface {
 constexpr double sqr2 = boost::math::constants::root_two<double>();
 constexpr double inv_sqr2 = boost::math::constants::half_root_two<double>();
 
-using Tensor4Pack = Tensor4<PackPtr<double *, 1>, 3, 3, 3, 3>;
-using DdgPack = Ddg<PackPtr<double *, 1>, 3, 3>;
+template <int DIM>
+using Tensor4Pack = Tensor4<PackPtr<double *, 1>, DIM, DIM, DIM, DIM>;
 
-using EntData = EntitiesFieldData::EntData;
-using DomainEle = VolumeElementForcesAndSourcesCore;
-using DomainEleOp = DomainEle::UserDataOperator;
+template <int DIM> using Tensor2Pack = Tensor2<PackPtr<double *, 1>, DIM, DIM>;
+
+template <int DIM> using Tensor1Pack = Tensor1<PackPtr<double *, 1>, DIM>;
+
+template <int DIM> using DdgPack = Ddg<PackPtr<double *, 1>, DIM, DIM>;
 
 enum DataTags { RHS = 0, LHS };
-
 
 struct BlockData {
   int iD;
@@ -46,7 +56,7 @@ struct BlockData {
   double storedEnergy;
   double externalVariable;
 
-  Range tEts;
+  Range eNts;
 
   BlockData()
       : oRder(-1), isFiniteStrain(false), behaviourPath("src/libBehaviour.so"),
@@ -141,6 +151,29 @@ template <typename T> inline auto get_voigt_vec_symm(T &t_grad) {
   return vec_sym;
 };
 
+template <typename T> inline auto get_voigt_vec_symm_plane_strain(T &t_grad) {
+  Tensor2_symmetric<double, 2> t_strain;
+  Index<'i', 2> i;
+  Index<'j', 2> j;
+  t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+
+  array<double, 4> vec_sym{t_strain(0, 0), t_strain(1, 1), 0,
+                           sqr2 * t_strain(0, 1)};
+  return vec_sym;
+};
+
+template <typename T1, typename T2, typename T3>
+inline auto get_voigt_vec_symm_axisymm(T1 &t_grad, T2 &t_disp, T3 &t_coords) {
+  Tensor2_symmetric<double, 2> t_strain;
+  Index<'i', 2> i;
+  Index<'j', 2> j;
+  t_strain(i, j) = (t_grad(i, j) || t_grad(j, i)) / 2;
+
+  array<double, 5> vec_sym{t_strain(0, 0), t_strain(1, 1),
+                           t_disp(0) / t_coords(0), sqr2 * t_strain(0, 1)};
+  return vec_sym;
+};
+
 template <typename T> inline auto get_voigt_vec(T &t_grad) {
   Tensor2<double, 3, 3> F;
   Index<'i', 3> i;
@@ -158,8 +191,32 @@ template <typename T> inline auto get_voigt_vec(T &t_grad) {
   return vec;
 };
 
+template <typename T> inline auto get_voigt_vec_plane_strain(T &t_grad) {
+  Tensor2<double, 2, 2> F;
+  Index<'i', 2> i;
+  Index<'j', 2> j;
+  F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
+
+  array<double, 5> vec{F(0, 0), F(1, 1), 1, F(0, 1), F(1, 0)};
+
+  return vec;
+};
+
+template <typename T1, typename T2, typename T3>
+inline auto get_voigt_vec_axisymm(T1 &t_grad, T2 &t_disp, T3 &t_coords) {
+  Tensor2<double, 2, 2> F;
+  Index<'i', 2> i;
+  Index<'j', 2> j;
+  F(i, j) = t_grad(i, j) + kronecker_delta(i, j);
+
+  array<double, 5> vec{F(0, 0), F(1, 1), 1. + t_disp(0) / t_coords(0), F(0, 1),
+                       F(1, 0)};
+
+  return vec;
+};
+
 template <typename T>
-inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
+inline auto to_non_symm_3d(const Tensor2_symmetric<T, 3> &symm) {
   Tensor2<double, 3, 3> non_symm;
   Number<0> N0;
   Number<1> N1;
@@ -173,21 +230,26 @@ inline auto to_non_symm(const Tensor2_symmetric<T, 3> &symm) {
   return non_symm;
 };
 
+template <typename T>
+inline auto to_non_symm_2d(const Tensor2_symmetric<T, 2> &symm) {
+  Tensor2<double, 2, 2> non_symm;
+  Number<0> N0;
+  Number<1> N1;
+  non_symm(N0, N0) = symm(N0, N0);
+  non_symm(N1, N1) = symm(N1, N1);
+  non_symm(N0, N1) = non_symm(N1, N0) = symm(N0, N1);
+  return non_symm;
+};
+
 template <typename T1, typename T2>
 inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
   MoFEMFunctionBeginHot;
-  Index<'i', 3> i;
-  Index<'j', 3> j;
-  Index<'k', 3> k;
-  Index<'l', 3> l;
 
   Number<0> N0;
   Number<1> N1;
   Number<2> N2;
 
-  if (std::is_same<T2, Tensor4Pack>::value) // for finite strains
-  {
-
+  if (std::is_same<T2, Tensor4Pack<3>>::value) { // 3D finite strain
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -269,9 +331,37 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
     D(N2, N1, N2, N0) = K[78];
     D(N2, N1, N1, N2) = K[79];
     D(N2, N1, N2, N1) = K[80];
+  }
 
-  } else {
+  if (std::is_same<T2, Tensor4Pack<2>>::value) { // plane strain, finite strain
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    // D(N0, N0, N2, N2) = K[2];
+    D(N0, N0, N0, N1) = K[3];
+    D(N0, N0, N1, N0) = K[4];
+    D(N1, N1, N0, N0) = K[5];
+    D(N1, N1, N1, N1) = K[6];
+    // D(N1, N1, N2, N2) = K[7];
+    D(N1, N1, N0, N1) = K[8];
+    D(N1, N1, N1, N0) = K[9];
+    // D(N2, N2, N0, N0) = K[10];
+    // D(N2, N2, N1, N1) = K[11];
+    // D(N2, N2, N2, N2) = K[12];
+    // D(N2, N2, N0, N1) = K[13];
+    // D(N2, N2, N1, N0) = K[14];
+    D(N0, N1, N0, N0) = K[15];
+    D(N0, N1, N1, N1) = K[16];
+    // D(N0, N1, N2, N2) = K[17];
+    D(N0, N1, N0, N1) = K[18];
+    D(N0, N1, N1, N0) = K[19];
+    D(N1, N0, N0, N0) = K[20];
+    D(N1, N0, N1, N1) = K[21];
+    // D(N1, N0, N2, N2) = K[22];
+    D(N1, N0, N0, N1) = K[23];
+    D(N1, N0, N1, N0) = K[24];
+  }
 
+  if (std::is_same<T2, DdgPack<3>>::value) { // 3D small strain
     D(N0, N0, N0, N0) = K[0];
     D(N0, N0, N1, N1) = K[1];
     D(N0, N0, N2, N2) = K[2];
@@ -321,7 +411,100 @@ inline MoFEMErrorCode get_tensor4_from_voigt(const T1 &K, T2 &D) {
     D(N1, N2, N1, N2) = 0.5 * K[35];
   }
 
-  // D(i, j, k, l) *= -1;
+  if (std::is_same<T2, DdgPack<2>>::value) { // plane strain, small strain
+
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    // D(N0, N0, N2, N2) = K[2];
+
+    D(N0, N0, N0, N1) = inv_sqr2 * K[3];
+
+    D(N1, N1, N0, N0) = K[4];
+    D(N1, N1, N1, N1) = K[5];
+    // D(N1, N1, N2, N2) = K[6];
+
+    D(N1, N1, N0, N1) = inv_sqr2 * K[7];
+
+    // D(N2, N2, N0, N0) = K[8];
+    // D(N2, N2, N1, N1) = K[9];
+    // D(N2, N2, N2, N2) = K[10];
+
+    // D(N2, N2, N0, N1) = inv_sqr2 * K[11];
+
+    D(N0, N1, N0, N0) = inv_sqr2 * K[12];
+    D(N0, N1, N1, N1) = inv_sqr2 * K[13];
+
+    // D(N0, N1, N2, N2) = inv_sqr2 * K[14];
+
+    D(N0, N1, N0, N1) = 0.5 * K[15];
+  }
+
+  MoFEMFunctionReturnHot(0);
+};
+
+template <bool IS_LARGE_STRAIN, typename T1, typename T2>
+inline MoFEMErrorCode get_full_tensor4_from_voigt(const T1 &K, T2 &D) {
+  MoFEMFunctionBeginHot;
+
+  Number<0> N0;
+  Number<1> N1;
+  Number<2> N2;
+
+  if constexpr (IS_LARGE_STRAIN) { // 2D finite strain, full tensor
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    D(N0, N0, N2, N2) = K[2];
+    D(N0, N0, N0, N1) = K[3];
+    D(N0, N0, N1, N0) = K[4];
+    D(N1, N1, N0, N0) = K[5];
+    D(N1, N1, N1, N1) = K[6];
+    D(N1, N1, N2, N2) = K[7];
+    D(N1, N1, N0, N1) = K[8];
+    D(N1, N1, N1, N0) = K[9];
+    D(N2, N2, N0, N0) = K[10];
+    D(N2, N2, N1, N1) = K[11];
+    D(N2, N2, N2, N2) = K[12];
+    D(N2, N2, N0, N1) = K[13];
+    D(N2, N2, N1, N0) = K[14];
+    D(N0, N1, N0, N0) = K[15];
+    D(N0, N1, N1, N1) = K[16];
+    D(N0, N1, N2, N2) = K[17];
+    D(N0, N1, N0, N1) = K[18];
+    D(N0, N1, N1, N0) = K[19];
+    D(N1, N0, N0, N0) = K[20];
+    D(N1, N0, N1, N1) = K[21];
+    D(N1, N0, N2, N2) = K[22];
+    D(N1, N0, N0, N1) = K[23];
+    D(N1, N0, N1, N0) = K[24];
+  } else { // 2D small strain, full tensor
+    
+    D(N0, N0, N0, N0) = K[0];
+    D(N0, N0, N1, N1) = K[1];
+    D(N0, N0, N2, N2) = K[2];
+
+    D(N0, N0, N0, N1) = inv_sqr2 * K[3];
+
+    D(N1, N1, N0, N0) = K[4];
+    D(N1, N1, N1, N1) = K[5];
+    D(N1, N1, N2, N2) = K[6];
+
+    D(N1, N1, N0, N1) = inv_sqr2 * K[7];
+
+    D(N2, N2, N0, N0) = K[8];
+    D(N2, N2, N1, N1) = K[9];
+    D(N2, N2, N2, N2) = K[10];
+
+    D(N2, N2, N0, N1) = inv_sqr2 * K[11];
+    D(N2, N2, N1, N0) = D(N2, N2, N0, N1);
+
+    D(N0, N1, N0, N0) = inv_sqr2 * K[12];
+    D(N0, N1, N1, N1) = inv_sqr2 * K[13];
+
+    D(N0, N1, N2, N2) = inv_sqr2 * K[14];
+    D(N1, N0, N2, N2) = D(N0, N1, N2, N2);
+
+    D(N0, N1, N0, N1) = 0.5 * K[15];
+  }
 
   MoFEMFunctionReturnHot(0);
 };
@@ -331,12 +514,15 @@ struct CommonData {
   MoFEM::Interface &mField;
   boost::shared_ptr<MatrixDouble> mGradPtr;
   boost::shared_ptr<MatrixDouble> mStressPtr;
+  boost::shared_ptr<MatrixDouble> mFullStrainPtr;
+  boost::shared_ptr<MatrixDouble> mFullStressPtr;
 
   boost::shared_ptr<MatrixDouble> mPrevGradPtr;
   boost::shared_ptr<MatrixDouble> mPrevStressPtr;
 
   boost::shared_ptr<MatrixDouble> mDispPtr;
   boost::shared_ptr<MatrixDouble> materialTangentPtr;
+  boost::shared_ptr<MatrixDouble> mFullTangentPtr;
   boost::shared_ptr<MatrixDouble> internalVariablePtr;
 
   std::map<int, BlockData> setOfBlocksData;
@@ -352,7 +538,7 @@ struct CommonData {
 
   CommonData(MoFEM::Interface &m_field) : mField(m_field) {}
 
-  MoFEMErrorCode setBlocks() {
+  MoFEMErrorCode setBlocks(int dim) {
     MoFEMFunctionBegin;
     string block_name = "MFRONT";
     for (_IT_CUBITMESHSETS_BY_SET_TYPE_FOR_LOOP_(mField, BLOCKSET, it)) {
@@ -362,9 +548,9 @@ struct CommonData {
         CHKERR it->getAttributes(block_data);
         const int id = it->getMeshsetId();
         EntityHandle meshset = it->getMeshset();
-        CHKERR mField.get_moab().get_entities_by_type(
-            meshset, MBTET, setOfBlocksData[id].tEts, true);
-        for (auto ent : setOfBlocksData[id].tEts)
+        CHKERR mField.get_moab().get_entities_by_dimension(
+            meshset, dim, setOfBlocksData[id].eNts, true);
+        for (auto ent : setOfBlocksData[id].eNts)
           blocksIDmap[ent] = id;
 
         setOfBlocksData[id].iD = id;
@@ -380,7 +566,8 @@ struct CommonData {
 
   MoFEMErrorCode getInternalVar(const EntityHandle fe_ent,
                                 const int nb_gauss_pts, const int var_size,
-                                const int grad_size) {
+                                const int grad_size, const int stress_size,
+                                bool is_large_strain = false) {
     MoFEMFunctionBegin;
 
     auto mget_tag_data = [&](Tag &m_tag, boost::shared_ptr<MatrixDouble> &m_mat,
@@ -396,7 +583,7 @@ struct CommonData {
         m_mat->resize(nb_gauss_pts, m_size, false);
         m_mat->clear();
         // initialize deformation gradient properly
-        if (is_def_grad && m_size == 9)
+        if (is_def_grad && is_large_strain)
           for (int gg = 0; gg != nb_gauss_pts; ++gg) {
             (*m_mat)(gg, 0) = 1;
             (*m_mat)(gg, 1) = 1;
@@ -406,7 +593,6 @@ struct CommonData {
         const int tag_size2 = m_mat->data().size();
         CHKERR mField.get_moab().tag_set_by_ptr(m_tag, &fe_ent, 1, tag_data2,
                                                 &tag_size2);
-
       } else {
         MatrixAdaptor tag_vec = MatrixAdaptor(
             nb_gauss_pts, m_size,
@@ -420,7 +606,7 @@ struct CommonData {
 
     CHKERR mget_tag_data(internalVariableTag, internalVariablePtr, var_size);
     CHKERR mget_tag_data(stressTag, mPrevStressPtr, grad_size);
-    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, grad_size, true);
+    CHKERR mget_tag_data(gradientTag, mPrevGradPtr, stress_size, true);
 
     MoFEMFunctionReturn(0);
   }
@@ -466,22 +652,20 @@ struct CommonData {
     MoFEMFunctionBegin;
     double zero = 0;
     for (auto &[id, data] : setOfBlocksData) {
-      CHKERR mField.get_moab().tag_clear_data(internalVariableTag, data.tEts,
+      CHKERR mField.get_moab().tag_clear_data(internalVariableTag, data.eNts,
                                               &zero);
-      CHKERR mField.get_moab().tag_clear_data(stressTag, data.tEts, &zero);
-      CHKERR mField.get_moab().tag_clear_data(gradientTag, data.tEts, &zero);
+      CHKERR mField.get_moab().tag_clear_data(stressTag, data.eNts, &zero);
+      CHKERR mField.get_moab().tag_clear_data(gradientTag, data.eNts, &zero);
     }
     MoFEMFunctionReturn(0);
   }
 };
 extern boost::shared_ptr<CommonData> commonDataPtr;
 
-// MoFEMErrorCode saveOutputMesh(int step, bool print_gauss);
-
-template <bool IS_LARGE_STRAIN>
+template <bool IS_LARGE_STRAIN, int DIM, ModelHypothesis H>
 inline MoFEMErrorCode
-mgis_integration(size_t gg,
-                 FTensor::Tensor2<FTensor::PackPtr<double *, 1>, 3, 3> &t_grad,
+mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
+                 Tensor1<PackPtr<double *, 3>, 3> &t_coords,
                  CommonData &common_data, BlockData &block_data) {
   MoFEMFunctionBegin;
   int check_integration;
@@ -492,15 +676,34 @@ mgis_integration(size_t gg,
   int &size_of_vars = block_data.sizeIntVar;
   int &size_of_grad = block_data.sizeGradVar;
   int &size_of_stress = block_data.sizeStressVar;
-  
+
   auto &mgis_bv = *block_data.mGisBehaviour;
 
-  if (IS_LARGE_STRAIN) {
-    setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
-                &*get_voigt_vec(t_grad).data());
+  if constexpr (IS_LARGE_STRAIN) {
+    if constexpr (DIM == 3)
+      setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
+                  &*get_voigt_vec(t_grad).data());
+    if constexpr (DIM == 2) {
+      if constexpr (H == AXISYMMETRICAL) {
+        setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
+                    &*get_voigt_vec_axisymm(t_grad, t_disp, t_coords).data());
+      } else
+        setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
+                    &*get_voigt_vec_plane_strain(t_grad).data());
+    }
   } else {
-    setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
-                &*get_voigt_vec_symm(t_grad).data());
+    if constexpr (DIM == 3)
+      setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
+                  &*get_voigt_vec_symm(t_grad).data());
+    if constexpr (DIM == 2) {
+      if constexpr (H == AXISYMMETRICAL)
+        setGradient(
+            block_data.behDataPtr->s1, 0, size_of_grad,
+            &*get_voigt_vec_symm_axisymm(t_grad, t_disp, t_coords).data());
+      else
+        setGradient(block_data.behDataPtr->s1, 0, size_of_grad,
+                    &*get_voigt_vec_symm_plane_strain(t_grad).data());
+    }
   }
 
   auto grad0_vec =
@@ -537,95 +740,103 @@ mgis_integration(size_t gg,
   MoFEMFunctionReturn(0);
 }
 
-// struct Monitor : public FEMethod {
-
-//   Monitor(SmartPetscObj<DM> &dm,
-//           boost::shared_ptr<PostProcVolumeOnRefinedMesh> post_proc_fe,
-//           boost::shared_ptr<DomainEle> update_history,
-//           moab::Interface &moab_mesh, bool print_gauss)
-//       : dM(dm), postProcFe(post_proc_fe), updateHist(update_history),
-//         internalVarMesh(moab_mesh), printGauss(print_gauss){};
-
-//   MoFEMErrorCode preProcess() {
-
-//     CHKERR TSGetTimeStep(ts, &t_dt);
-//     return 0;
-//   }
-//   MoFEMErrorCode operator()() { return 0; }
-
-//   MoFEMErrorCode postProcess() {
-//     MoFEMFunctionBegin;
-
-//     // CHKERR saveOutputMesh(ts_step);
-
-//     CHKERR TSSetTimeStep(ts, t_dt_prop);
-
-//     MoFEMFunctionReturn(0);
-//   }
-
-// private:
-//   SmartPetscObj<DM> dM;
-//   boost::shared_ptr<PostProcVolumeOnRefinedMesh> postProcFe;
-//   boost::shared_ptr<DomainEle> updateHist;
-//   moab::Interface &internalVarMesh;
-//   bool printGauss;
-// };
-
-template <bool UPDATE, bool IS_LARGE_STRAIN>
-struct OpStressTmp : public DomainEleOp {
-  OpStressTmp(const std::string field_name,
-              boost::shared_ptr<CommonData> common_data_ptr);
-  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-
-private:
-  boost::shared_ptr<CommonData> commonDataPtr;
-};
-
-template <typename T> struct OpTangent : public DomainEleOp {
-  OpTangent(const std::string field_name,
-            boost::shared_ptr<CommonData> common_data_ptr);
-  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-
-private:
-  boost::shared_ptr<CommonData> commonDataPtr;
-};
-
-struct OpPostProcElastic : public DomainEleOp {
-  OpPostProcElastic(const std::string field_name,
-                    moab::Interface &post_proc_mesh,
-                    std::vector<EntityHandle> &map_gauss_pts,
-                    boost::shared_ptr<CommonData> common_data_ptr);
-  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-
-private:
-  moab::Interface &postProcMesh;
-  std::vector<EntityHandle> &mapGaussPts;
-  boost::shared_ptr<CommonData> commonDataPtr;
-};
-
-struct OpPostProcInternalVariables : public DomainEleOp {
-  OpPostProcInternalVariables(const std::string field_name,
-                              moab::Interface &post_proc_mesh,
-                              std::vector<EntityHandle> &map_gauss_pts,
-                              boost::shared_ptr<CommonData> common_data_ptr,
-                              int global_rule);
-  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
-  // MoFEMErrorCode doWork(int row_side, int col_side, EntityType row_type,
-  //                       EntityType col_type, EntData &row_data,
-  //                       EntData &col_data);
-
-private:
-  moab::Interface &postProcMesh;
-  std::vector<EntityHandle> &mapGaussPts;
-  boost::shared_ptr<CommonData> commonDataPtr;
-  int globalRule;
-};
-
 template <typename T> T get_tangent_tensor(MatrixDouble &mat);
 
-struct OpSaveGaussPts : public DomainEleOp {
+template <bool UPDATE, bool IS_LARGE_STRAIN, ModelHypothesis H>
+struct OpStressTmp : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
+
+  OpStressTmp(const std::string field_name,
+              boost::shared_ptr<CommonData> common_data_ptr,
+              boost::shared_ptr<FEMethod> monitor_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        commonDataPtr(common_data_ptr), monitorPtr(monitor_ptr) {
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+  boost::shared_ptr<FEMethod> monitorPtr;
+};
+
+template <bool IS_LARGE_STRAIN, ModelHypothesis H>
+struct OpSaveStress : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
+
+  OpSaveStress(const std::string field_name,
+               boost::shared_ptr<CommonData> common_data_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        commonDataPtr(common_data_ptr) {
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+};
+
+template <typename T, ModelHypothesis H>
+struct OpTangent : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
+
+  OpTangent(const std::string field_name,
+            boost::shared_ptr<CommonData> common_data_ptr,
+            boost::shared_ptr<FEMethod> monitor_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        commonDataPtr(common_data_ptr), monitorPtr(monitor_ptr) {
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
+  MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+  boost::shared_ptr<FEMethod> monitorPtr;
+};
+
+struct OpAxisymmetricRhs
+    : public OpBaseImpl<PETSC,
+                        FaceElementForcesAndSourcesCore::UserDataOperator> {
+  OpAxisymmetricRhs(const std::string field_name,
+                    boost::shared_ptr<CommonData> common_data_ptr);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+
+  MoFEMErrorCode iNtegrate(EntData &row_data);
+};
+
+struct OpAxisymmetricLhs
+    : public OpBaseImpl<PETSC,
+                        FaceElementForcesAndSourcesCore::UserDataOperator> {
+  OpAxisymmetricLhs(const std::string field_name,
+                    boost::shared_ptr<CommonData> common_data_ptr);
+
+private:
+  boost::shared_ptr<CommonData> commonDataPtr;
+
+  MoFEMErrorCode iNtegrate(EntData &row_data, EntData &col_data);
+};
+
+template <ModelHypothesis H>
+struct OpSaveGaussPts : public MFrontEleType<H>::DomainEleOp {
+  static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
+
   OpSaveGaussPts(const std::string field_name, moab::Interface &moab_mesh,
-                 boost::shared_ptr<CommonData> common_data_ptr);
+                 boost::shared_ptr<CommonData> common_data_ptr)
+      : MFrontEleType<H>::DomainEleOp(field_name,
+                                      MFrontEleType<H>::DomainEleOp::OPROW),
+        internalVarMesh(moab_mesh), commonDataPtr(common_data_ptr) {
+    // Operator is only executed for vertices
+    std::fill(&MFrontEleType<H>::DomainEleOp::doEntities[MBEDGE],
+              &MFrontEleType<H>::DomainEleOp::doEntities[MBMAXTYPE], false);
+  }
   MoFEMErrorCode doWork(int side, EntityType type, EntData &data);
 
 private:
@@ -633,14 +844,12 @@ private:
   moab::Interface &internalVarMesh;
 };
 
+//FIXME: do we need this?
 struct FePrePostProcess : public FEMethod {
 
   boost::ptr_vector<MethodForForceScaling> methodsOp;
 
-  // FePrePostProcess(){}
-
   MoFEMErrorCode preProcess() {
-    //
     MoFEMFunctionBegin;
     switch (ts_ctx) {
     case CTX_TSSETIJACOBIAN: {
@@ -663,12 +872,22 @@ struct FePrePostProcess : public FEMethod {
   MoFEMErrorCode postProcess() { return 0; }
 };
 
-typedef struct OpTangent<Tensor4Pack> OpTangentFiniteStrains;
-typedef struct OpTangent<DdgPack> OpTangentSmallStrains;
+template <int DIM, ModelHypothesis H>
+using OpTangentFiniteStrains = struct OpTangent<Tensor4Pack<DIM>, H>;
 
-typedef struct OpStressTmp<true, true> OpUpdateVariablesFiniteStrains;
-typedef struct OpStressTmp<true, false> OpUpdateVariablesSmallStrains;
-typedef struct OpStressTmp<false, true> OpStressFiniteStrains;
-typedef struct OpStressTmp<false, false> OpStressSmallStrains;
+template <int DIM, ModelHypothesis H>
+using OpTangentSmallStrains = struct OpTangent<DdgPack<DIM>, H>;
+
+template <ModelHypothesis H>
+using OpUpdateVariablesFiniteStrains = struct OpStressTmp<true, true, H>;
+
+template <ModelHypothesis H>
+using OpUpdateVariablesSmallStrains = struct OpStressTmp<true, false, H>;
+
+template <ModelHypothesis H>
+using OpStressFiniteStrains = struct OpStressTmp<false, true, H>;
+
+template <ModelHypothesis H>
+using OpStressSmallStrains = struct OpStressTmp<false, false, H>;
 
 } // namespace MFrontInterface
