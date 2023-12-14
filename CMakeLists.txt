@@ -55,7 +55,19 @@ add_library(mfront_lib_all
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
 
-target_link_libraries(mfront_lib_all MFrontGenericInterface)
+target_link_libraries(mfront_lib_all 
+  MFrontGenericInterface
+  users_modules
+  mofem_finite_elements
+  mofem_interfaces
+  mofem_multi_indices
+  mofem_petsc
+  mofem_approx
+  mofem_third_party
+  mofem_matrix_function
+  mofem_post_proc
+  mofem_boundary_conditions
+)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="dylib")
@@ -109,12 +121,22 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMENT "Make linking to behaviours directory" VERBATIM)
 
-  if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
+  # if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
     install(
-      FILES ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
-  endif()
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR} 
+      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE 
+      GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  # endif()
 
 endif(MGIS_DIR)
+
+add_custom_target(mfront_compile_behaviours
+  ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SignoriniHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SaintVenantKirchhoffElasticity.mfront
+)
+
+if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
+    add_dependencies(mfront_make_link_to_behaviours_directory mfront_compile_behaviours)
+  endif()
 
 if(TFEL_DIR)
   message("TFEL_DIR FOUND")
