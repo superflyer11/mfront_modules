@@ -18,13 +18,13 @@ eel.setGlossaryName("ElasticStrain");
 @StateVariable strain p;
 p.setGlossaryName("EquivalentPlasticStrain");
 
-@Parameter young =  70.e9;
+@MaterialProperty real young;
 young.setGlossaryName("YoungModulus");
-@Parameter nu    =   0.34;
+@MaterialProperty real nu;
 nu.setGlossaryName("PoissonRatio");
-@Parameter H     =  10.e9;
+@MaterialProperty real H;
 H.setEntryName("HardeningSlope");
-@Parameter s0    =  300.e6;
+@MaterialProperty real s0;
 s0.setGlossaryName("YieldStress");
 
 /*!
