@@ -280,13 +280,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
   mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
   updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
 
-  CHKERR AddHOOps<DIM, DIM, DIM>::add(mfrontPipelineRhsPtr->getOpPtrVector(),
-                                      {H1}, meshNodeField);
-  CHKERR AddHOOps<DIM, DIM, DIM>::add(mfrontPipelineLhsPtr->getOpPtrVector(),
-                                      {H1}, meshNodeField);
-  CHKERR AddHOOps<DIM, DIM, DIM>::add(
-      updateIntVariablesElePtr->getOpPtrVector(), {H1}, meshNodeField);
-
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
     CHKERR mField.add_ents_to_finite_element_by_dim(data.eNts, DIM,
                                                     "MFRONT_EL");
@@ -296,38 +289,75 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
 };
 
 template <ModelHypothesis H>
-MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
+MoFEMErrorCode MFrontMoFEMInterface<H>::setIntegrationRule(
+    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
   MoFEMFunctionBegin;
-
-  auto &moab_gauss = *moabGaussIntPtr;
-
   auto integration_rule = [](int, int, int approx_order) {
     return 2 * approx_order + 1;
   };
+  fe_ptr->getRuleHook = integration_rule;
+  MoFEMFunctionReturn(0);
+}
 
-  mfrontPipelineLhsPtr->getRuleHook = integration_rule;
-  mfrontPipelineRhsPtr->getRuleHook = integration_rule;
-  updateIntVariablesElePtr->getRuleHook = integration_rule;
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setBaseOperators(
+    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
+  MoFEMFunctionBegin;
+  CHKERR AddHOOps<DIM, DIM, DIM>::add(fe_ptr->getOpPtrVector(), {H1},
+                                      meshNodeField);
+  MoFEMFunctionReturn(0);
+}
 
-  updateIntVariablesElePtr->getOpPtrVector().push_back(
-      new OpCalculateVectorFieldGradient<DIM, DIM>(positionField,
-                                                   commonDataPtr->mGradPtr));
-  updateIntVariablesElePtr->getOpPtrVector().push_back(
-      new OpCalculateVectorFieldValues<DIM>(positionField,
-                                            commonDataPtr->mDispPtr));
-  if (isFiniteKinematics)
-    updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpUpdateVariablesFiniteStrains<H>(positionField, commonDataPtr,
-                                              monitorPtr));
-  else
-    updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpUpdateVariablesSmallStrains<H>(positionField, commonDataPtr,
-                                             monitorPtr));
-  if (saveGauss && (H == TRIDIMENSIONAL)) {
-    // FIXME: decide if needed for 2D
-    updateIntVariablesElePtr->getOpPtrVector().push_back(
-        new OpSaveGaussPts<H>(positionField, moab_gauss, commonDataPtr));
-  }
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setRhsOperators(
+    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
+  MoFEMFunctionBegin;
+
+  CHKERR setIntegrationRule(fe_ptr);
+  CHKERR setBaseOperators(fe_ptr);
+
+  auto jacobian = [&](const double r, const double, const double) {
+    if (H == AXISYMMETRICAL)
+      return 2. * M_PI * r;
+    else
+      return 1.;
+  };
+
+  auto add_domain_ops_rhs = [&](auto &pipeline) {
+    if (isFiniteKinematics)
+      pipeline.push_back(new OpStressFiniteStrains<H>(
+          positionField, commonDataPtr, monitorPtr));
+    else
+      pipeline.push_back(new OpStressSmallStrains<H>(
+          positionField, commonDataPtr, monitorPtr));
+
+    pipeline.push_back(new OpInternalForce(
+        positionField, commonDataPtr->mStressPtr, jacobian));
+
+    if (H == AXISYMMETRICAL)
+      pipeline.push_back(new OpAxisymmetricRhs(positionField, commonDataPtr));
+  };
+
+  auto add_domain_base_ops = [&](auto &pipeline) {
+    pipeline.push_back(new OpCalculateVectorFieldValues<DIM>(
+        positionField, commonDataPtr->mDispPtr));
+    pipeline.push_back(new OpCalculateVectorFieldGradient<DIM, DIM>(
+        positionField, commonDataPtr->mGradPtr));
+  };
+
+  add_domain_base_ops(fe_ptr->getOpPtrVector());
+  add_domain_ops_rhs(fe_ptr->getOpPtrVector());
+
+  MoFEMFunctionReturn(0);
+}
+
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setLhsOperators(
+    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
+  MoFEMFunctionBegin;
+
+  CHKERR setIntegrationRule(fe_ptr);
+  CHKERR setBaseOperators(fe_ptr);
 
   auto jacobian = [&](const double r, const double, const double) {
     if (H == AXISYMMETRICAL)
@@ -354,21 +384,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
       pipeline.push_back(new OpAxisymmetricLhs(positionField, commonDataPtr));
   };
 
-  auto add_domain_ops_rhs = [&](auto &pipeline) {
-    if (isFiniteKinematics)
-      pipeline.push_back(new OpStressFiniteStrains<H>(
-          positionField, commonDataPtr, monitorPtr));
-    else
-      pipeline.push_back(new OpStressSmallStrains<H>(
-          positionField, commonDataPtr, monitorPtr));
-
-    pipeline.push_back(new OpInternalForce(
-        positionField, commonDataPtr->mStressPtr, jacobian));
-
-    if (H == AXISYMMETRICAL)
-      pipeline.push_back(new OpAxisymmetricRhs(positionField, commonDataPtr));
-  };
-
   auto add_domain_base_ops = [&](auto &pipeline) {
     pipeline.push_back(new OpCalculateVectorFieldValues<DIM>(
         positionField, commonDataPtr->mDispPtr));
@@ -376,11 +391,43 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
         positionField, commonDataPtr->mGradPtr));
   };
 
-  add_domain_base_ops(mfrontPipelineLhsPtr->getOpPtrVector());
-  add_domain_base_ops(mfrontPipelineRhsPtr->getOpPtrVector());
+  add_domain_base_ops(fe_ptr->getOpPtrVector());
+  add_domain_ops_lhs(fe_ptr->getOpPtrVector());
 
-  add_domain_ops_lhs(mfrontPipelineLhsPtr->getOpPtrVector());
-  add_domain_ops_rhs(mfrontPipelineRhsPtr->getOpPtrVector());
+  MoFEMFunctionReturn(0);
+}
+
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
+  MoFEMFunctionBegin;
+
+  auto &moab_gauss = *moabGaussIntPtr;
+
+  CHKERR setIntegrationRule(updateIntVariablesElePtr);
+  CHKERR setBaseOperators(updateIntVariablesElePtr);
+
+  updateIntVariablesElePtr->getOpPtrVector().push_back(
+      new OpCalculateVectorFieldGradient<DIM, DIM>(positionField,
+                                                   commonDataPtr->mGradPtr));
+  updateIntVariablesElePtr->getOpPtrVector().push_back(
+      new OpCalculateVectorFieldValues<DIM>(positionField,
+                                            commonDataPtr->mDispPtr));
+  if (isFiniteKinematics)
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpUpdateVariablesFiniteStrains<H>(positionField, commonDataPtr,
+                                              monitorPtr));
+  else
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpUpdateVariablesSmallStrains<H>(positionField, commonDataPtr,
+                                             monitorPtr));
+  if (saveGauss && (H == TRIDIMENSIONAL)) {
+    // FIXME: decide if needed for 2D
+    updateIntVariablesElePtr->getOpPtrVector().push_back(
+        new OpSaveGaussPts<H>(positionField, moab_gauss, commonDataPtr));
+  }
+
+  CHKERR setRhsOperators(mfrontPipelineRhsPtr);
+  CHKERR setLhsOperators(mfrontPipelineLhsPtr);
 
   if (testJacobian) {
     CHKERR testOperators();

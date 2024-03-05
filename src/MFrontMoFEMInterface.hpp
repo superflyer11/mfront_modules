@@ -119,6 +119,16 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode createElements() override;
   MoFEMErrorCode setOperators() override;
 
+  MoFEMErrorCode
+  setIntegrationRule(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr);
+  MoFEMErrorCode
+  setBaseOperators(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr);
+
+  MoFEMErrorCode
+  setRhsOperators(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) override;
+  MoFEMErrorCode
+  setLhsOperators(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) override;
+
   MoFEMErrorCode testOperators();
 
   MoFEMErrorCode addElementsToDM(SmartPetscObj<DM> dm) override;
