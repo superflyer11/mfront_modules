@@ -276,10 +276,6 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::createElements() {
     CHKERR mField.modify_finite_element_add_field_data("MFRONT_EL",
                                                        meshNodeField);
 
-  mfrontPipelineRhsPtr = boost::make_shared<DomainEle>(mField);
-  mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
-  updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
-
   for (auto &[id, data] : commonDataPtr->setOfBlocksData) {
     CHKERR mField.add_ents_to_finite_element_by_dim(data.eNts, DIM,
                                                     "MFRONT_EL");
@@ -293,7 +289,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setIntegrationRule(
     boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
   MoFEMFunctionBegin;
   auto integration_rule = [](int, int, int approx_order) {
-    return 2 * approx_order + 1;
+    return 2 * approx_order;
   };
   fe_ptr->getRuleHook = integration_rule;
   MoFEMFunctionReturn(0);
@@ -301,20 +297,16 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setIntegrationRule(
 
 template <ModelHypothesis H>
 MoFEMErrorCode MFrontMoFEMInterface<H>::setBaseOperators(
-    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
+    boost::ptr_deque<ForcesAndSourcesCore::UserDataOperator> &pip) {
   MoFEMFunctionBegin;
-  CHKERR AddHOOps<DIM, DIM, DIM>::add(fe_ptr->getOpPtrVector(), {H1},
-                                      meshNodeField);
+  CHKERR AddHOOps<DIM, DIM, DIM>::add(pip, {H1}, meshNodeField);
   MoFEMFunctionReturn(0);
 }
 
 template <ModelHypothesis H>
-MoFEMErrorCode MFrontMoFEMInterface<H>::setRhsOperators(
-    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
+MoFEMErrorCode MFrontMoFEMInterface<H>::opFactoryDomainRhs(
+    boost::ptr_deque<ForcesAndSourcesCore::UserDataOperator> &pip) {
   MoFEMFunctionBegin;
-
-  CHKERR setIntegrationRule(fe_ptr);
-  CHKERR setBaseOperators(fe_ptr);
 
   auto jacobian = [&](const double r, const double, const double) {
     if (H == AXISYMMETRICAL)
@@ -345,19 +337,16 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setRhsOperators(
         positionField, commonDataPtr->mGradPtr));
   };
 
-  add_domain_base_ops(fe_ptr->getOpPtrVector());
-  add_domain_ops_rhs(fe_ptr->getOpPtrVector());
+  add_domain_base_ops(pip);
+  add_domain_ops_rhs(pip);
 
   MoFEMFunctionReturn(0);
 }
 
 template <ModelHypothesis H>
-MoFEMErrorCode MFrontMoFEMInterface<H>::setLhsOperators(
-    boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) {
+MoFEMErrorCode MFrontMoFEMInterface<H>::opFactoryDomainLhs(
+    boost::ptr_deque<ForcesAndSourcesCore::UserDataOperator> &pip) {
   MoFEMFunctionBegin;
-
-  CHKERR setIntegrationRule(fe_ptr);
-  CHKERR setBaseOperators(fe_ptr);
 
   auto jacobian = [&](const double r, const double, const double) {
     if (H == AXISYMMETRICAL)
@@ -391,20 +380,21 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setLhsOperators(
         positionField, commonDataPtr->mGradPtr));
   };
 
-  add_domain_base_ops(fe_ptr->getOpPtrVector());
-  add_domain_ops_lhs(fe_ptr->getOpPtrVector());
+  add_domain_base_ops(pip);
+  add_domain_ops_lhs(pip);
 
   MoFEMFunctionReturn(0);
 }
 
 template <ModelHypothesis H>
-MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
+MoFEMErrorCode MFrontMoFEMInterface<H>::setUpdateElementVariablesOperators() {
   MoFEMFunctionBegin;
 
   auto &moab_gauss = *moabGaussIntPtr;
 
+  updateIntVariablesElePtr = boost::make_shared<DomainEle>(mField);
   CHKERR setIntegrationRule(updateIntVariablesElePtr);
-  CHKERR setBaseOperators(updateIntVariablesElePtr);
+  CHKERR setBaseOperators(updateIntVariablesElePtr->getOpPtrVector());
 
   updateIntVariablesElePtr->getOpPtrVector().push_back(
       new OpCalculateVectorFieldGradient<DIM, DIM>(positionField,
@@ -426,8 +416,24 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
         new OpSaveGaussPts<H>(positionField, moab_gauss, commonDataPtr));
   }
 
-  CHKERR setRhsOperators(mfrontPipelineRhsPtr);
-  CHKERR setLhsOperators(mfrontPipelineLhsPtr);
+  MoFEMFunctionReturn(0);
+}
+
+template <ModelHypothesis H>
+MoFEMErrorCode MFrontMoFEMInterface<H>::setOperators() {
+  MoFEMFunctionBegin;
+
+  CHKERR setUpdateElementVariablesOperators();
+
+  mfrontPipelineRhsPtr = boost::make_shared<DomainEle>(mField);
+  CHKERR setIntegrationRule(mfrontPipelineRhsPtr);
+  CHKERR setBaseOperators(mfrontPipelineRhsPtr->getOpPtrVector());
+  CHKERR opFactoryDomainRhs(mfrontPipelineRhsPtr->getOpPtrVector());
+
+  mfrontPipelineLhsPtr = boost::make_shared<DomainEle>(mField);
+  CHKERR setIntegrationRule(mfrontPipelineLhsPtr);
+  CHKERR setBaseOperators(mfrontPipelineLhsPtr->getOpPtrVector());
+  CHKERR opFactoryDomainLhs(mfrontPipelineLhsPtr->getOpPtrVector());
 
   if (testJacobian) {
     CHKERR testOperators();
@@ -588,7 +594,9 @@ MFrontMoFEMInterface<H>::setupSolverFunctionTS(const TSType type) {
 };
 
 template <ModelHypothesis H>
-MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
+MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step,
+                                                           SmartPetscObj<DM> dm,
+                                                           string fe_name) {
   MoFEMFunctionBegin;
 
   auto create_post_process_element = [&]() {
@@ -621,7 +629,8 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
         AINSWORTH_LEGENDRE_BASE, L2));
 
     auto fe_physics_ptr = op_this->getThisFEPtr();
-    fe_physics_ptr->getRuleHook = [](int, int, int p) { return 2 * p + 1; };
+    CHKERR setIntegrationRule(fe_physics_ptr);
+
     fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionMassMatrix(
         oRder, mass_ptr, entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
     if (isFiniteKinematics) {
@@ -695,7 +704,7 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
     MoFEMFunctionBegin;
 
     if (saveVolume) {
-      CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", postProcFe);
+      CHKERR DMoFEMLoopFiniteElements(dm, fe_name, postProcFe);
       CHKERR postProcFe->writeFile("out_" + optionsPrefix +
                                    boost::lexical_cast<std::string>(step) +
                                    ".h5m");
@@ -719,9 +728,11 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step) {
 };
 
 template <ModelHypothesis H>
-MoFEMErrorCode MFrontMoFEMInterface<H>::updateElementVariables() {
+MoFEMErrorCode
+MFrontMoFEMInterface<H>::updateElementVariables(SmartPetscObj<DM> dm,
+                                                string fe_name) {
 
   MoFEMFunctionBegin;
-  CHKERR DMoFEMLoopFiniteElements(dM, "MFRONT_EL", updateIntVariablesElePtr);
+  CHKERR DMoFEMLoopFiniteElements(dm, fe_name, updateIntVariablesElePtr);
   MoFEMFunctionReturn(0);
 };

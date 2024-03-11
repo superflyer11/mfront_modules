@@ -121,13 +121,15 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
 
   MoFEMErrorCode
   setIntegrationRule(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr);
-  MoFEMErrorCode
-  setBaseOperators(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr);
+  MoFEMErrorCode setBaseOperators(
+      boost::ptr_deque<ForcesAndSourcesCore::UserDataOperator> &pip);
 
-  MoFEMErrorCode
-  setRhsOperators(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) override;
-  MoFEMErrorCode
-  setLhsOperators(boost::shared_ptr<ForcesAndSourcesCore> fe_ptr) override;
+  MoFEMErrorCode setUpdateElementVariablesOperators() override;
+
+  MoFEMErrorCode opFactoryDomainRhs(
+      boost::ptr_deque<ForcesAndSourcesCore::UserDataOperator> &pip) override;
+  MoFEMErrorCode opFactoryDomainLhs(
+      boost::ptr_deque<ForcesAndSourcesCore::UserDataOperator> &pip) override;
 
   MoFEMErrorCode testOperators();
 
@@ -139,8 +141,17 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   MoFEMErrorCode setupSolverJacobianSNES() override;
   MoFEMErrorCode setupSolverFunctionSNES() override;
 
-  MoFEMErrorCode updateElementVariables() override;
-  MoFEMErrorCode postProcessElement(int step) override;
+  MoFEMErrorCode updateElementVariables(SmartPetscObj<DM> dm,
+                                        string fe_name) override;
+  MoFEMErrorCode updateElementVariables() override {
+    return updateElementVariables(dM, "MFRONT_EL");
+  }
+
+  MoFEMErrorCode postProcessElement(int step, SmartPetscObj<DM> dm,
+                                    string fe_name) override;
+  MoFEMErrorCode postProcessElement(int step) override {
+    return postProcessElement(step, dM, "MFRONT_EL");
+  }
 };
 
 #endif // __MFRONTGENERICINTERFACE_HPP__
