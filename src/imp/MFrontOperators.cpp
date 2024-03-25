@@ -376,7 +376,6 @@ MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
   // get integration weights
   auto t_w = getFTensor0IntegrationWeight();
   // get coordinate at integration points
-  auto t_coords = getFTensor1CoordsAtGaussPts();
 
   auto t_full_stress =
       getFTensor2FromMat<3, 3>(*(commonDataPtr->mFullStressPtr));
@@ -388,22 +387,18 @@ MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
 
     FTensor::Tensor0<double *> t_base(&row_data.getN()(gg, 0));
 
-    // Cylinder radius
-    const double r_cylinder = t_coords(0);
-
     // take into account Jacobian
-    const double alpha = t_w * vol * (2 * M_PI * r_cylinder);
+    const double alpha = t_w * vol * 2 * M_PI;
     // loop over rows base functions
     for (int rr = 0; rr != nbRows / 2; ++rr) {
 
-      t_nf(0) += alpha * t_full_stress(2, 2) / r_cylinder * t_base;
+      t_nf(0) += alpha * t_full_stress(2, 2) * t_base;
 
       ++t_base;
       ++t_nf;
     }
 
     ++t_full_stress;
-    ++t_coords;
     ++t_w; // move to another integration weight
   }
 
@@ -450,7 +445,7 @@ MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,
     const double r_cylinder = t_coords(0);
 
     // take into account Jacobean
-    const double alpha = t_w * vol * (2 * M_PI * r_cylinder);
+    const double alpha = t_w * vol * 2. * M_PI;
 
     // loop over rows base functions
     int rr = 0;
@@ -467,31 +462,31 @@ MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,
       // loop over columns
       for (int cc = 0; cc != nbCols / 2; cc++) {
 
-        t_m(0, 0) += alpha * t_D(N0, N0, N2, N2) * t_col_base / r_cylinder *
-                     t_row_diff_base(0);
+        t_m(0, 0) +=
+            alpha * t_D(N0, N0, N2, N2) * t_col_base * t_row_diff_base(0);
 
-        t_m(1, 0) += alpha * t_D(N1, N1, N2, N2) * t_col_base / r_cylinder *
-                     t_row_diff_base(1);
+        t_m(1, 0) +=
+            alpha * t_D(N1, N1, N2, N2) * t_col_base * t_row_diff_base(1);
 
-        t_m(0, 0) += alpha * t_D(N2, N2, N0, N0) * t_col_diff_base(0) *
-                     t_row_base / r_cylinder;
+        t_m(0, 0) +=
+            alpha * t_D(N2, N2, N0, N0) * t_col_diff_base(0) * t_row_base;
 
-        t_m(0, 1) += alpha * t_D(N2, N2, N1, N1) * t_col_diff_base(1) *
-                     t_row_base / r_cylinder;
+        t_m(0, 1) +=
+            alpha * t_D(N2, N2, N1, N1) * t_col_diff_base(1) * t_row_base;
 
-        t_m(0, 0) += alpha * t_D(N2, N2, N2, N2) * t_col_base / r_cylinder *
-                     t_row_base / r_cylinder;
+        t_m(0, 0) += alpha * (t_D(N2, N2, N2, N2) / r_cylinder) * t_col_base *
+                     t_row_base;
 
-        t_m(0, 0) += alpha * t_D(N2, N2, N0, N1) * t_col_diff_base(1) *
-                     t_row_base / r_cylinder;
+        t_m(0, 0) +=
+            alpha * t_D(N2, N2, N0, N1) * t_col_diff_base(1) * t_row_base;
 
-        t_m(0, 1) += alpha * t_D(N2, N2, N1, N0) * t_col_diff_base(0) *
-                     t_row_base / r_cylinder;
+        t_m(0, 1) +=
+            alpha * t_D(N2, N2, N1, N0) * t_col_diff_base(0) * t_row_base;
 
-        t_m(0, 0) += alpha * t_D(N0, N1, N2, N2) * t_col_base / r_cylinder *
-                     t_row_diff_base(1);
+        t_m(0, 0) +=
+            alpha * t_D(N0, N1, N2, N2) * t_col_base * t_row_diff_base(1);
 
-        t_m(1, 0) += alpha * t_D(N1, N0, N2, N2) * t_col_base / r_cylinder *
+        t_m(1, 0) += alpha * t_D(N1, N0, N2, N2) * t_col_base *
                      t_row_diff_base(0);
 
         ++t_col_base;
