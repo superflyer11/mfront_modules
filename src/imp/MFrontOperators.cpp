@@ -388,7 +388,7 @@ MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
     FTensor::Tensor0<double *> t_base(&row_data.getN()(gg, 0));
 
     // take into account Jacobian
-    const double alpha = t_w * vol * 2 * M_PI;
+    const double alpha = t_w * vol * 2. * M_PI;
     // loop over rows base functions
     for (int rr = 0; rr != nbRows / 2; ++rr) {
 
