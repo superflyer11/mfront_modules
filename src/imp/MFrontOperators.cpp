@@ -359,9 +359,10 @@ MoFEMErrorCode OpTangent<T, H>::doWork(int side, EntityType type,
 
 OpAxisymmetricRhs::OpAxisymmetricRhs(
     const std::string field_name, boost::shared_ptr<CommonData> common_data_ptr)
-    : OpBaseImpl<PETSC, MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp>(
-          field_name, field_name,
-          MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp::OPROW),
+    : FormsIntegrators<MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp>::
+          Assembly<MFRONT_AT>::OpBase(
+              field_name, field_name,
+              MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp::OPROW),
       commonDataPtr(common_data_ptr){};
 
 MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
@@ -407,9 +408,10 @@ MoFEMErrorCode OpAxisymmetricRhs::iNtegrate(EntData &row_data) {
 
 OpAxisymmetricLhs::OpAxisymmetricLhs(
     const std::string field_name, boost::shared_ptr<CommonData> common_data_ptr)
-    : OpBaseImpl<PETSC, MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp>(
-          field_name, field_name,
-          MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp::OPROWCOL),
+    : FormsIntegrators<MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp>::
+          Assembly<MFRONT_AT>::OpBase(
+              field_name, field_name,
+              MFrontMoFEMInterface<AXISYMMETRICAL>::DomainEleOp::OPROWCOL),
       commonDataPtr(common_data_ptr){};
 
 MoFEMErrorCode OpAxisymmetricLhs::iNtegrate(EntData &row_data,

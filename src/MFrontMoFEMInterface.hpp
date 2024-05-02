@@ -10,8 +10,6 @@
  * MoFEM is free software: you can redistribute it and/or modify it under
  * the terms of the MIT License>. */
 
-#pragma once
-
 #ifndef __MFRONTGENERICINTERFACE_HPP__
 #define __MFRONTGENERICINTERFACE_HPP__
 
@@ -57,6 +55,14 @@ template <> struct MFrontEleType<AXISYMMETRICAL> {
   static constexpr int SPACE_DIM = 2;
 };
 
+#ifndef SCHUR_ASSEMBLE
+#define SCHUR_ASSEMBLE 0
+#endif
+
+constexpr AssemblyType MFRONT_AT =
+    (SCHUR_ASSEMBLE) ? AssemblyType::SCHUR
+                     : AssemblyType::PETSC; //< selected assembly type
+
 template <ModelHypothesis H = TRIDIMENSIONAL>
 struct MFrontMoFEMInterface : public GenericElementInterface {
 
@@ -68,14 +74,14 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   static constexpr int DIM = MFrontEleType<H>::SPACE_DIM;
 
   using OpInternalForce =
-      typename FormsIntegrators<DomainEleOp>::template Assembly<PETSC>::
+      typename FormsIntegrators<DomainEleOp>::template Assembly<MFRONT_AT>::
           template LinearForm<GAUSS>::template OpGradTimesTensor<1, DIM, DIM>;
   using OpAssembleLhsFiniteStrains =
-      typename FormsIntegrators<DomainEleOp>::template Assembly<PETSC>::
+      typename FormsIntegrators<DomainEleOp>::template Assembly<MFRONT_AT>::
           template BiLinearForm<GAUSS>::template OpGradTensorGrad<1, DIM, DIM,
                                                                   1>;
   using OpAssembleLhsSmallStrains =
-      typename FormsIntegrators<DomainEleOp>::template Assembly<PETSC>::
+      typename FormsIntegrators<DomainEleOp>::template Assembly<MFRONT_AT>::
           template BiLinearForm<GAUSS>::template OpGradSymTensorGrad<1, DIM,
                                                                      DIM, 0>;
 

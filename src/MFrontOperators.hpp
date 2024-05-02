@@ -801,8 +801,8 @@ private:
 };
 
 struct OpAxisymmetricRhs
-    : public OpBaseImpl<PETSC,
-                        FaceElementForcesAndSourcesCore::UserDataOperator> {
+    : public FormsIntegrators<MFrontMoFEMInterface<
+          AXISYMMETRICAL>::DomainEleOp>::Assembly<MFRONT_AT>::OpBase {
   OpAxisymmetricRhs(const std::string field_name,
                     boost::shared_ptr<CommonData> common_data_ptr);
 
@@ -813,8 +813,8 @@ private:
 };
 
 struct OpAxisymmetricLhs
-    : public OpBaseImpl<PETSC,
-                        FaceElementForcesAndSourcesCore::UserDataOperator> {
+    : public FormsIntegrators<MFrontMoFEMInterface<
+          AXISYMMETRICAL>::DomainEleOp>::Assembly<MFRONT_AT>::OpBase {
   OpAxisymmetricLhs(const std::string field_name,
                     boost::shared_ptr<CommonData> common_data_ptr);
 

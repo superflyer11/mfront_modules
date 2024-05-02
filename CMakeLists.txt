@@ -50,12 +50,12 @@ add_executable(mfront_interface
 include_directories(${MGIS_DIR}/include)
 include_directories(${MGIS_DIR}/lib)
 
-add_library(mfront_lib_all
+add_library(mfront_lib
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontOperators.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
 )
 
-target_link_libraries(mfront_lib_all 
+target_link_libraries(mfront_lib
   MFrontGenericInterface
   users_modules
   mofem_finite_elements
@@ -70,24 +70,64 @@ target_link_libraries(mfront_lib_all
 )
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="dylib")
+    target_compile_definitions(mfront_lib PUBLIC DEFAULT_LIB_EXTENSION="dylib")
     set(DEFAULT_LIB_EXTENSION "dylib")
   else()
-    target_compile_definitions(mfront_lib_all PUBLIC DEFAULT_LIB_EXTENSION="so")
+    target_compile_definitions(mfront_lib PUBLIC DEFAULT_LIB_EXTENSION="so")
     set(DEFAULT_LIB_EXTENSION "so")
 endif()
 
 install(
-  TARGETS mfront_lib_all
+  TARGETS mfront_lib
   DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR}
-  EXPORT mfront_lib_all_targets)
+  EXPORT mfront_lib_targets)
 install(
-  EXPORT mfront_lib_all_targets
-  FILE mfront_lib_all_targets.cmake
+  EXPORT mfront_lib_targets
+  FILE mfront_lib_targets.cmake
   DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
 
+add_library(mfront_schur_lib
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontOperators.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/imp/MFrontMoFEMInterface.cpp
+)
+
+set_target_properties(
+  mfront_schur_lib PROPERTIES COMPILE_FLAGS "-DSCHUR_ASSEMBLE=1")
+
+target_link_libraries(mfront_schur_lib
+  MFrontGenericInterface
+  users_modules
+  mofem_finite_elements
+  mofem_interfaces
+  mofem_multi_indices
+  mofem_petsc
+  mofem_approx
+  mofem_third_party
+  mofem_matrix_function
+  mofem_post_proc
+  mofem_boundary_conditions
+)
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    target_compile_definitions(mfront_schur_lib PUBLIC DEFAULT_LIB_EXTENSION="dylib")
+    set(DEFAULT_LIB_EXTENSION "dylib")
+  else()
+    target_compile_definitions(mfront_schur_lib PUBLIC DEFAULT_LIB_EXTENSION="so")
+    set(DEFAULT_LIB_EXTENSION "so")
+endif()
+
+install(
+  TARGETS mfront_schur_lib
+  DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR}
+  EXPORT mfront_schur_lib_targets)
+install(
+  EXPORT mfront_schur_lib_targets
+  FILE mfront_schur_lib_targets.cmake
+  DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR})
+  
+
 target_link_libraries(mfront_interface
-    mfront_lib_all
+    mfront_lib
     users_modules
     mofem_finite_elements
     mofem_interfaces
