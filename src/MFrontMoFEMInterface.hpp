@@ -60,7 +60,7 @@ template <> struct MFrontEleType<AXISYMMETRICAL> {
 #endif
 
 constexpr AssemblyType MFRONT_AT =
-    (SCHUR_ASSEMBLE) ? AssemblyType::SCHUR
+    (SCHUR_ASSEMBLE) ? AssemblyType::BLOCK_SCHUR
                      : AssemblyType::PETSC; //< selected assembly type
 
 template <ModelHypothesis H = TRIDIMENSIONAL>
