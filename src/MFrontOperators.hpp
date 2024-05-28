@@ -725,11 +725,11 @@ mgis_integration(size_t gg, Tensor2Pack<DIM> &t_grad, Tensor1Pack<DIM> &t_disp,
   check_integration = integrate(block_data.bView, mgis_bv);
   switch (check_integration) {
   case -1:
-    SETERRQ(PETSC_COMM_SELF, MOFEM_OPERATION_UNSUCCESSFUL,
-            "MFront integration failed");
+    MOFEM_LOG("WORLD", Sev::error)
+        << "Mfront integration failed";
     break;
   case 0:
-    MOFEM_LOG("WORLD", Sev::inform)
+    MOFEM_LOG("WORLD", Sev::warning)
         << "Mfront integration succeeded but results are unreliable";
     break;
   case 1:
