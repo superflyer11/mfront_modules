@@ -257,12 +257,12 @@ if(TFEL_DIR)
   ### ELASTOPLASTICITY 2D ###
 
   add_test(necking_2d
-    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_2d_4parts.h5m -hypothesis plane_strain -mi_block_1 LogPlastNonlinHardNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -ts_max_time 1.0 -ts_dt 0.1 -ts_adapt_scale_solve_failed 0.5 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 65  -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt  -ts_theta_theta 1  -ts_exact_final_time matchstep -atom_test 1 -field_eval_coords 6.2975,0 -mi_test_jacobian 1 -mi_random_field_scale 0.01 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
+    ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_2d_4parts.h5m -hypothesis plane_strain -mi_block_1 LogPlastNonlinHardNoParam -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} -ts_max_time 1.0 -ts_dt 0.01 -ts_theta_initial_guess_extrapolate 1 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 65  -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt  -ts_theta_theta 1  -ts_exact_final_time matchstep -atom_test 1 -field_eval_coords 6.2975,0 -mi_test_jacobian 1 -mi_random_field_scale 0.01 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
 )
 
   add_test(necking_miehe_2d
     ${MoFEM_MPI_RUN} ${MPI_RUN_FLAGS} -np 4 ${CMAKE_CURRENT_BINARY_DIR}/mfront_interface -file_name ${CMAKE_CURRENT_SOURCE_DIR}/meshes/necking_2d_4parts.h5m -hypothesis axisymmetry -mi_block_1 LogPlastNonlinHard -mi_lib_path_1 ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.${DEFAULT_LIB_EXTENSION} 
-    -mi_param_1_0 450 -mi_param_1_1 129.24 -mi_param_1_2 265 -mi_param_1_3 16.93 -ts_max_time 1.4 -ts_dt 0.1 -ts_adapt_scale_solve_failed 0.5 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler  -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.01 -atom_test 2 -field_eval_coords 6.2975,0 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
+    -mi_param_1_0 450 -mi_param_1_1 129.24 -mi_param_1_2 265 -mi_param_1_3 16.93 -ts_max_time 1.4 -ts_dt 0.02 -ts_theta_initial_guess_extrapolate 1 -snes_atol 1e-8 -snes_rtol 1e-8 -snes_max_it 40 -order 2 -ts_max_snes_failures -1 -snes_linesearch_type bt -ts_type beuler  -ts_exact_final_time matchstep -pc_type lu -mi_test_jacobian 1 -mi_random_field_scale 0.01 -atom_test 2 -field_eval_coords 6.2975,0 -is_partitioned 1 -load_history ${CMAKE_CURRENT_SOURCE_DIR}/load_history.in
   )
 
   ### ELASTICITY 2D ###
