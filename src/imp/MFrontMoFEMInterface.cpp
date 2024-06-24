@@ -48,6 +48,7 @@ MFrontMoFEMInterface<H>::MFrontMoFEMInterface(MoFEM::Interface &m_field,
   randomFieldScale = 1.0;
   optionsPrefix = "mi_";
   monitorPtr = nullptr;
+  fieldBase = NOBASE;
 }
 
 template <ModelHypothesis H>
@@ -240,6 +241,32 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::getCommandLineParameters() {
 
   CHKERR check_behaviours_kinematics(isFiniteKinematics);
 
+  auto get_base = [&]() {
+    Range domain_ents;
+    CHKERR mField.get_moab().get_entities_by_dimension(0, DIM, domain_ents,
+                                                       true);
+    if (domain_ents.empty())
+      CHK_THROW_MESSAGE(MOFEM_NOT_FOUND, "Empty mesh");
+    const auto type = type_from_handle(domain_ents[0]);
+    switch (type) {
+    case MBQUAD:
+      return DEMKOWICZ_JACOBI_BASE;
+    case MBHEX:
+      return DEMKOWICZ_JACOBI_BASE;
+    case MBTRI:
+      return AINSWORTH_LEGENDRE_BASE;
+    case MBTET:
+      return AINSWORTH_LEGENDRE_BASE;
+    default:
+      CHK_THROW_MESSAGE(MOFEM_NOT_FOUND, "Element type not handled");
+    }
+    return NOBASE;
+  };
+
+  fieldBase = get_base();
+  MOFEM_LOG("WORLD", Sev::inform)
+      << "MFront approximation base " << ApproximationBaseNames[fieldBase];
+
   MoFEMFunctionReturn(0);
 };
 
@@ -248,15 +275,12 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::addElementFields() {
   MoFEMFunctionBeginHot;
   auto simple = mField.getInterface<Simple>();
   if (!mField.check_field(positionField)) {
-    CHKERR simple->addDomainField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
-                                  DIM);
-    CHKERR simple->addBoundaryField(positionField, H1, AINSWORTH_LEGENDRE_BASE,
-                                    DIM);
+    CHKERR simple->addDomainField(positionField, H1, fieldBase, DIM);
+    CHKERR simple->addBoundaryField(positionField, H1, fieldBase, DIM);
     CHKERR simple->setFieldOrder(positionField, oRder);
   }
   if (!mField.check_field(meshNodeField)) {
-    CHKERR simple->addDataField(meshNodeField, H1, AINSWORTH_LEGENDRE_BASE,
-                                DIM);
+    CHKERR simple->addDataField(meshNodeField, H1, fieldBase, DIM);
     CHKERR simple->setFieldOrder(meshNodeField, 2);
   }
 
@@ -621,18 +645,18 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step,
     auto op_this = new OpLoopThis<DomainEle>(mField, simple->getDomainFEName(),
                                              Sev::noisy);
     pip.push_back(op_this);
-    pip.push_back(new OpDGProjectionEvaluation(
-        commonDataPtr->mFullStrainPtr, strain_coeffs_ptr, entity_data_l2,
-        AINSWORTH_LEGENDRE_BASE, L2));
-    pip.push_back(new OpDGProjectionEvaluation(
-        commonDataPtr->mFullStressPtr, stress_coeffs_ptr, entity_data_l2,
-        AINSWORTH_LEGENDRE_BASE, L2));
+    pip.push_back(new OpDGProjectionEvaluation(commonDataPtr->mFullStrainPtr,
+                                               strain_coeffs_ptr,
+                                               entity_data_l2, fieldBase, L2));
+    pip.push_back(new OpDGProjectionEvaluation(commonDataPtr->mFullStressPtr,
+                                               stress_coeffs_ptr,
+                                               entity_data_l2, fieldBase, L2));
 
     auto fe_physics_ptr = op_this->getThisFEPtr();
     CHKERR setIntegrationRule(fe_physics_ptr);
 
     fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionMassMatrix(
-        oRder, mass_ptr, entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+        oRder, mass_ptr, entity_data_l2, fieldBase, L2));
     if (isFiniteKinematics) {
       fe_physics_ptr->getOpPtrVector().push_back(
           new OpSaveStress<true, H>(positionField, commonDataPtr));
@@ -642,10 +666,10 @@ MoFEMErrorCode MFrontMoFEMInterface<H>::postProcessElement(int step,
     }
     fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionCoefficients(
         commonDataPtr->mFullStrainPtr, strain_coeffs_ptr, mass_ptr,
-        entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+        entity_data_l2, fieldBase, L2));
     fe_physics_ptr->getOpPtrVector().push_back(new OpDGProjectionCoefficients(
         commonDataPtr->mFullStressPtr, stress_coeffs_ptr, mass_ptr,
-        entity_data_l2, AINSWORTH_LEGENDRE_BASE, L2));
+        entity_data_l2, fieldBase, L2));
 
     using OpPPMapVec = OpPostProcMapInMoab<DIM, DIM>;
     using OpPPMapTen = OpPostProcMapInMoab<3, 3>;
