@@ -166,12 +166,10 @@ add_custom_target(mfront_compile_behaviours
     ${TFEL_DIR}/bin/mfront --obuild --interface=generic ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHard.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LogPlastNonlinHardNoParam.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/IsotropicLinearHardeningPlasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/StandardLinearSolid.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/LinearElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SignoriniHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/OgdenHyperElasticity.mfront ${CMAKE_CURRENT_SOURCE_DIR}/behaviours/SaintVenantKirchhoffElasticity.mfront
 )
 
-if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
-  install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR} 
-    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE 
-    GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-endif()
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so DESTINATION ${MFRONT_INTERFACE_INSTALL_DIR} 
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE 
+  GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/src/libBehaviour.so)
     add_dependencies(mfront_make_link_to_behaviours_directory mfront_compile_behaviours)
