@@ -102,6 +102,8 @@ struct MFrontMoFEMInterface : public GenericElementInterface {
   bool isFiniteKinematics;
   BitRefLevel bIt;
 
+  FieldApproximationBase fieldBase;
+
   boost::shared_ptr<PostProcDomainOnRefinedMesh> postProcFe;
   boost::shared_ptr<DomainEle> updateIntVariablesElePtr;
 
