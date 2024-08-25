@@ -8,3 +8,6 @@ _Store
 
 .build-tools.cson
 .vscode
+/builds
+/include
+/src

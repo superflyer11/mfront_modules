@@ -1,0 +1,192 @@
+@DSL DefaultFiniteStrainDSL;
+@Behaviour ModifiedCamClay;
+@Author Your Name;
+@Date 2024-08-25;
+@Description{
+  "Comprehensive implementation of the Modified Cam Clay model for soil mechanics using MFront DSL."
+}
+
+// ------------------------------
+// Material Properties
+// ------------------------------
+@MaterialProperty real lambda;   // Slope of the normal consolidation line
+@MaterialProperty real kappa;    // Slope of the elastic swelling line
+@MaterialProperty real M;        // Slope of the critical state line
+@MaterialProperty real v0;       // Initial specific volume
+@MaterialProperty real nu;       // Poisson's ratio
+@MaterialProperty real pc0;      // Initial pre-consolidation pressure
+@MaterialProperty real pamb;     // Ambient pressure (atmospheric pressure)
+@MaterialProperty real e0;       // Initial void ratio
+@MaterialProperty real gamma;    // Unit weight of the soil
+
+// ------------------------------
+// State Variables
+// ------------------------------
+@StateVariable StressStensor sigma;      // Cauchy stress tensor
+@StateVariable StrainStensor epsp;       // Plastic strain tensor
+@StateVariable real pc;                  // Pre-consolidation pressure
+
+// ------------------------------
+// Auxiliary State Variables
+// ------------------------------
+@AuxiliaryStateVariable real e;          // Current void ratio
+@AuxiliaryStateVariable real v;          // Current specific volume
+@AuxiliaryStateVariable real epsv_p;     // Plastic volumetric strain
+
+// ------------------------------
+// Local Variables
+// ------------------------------
+@LocalVariable real K;                   // Bulk modulus
+@LocalVariable real G;                   // Shear modulus
+@LocalVariable real E;                   // Young's modulus
+@LocalVariable real M_squared;           // M squared
+@LocalVariable StressStensor sigma_trial;// Trial stress tensor
+@LocalVariable real f_trial;             // Yield function value at trial state
+@LocalVariable real delta_lambda;        // Plastic multiplier
+@LocalVariable StrainStensor depsilon;   // Total strain increment
+@LocalVariable StrainStensor deel;       // Elastic strain increment
+@LocalVariable StrainStensor depsp;      // Plastic strain increment
+
+// ------------------------------
+// Initialization of Local Variables
+// ------------------------------
+@InitLocalVariables{
+    // Check validity of material parameters
+    tfel::raise_if(lambda <= kappa, "Invalid parameters: lambda must be greater than kappa.");
+    tfel::raise_if(M <= 0.0, "Invalid parameter: M must be positive.");
+    tfel::raise_if(nu <= 0.0 || nu >= 0.5, "Invalid parameter: Poisson's ratio must be between 0 and 0.5.");
+
+    // Initialize auxiliary variables
+    e = e0;
+    v = 1.0 + e; // Specific volume v = 1 + e
+    epsv_p = 0.0;
+
+    // Initialize state variables
+    sigma = StressStensor::Zero(); // Assuming initial stress is zero
+    epsp = StrainStensor::Zero();
+    pc = pc0;
+
+    // Compute initial elastic moduli
+    K = pamb * (1 + e0) / kappa;
+    G = 1.5 * K * (1 - 2 * nu) / (1 + nu);
+    E = 2 * G * (1 + nu);
+
+    // Precompute M squared
+    M_squared = M * M;
+}
+
+// ------------------------------
+// Integrator
+// ------------------------------
+@Integrator{
+    // --------------------------
+    // Input: depsilon (total strain increment)
+    // --------------------------
+    // In practice, 'depsilon' is provided by the finite element solver.
+    // For demonstration, we define it explicitly here.
+    depsilon = StrainStensor{
+        {depsilon_xx, depsilon_xy, depsilon_xz},
+        {depsilon_yx, depsilon_yy, depsilon_yz},
+        {depsilon_zx, depsilon_zy, depsilon_zz}
+    };
+    // Replace 'depsilon_ij' with actual strain increment values.
+
+    // --------------------------
+    // Elastic Predictor Step
+    // --------------------------
+    // Compute trial elastic strain
+    deel = depsilon;
+
+    // Compute trial stress
+    sigma_trial = sigma + 2 * G * dev(deel) + K * trace(deel) * StressStensor::Id();
+
+    // Compute invariants
+    const real p_trial = (-1.0/3.0) * trace(sigma_trial); // Mean stress
+    const StressStensor s_trial = dev(sigma_trial);       // Deviatoric stress
+    const real q_trial = std::sqrt(1.5) * norm(s_trial);  // Deviatoric stress magnitude
+
+    // Compute current void ratio
+    e = e0 - (trace(depsilon) - epsv_p);
+
+    // Update pre-consolidation pressure
+    const real pc_trial = pc0 * std::exp((e0 - e) / (lambda - kappa));
+
+    // Evaluate yield function at trial state
+    f_trial = q_trial * q_trial + M_squared * p_trial * (p_trial - pc_trial);
+
+    // --------------------------
+    // Check Yield Condition
+    // --------------------------
+    if (f_trial <= 0.0) {
+        // Elastic step
+        sigma = sigma_trial;
+    } else {
+        // Plastic correction
+        // Compute plastic multiplier (delta_lambda) using Newton-Raphson method
+
+        // Initialize variables for iterative solution
+        delta_lambda = 0.0;
+        const int max_iter = 25;
+        const real tolerance = 1e-6;
+        real residual = f_trial;
+        int iter = 0;
+
+        // Initial guesses
+        real p = p_trial;
+        real q = q_trial;
+        real pc_new = pc_trial;
+
+        while (std::abs(residual) > tolerance && iter < max_iter) {
+            // Compute derivatives
+            const real dp_dlambda = -K * M_squared * p / q;
+            const real dq_dlambda = -2 * G;
+
+            // Update stresses
+            p += dp_dlambda * delta_lambda;
+            q += dq_dlambda * delta_lambda;
+            pc_new = pc0 * std::exp((e0 - e + delta_lambda * M) / (lambda - kappa));
+
+            // Update residual
+            residual = q * q + M_squared * p * (p - pc_new);
+
+            // Compute derivative of residual
+            const real dresidual_dlambda = 2 * q * dq_dlambda + M_squared * (dp_dlambda * (2 * p - pc_new) - p * (pc_new * M / (lambda - kappa)));
+
+            // Update delta_lambda
+            delta_lambda -= residual / dresidual_dlambda;
+
+            iter++;
+        }
+
+        // Update stresses
+        sigma = sigma_trial - 2 * G * delta_lambda * dev(deel) / norm(dev(deel)) - K * delta_lambda * M * StressStensor::Id();
+
+        // Update plastic strain
+        depsp = delta_lambda * M * StressStensor::Id() + delta_lambda * dev(deel) / norm(dev(deel));
+        epsp += depsp;
+
+        // Update pre-consolidation pressure and void ratio
+        pc = pc_new;
+        e -= delta_lambda * M;
+
+        // Ensure numerical stability
+        pc = std::max(pc, 1e-5);
+        e = std::max(e, 0.0);
+    }
+
+    // Update specific volume
+    v = 1.0 + e;
+}
+
+// ------------------------------
+// Post-Integration Updates
+// ------------------------------
+@UpdateAuxiliaryStateVariables{
+    // Update plastic volumetric strain
+    epsv_p = trace(epsp);
+
+    // Recompute elastic moduli based on updated void ratio
+    K = pamb * v / kappa;
+    G = 1.5 * K * (1 - 2 * nu) / (1 + nu);
+    E = 2 * G * (1 + nu);
+}
