@@ -15,7 +15,7 @@ Non-associated DP (perfect plasticity)
 F = alpha * I_1 + sqrt(J_2) - K
 };
 
-@Algorithm NewtonRaphson;
+// @Algorithm NewtonRaphson;
 @MaximumNumberOfIterations 100;
 
 @Brick StandardElasticity;
@@ -25,7 +25,7 @@ F = alpha * I_1 + sqrt(J_2) - K
 @Parameter local_zero_tolerance = 1.e-14;
 
 @ModellingHypotheses{".+"};
-@RequireStiffnessTensor<UnAltered>;
+// @RequireStiffnessTensor<UnAltered>;
 
 // Intercept of yield function
 @MaterialProperty real K;
