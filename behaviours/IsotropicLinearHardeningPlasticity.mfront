@@ -47,31 +47,30 @@ s0.setGlossaryName("YieldStress");
  * behaviour integration using a fully implicit Euler-backwark scheme.
  */
 @ProvidesSymmetricTangentOperator;
-@Integrator{
-  const auto lambda = computeLambda(young,nu);
-  const auto mu     = computeMu(young,nu);
+@Integrator {
+  const auto lambda = computeLambda(young, nu);
+  const auto mu = computeMu(young, nu);
+  // elastic loading
   eel += deto;
-  const auto se     = 2*mu*deviator(eel);
-  const auto seq_e  = sigmaeq(se);
-  const auto b      = seq_e-s0-H*p>stress{0};
-  if(b){
-    const auto iseq_e = 1/seq_e;
-    const auto n      = eval(3*se/(2*seq_e));
-    const auto cste   = 1/(H+3*mu);
-    dp   = (seq_e-s0-H*p)*cste;
-    eel -= dp*n;
-    if(computeTangentOperator_){
-      if(smt==CONSISTENTTANGENTOPERATOR){
-	Dt = (lambda*Stensor4::IxI()+2*mu*Stensor4::Id()
-	      -4*mu*mu*(dp*iseq_e*(Stensor4::M()-(n^n))+cste*(n^n)));
-      } else {
-	Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
-      }
-    }
-  } else {
-    if(computeTangentOperator_){
-      Dt = lambda*Stensor4::IxI()+2*mu*Stensor4::Id();
+  if(computeTangentOperator_){
+    Dt = lambda * Stensor4::IxI() + 2 * mu * Stensor4::Id();
+  }
+  // trial equivalent stress
+  const auto se = 2 * mu * deviator(eel);
+  const auto seq_e = sigmaeq(se);
+  const auto plastic_loading = seq_e - s0 - H * p > stress{0};
+  // plastic loading
+  if (plastic_loading) {
+    const auto iseq_e = 1 / seq_e;
+    const auto n = eval(3 * se / (2 * seq_e));
+    const auto cste = 1 / (H + 3 * mu);
+    dp = (seq_e - s0 - H * p) * cste;
+    eel -= dp * n;
+    if ((computeTangentOperator_) && (smt == CONSISTENTTANGENTOPERATOR)) {
+      Dt -= 4 * mu * mu *
+            (dp * iseq_e * (Stensor4::M() - (n ^ n)) + cste * (n ^ n));
     }
   }
-  sig = lambda*trace(eel)*Stensor::Id()+2*mu*eel;
+  // stress update
+  sig = lambda * trace(eel) * Stensor::Id() + 2 * mu * eel;
 }
