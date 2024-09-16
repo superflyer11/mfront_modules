@@ -1,5 +1,5 @@
 @DSL Implicit;
-@Behaviour ModCamClay_semiExpl;
+@Behaviour SemiExplicitModifiedCamClay_OpenGeoSys2023;
 @Author Christian Silbermann, Eric Simo, Miguel Mánica, Thomas Helfer, Thomas Nagel;
 @Date 10/01/2023;
 @Description{
@@ -41,13 +41,13 @@ nu.setGlossaryName("PoissonRatio");
 @PhysicalBounds M in [0:*[;
 M.setEntryName("CriticalStateLineSlope");
 
-@MaterialProperty real la;
-@PhysicalBounds la in [0:*[;
-la.setEntryName("VirginConsolidationLineSlope");
-
 @MaterialProperty real ka;
 @PhysicalBounds ka in [0:*[;
 ka.setEntryName("SwellingLineSlope");
+
+@MaterialProperty real la;
+@PhysicalBounds la in [0:*[;
+la.setEntryName("VirginConsolidationLineSlope");
 
 @MaterialProperty stress pc_char;
 pc_char.setEntryName("CharacteristicPreConsolidationPressure");
@@ -88,11 +88,6 @@ v.setEntryName("VolumeRatio");  // Total volume per solid volume = inv(1 - poros
 
 @InitLocalVariables
 {
-    /// added by TL
-    pc = pc_char;
-    epl_V = 0;
-    v = v0;
-    //
     tfel::raise_if(la < ka, "Invalid parameters: la<ka");
     M2 = M * M;
 

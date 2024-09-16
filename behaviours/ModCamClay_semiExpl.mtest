@@ -1,0 +1,42 @@
+@Author HELFER Thomas;
+@Date   09/09/2024;
+@Description{
+
+};
+
+@MaximumNumberOfSubSteps 1;
+@MaximumNumberOfIterations 5;
+@ModellingHypothesis 'Tridimensional';
+@Behaviour '/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so' 'ModCamClay_semiExpl';
+
+// material properties
+@MaterialProperty<constant> 'PoissonRatio' 0.3;
+@MaterialProperty<constant> 'CriticalStateLineSlope' 1.2;
+@MaterialProperty<constant> 'SwellingLineSlope' 6.6e-3;
+@MaterialProperty<constant> 'VirginConsolidationLineSlope' 7.7e-2;
+@MaterialProperty<constant> 'InitialVolumeRatio' 1.788;
+@MaterialProperty<constant> 'CharacteristicPreConsolidationPressure' 200.0e3;
+
+// external state variable
+@ExternalStateVariable 'Temperature' 293.15;
+
+@InternalStateVariable 'PreConsolidationPressure' 200.0e3;
+@InternalStateVariable 'VolumeRatio' 1.788;
+
+@Stress {-2.e5, -2.e5, -2.e5, 0.0, 0.0, 0.0};
+
+@ImposedStress 'SXX' {0 : -2.0e5, 0.02: -2.0 1: -2.0e5};
+@ImposedStress 'SYY' {0 : -2.0e5, 0.02: -2.0 1: -2.0e5};
+@ImposedStress 'SZZ' {0 : -2.0e5, 0.02: -2.0 0.5: -5.87387e5};
+@Times {0.,1 in 200};
+
+@Print "Trying to print from mtest";
+// ignore test results
+// @Test<function> {
+// 'SXX' : 'YoungModulus * EXX', 'SYY' : '0','SZZ' : '0',
+// 'SXY' : '0', 'SXZ' : '0','SYZ' : '0'
+// } 1e-2;
+// @Test<function> {
+// 'EYY' : '-PoissonRatio * EXX','EZZ' : '-PoissonRatio * EXX',
+// 'EXY' : '0', 'EXZ' : '0','EYZ' : '0'
+// } 1e-14;

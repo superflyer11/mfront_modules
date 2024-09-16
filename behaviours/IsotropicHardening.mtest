@@ -1,0 +1,33 @@
+// loading the model
+@Behaviour '/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so' 'IsotropicLinearHardeningPlasticity';
+@MaterialProperty<constant> 'YoungModulus' 200e3;
+@MaterialProperty<constant> 'PoissonRatio' 0.3;
+@MaterialProperty<constant> 'HardeningSlope' 10000;
+@MaterialProperty<constant> 'YieldStrength' 250e3;
+@ExternalStateVariable 'Temperature' 293.15;
+@ImposedStrain 'EXX' {0 : 0, 1 : 2};
+@Times{0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1};
+// @Test<function> {
+// 'SXX' : 'YoungModulus * EXX', 'SYY' : '0','SZZ' : '0',
+// 'SXY' : '0', 'SXZ' : '0','SYZ' : '0'
+// } 1e-2;
+// @Test<function> {
+// 'EYY' : '-PoissonRatio * EXX','EZZ' : '-PoissonRatio * EXX',
+// 'EXY' : '0', 'EXZ' : '0','EYZ' : '0'
+// } 1e-14;
+// Threshold strain for yielding
+// @LocalVariable real epsilon_y;
+// epsilon_y = YieldStrength / YoungModulus;
+
+// Hardening formula for stress-strain curve
+@Test<function> {
+  'SXX' : 'EXX < (YieldStrength / YoungModulus) ? YoungModulus * EXX : YieldStrength + HardeningSlope * (EXX - (YieldStrength / YoungModulus))', 
+  'SYY' : '0','SZZ' : '0',
+  'SXY' : '0', 'SXZ' : '0','SYZ' : '0'
+} 1e-2;
+
+// Poisson's effect on lateral strain
+@Test<function> {
+  'EYY' : '-PoissonRatio * EXX','EZZ' : '-PoissonRatio * EXX',
+  'EXY' : '0', 'EXZ' : '0','EYZ' : '0'
+} 1e-14;
