@@ -20,9 +20,10 @@ poisson_ratio.setGlossaryName("PoissonRatio");
 @StateVariable strain p[2];
 p.setGlossaryName("EquivalentPlasticStrain");
 
-@LocalVariable bool bpl[2];
 @LocalVariable real tg;
 @LocalVariable real R;
+@LocalVariable real Re;
+@LocalVariable bool bpl[2];
 
 @MaterialProperty stress d;
 d.setEntryName("d");
@@ -47,7 +48,7 @@ pb.setEntryName("pb");
 }
 
 @Predictor {
-    // moved everything to integrator
+    // moved everything to inside integrator
 }
 
 @Integrator {

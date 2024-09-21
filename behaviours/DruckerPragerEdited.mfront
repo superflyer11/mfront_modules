@@ -5,22 +5,31 @@
 
 @ModellingHypotheses{".+"};
 
-@Epsilon 1.e-16;
+@Epsilon 1.e-10;
 @Theta 1.;
 
-@Brick StandardElasticity{young_modulus : 150e9, poisson_ratio : 0.3};
+@Brick StandardElasticity{young_modulus : 150e3, poisson_ratio : 0.3};
 
 @StateVariable strain p[2];
 p.setGlossaryName("EquivalentPlasticStrain");
 
+// @Parameter d    = 150;
+// @Parameter beta = 0.6;
+// @Parameter pa   = -10;
+// @Parameter pb   = -75;
+
 // maximum VM stress
-@Parameter d    = 150;
+@MaterialProperty stress d;
+d.setEntryName("d");
 // slope of the cap
-@Parameter beta = 0.6;
+@MaterialProperty real beta;
+beta.setEntryName("beta");
 // hydrostatic pressure at the cap
-@Parameter pa   = 10;
+@MaterialProperty stress pa;
+pa.setEntryName("pa");
 // minimum hydrostatic pressure
-@Parameter pb   = 0;
+@MaterialProperty stress pb;
+pb.setEntryName("pb");
 
 @LocalVariable real tg;
 @LocalVariable real R;

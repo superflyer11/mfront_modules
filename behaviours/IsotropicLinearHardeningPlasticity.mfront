@@ -17,7 +17,7 @@
 
 @StateVariable StrainStensor eel;
 eel.setGlossaryName("ElasticStrain");
-@StateVariable strain p;
+@StateVariable strain p; 
 p.setGlossaryName("EquivalentPlasticStrain");
 
 @MaterialProperty real young;

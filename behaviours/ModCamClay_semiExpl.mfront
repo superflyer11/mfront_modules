@@ -189,7 +189,7 @@ v.setEntryName("VolumeRatio");  // Total volume per solid volume = inv(1 - poros
     dfrpc_ddrpc = 1 + deplV * the * theta + dfrpc_ddeplV * dlp * trace(dn_ddrpc);
 }
 
-@ComputeFinalStress {
+@    {
     // updating the stress at the end of the time step
     sig = sig0 + dsig_deel * deel;
 }
