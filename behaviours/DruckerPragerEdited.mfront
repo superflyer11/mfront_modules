@@ -8,7 +8,8 @@
 @Epsilon 1.e-10;
 @Theta 1.;
 
-@Brick StandardElasticity{young_modulus : 150e3, poisson_ratio : 0.3};
+@Brick StandardElasticity;
+// @Brick StandardElasticity{young_modulus : 150e3, poisson_ratio : 0.3};
 
 @StateVariable strain p[2];
 p.setGlossaryName("EquivalentPlasticStrain");
@@ -19,6 +20,7 @@ p.setGlossaryName("EquivalentPlasticStrain");
 // @Parameter pb   = -75;
 
 // maximum VM stress
+
 @MaterialProperty stress d;
 d.setEntryName("d");
 // slope of the cap
@@ -31,12 +33,17 @@ pa.setEntryName("pa");
 @MaterialProperty stress pb;
 pb.setEntryName("pb");
 
+
+@LocalVariable real lambda;
+@LocalVariable real mu;
 @LocalVariable real tg;
 @LocalVariable real R;
 @LocalVariable real Re;
 @LocalVariable bool bpl[2];
 
 @InitLocalVariables {
+  lambda = computeLambda(young, nu);
+  mu = computeMu(young, nu);
   tg = tan(beta);
   R = (pa - pb) / (d - pa * tg);
 }
