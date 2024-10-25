@@ -1,5 +1,5 @@
 @DSL DefaultDSL;
-@Behaviour IsotropicLinearHardeningPlasticity;
+@Behaviour VonMisesIsotropicLinearHardening;
 @Author Thomas Helfer;
 @Date   14/10/2016;
 @Description{
@@ -13,12 +13,14 @@
   "\]"
 }
 
-
-
 @StateVariable StrainStensor eel;
 eel.setGlossaryName("ElasticStrain");
+@StateVariable StrainStensor epl;
+epl.setGlossaryName("PlasticStrain"); // purely for visualizing data when running in mtest
 @StateVariable strain p; 
 p.setGlossaryName("EquivalentPlasticStrain");
+@AuxiliaryStateVariable stress sigeeqtrial;
+sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
 
 @MaterialProperty real young;
 young.setGlossaryName("YoungModulus");
@@ -28,11 +30,10 @@ nu.setGlossaryName("PoissonRatio");
 H.setEntryName("HardeningSlope");
 @MaterialProperty real s0;
 s0.setGlossaryName("YieldStress");
-
 /*!
  * computation of the prediction operator: we only provide the elastic
  * operator.
- *
+ *  
  * We could also provide a tangent operator, but this would mean
  * saving an auxiliary state variable stating if a plastic loading
  * occured at the previous time step.
@@ -51,26 +52,30 @@ s0.setGlossaryName("YieldStress");
   const auto lambda = computeLambda(young, nu);
   const auto mu = computeMu(young, nu);
   // elastic loading
-  eel += deto;
+  deel = deto; 
   if(computeTangentOperator_){
     Dt = lambda * Stensor4::IxI() + 2 * mu * Stensor4::Id();
   }
   // trial equivalent stress
-  const auto se = 2 * mu * deviator(eel);
+  const auto se = 2 * mu * deviator(eel + deel);
   const auto seq_e = sigmaeq(se);
+  sigeeqtrial = seq_e;
   const auto plastic_loading = seq_e - s0 - H * p > stress{0};
   // plastic loading
   if (plastic_loading) {
     const auto iseq_e = 1 / seq_e;
     const auto n = eval(3 * se / (2 * seq_e));
-    const auto cste = 1 / (H + 3 * mu);
-    dp = (seq_e - s0 - H * p) * cste;
-    eel -= dp * n;
+    // const auto cste = 1 / (H + 3 * mu);
+    dp = (seq_e - s0 - H * p) * (1 / (H + 3 * mu));
+    deel -= dp * n;
+    // using this line to extract the plastic strain
+    epl += dp * n;
     if ((computeTangentOperator_) && (smt == CONSISTENTTANGENTOPERATOR)) {
       Dt -= 4 * mu * mu *
-            (dp * iseq_e * (Stensor4::M() - (n ^ n)) + cste * (n ^ n));
+            (dp * iseq_e * (Stensor4::M() - (n ^ n)) + (1 / (H + 3 * mu)) * (n ^ n));
     }
   }
   // stress update
-  sig = lambda * trace(eel) * Stensor::Id() + 2 * mu * eel;
+  sig = lambda * trace(eel + deel) * Stensor::Id() + 2 * mu * (eel + deel);
 }
+// note eel is then updated after @Integrator using its increment

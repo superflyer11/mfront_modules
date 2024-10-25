@@ -1,25 +1,19 @@
 @DSL Implicit;
-@Behaviour DruckerPragerCap;
+@Behaviour DruckerPragerCapOriginal;
 @Author Thomas Helfer;
 @Date 15 / 05 / 2018;
-
+@Description {
+  same notation as gallery except parameters to material properties
+}
 @ModellingHypotheses{".+"};
 
-@Epsilon 1.e-10;
+@Epsilon 1.e-16;
 @Theta 1.;
 
 @Brick StandardElasticity;
-// @Brick StandardElasticity{young_modulus : 150e3, poisson_ratio : 0.3};
 
 @StateVariable strain p[2];
 p.setGlossaryName("EquivalentPlasticStrain");
-
-// @Parameter d    = 150;
-// @Parameter beta = 0.6;
-// @Parameter pa   = -10;
-// @Parameter pb   = -75;
-
-// maximum VM stress
 
 @MaterialProperty stress d;
 d.setEntryName("d");
@@ -33,7 +27,6 @@ pa.setEntryName("pa");
 @MaterialProperty stress pb;
 pb.setEntryName("pb");
 
-
 @LocalVariable real lambda;
 @LocalVariable real mu;
 @LocalVariable real tg;
@@ -41,11 +34,15 @@ pb.setEntryName("pb");
 @LocalVariable real Re;
 @LocalVariable bool bpl[2];
 
+@AuxiliaryStateVariable stress sigeeqtrial;
+sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
+
+
 @InitLocalVariables {
-  lambda = computeLambda(young, nu);
-  mu = computeMu(young, nu);
   tg = tan(beta);
   R = (pa - pb) / (d - pa * tg);
+  lambda = computeLambda(young, nu);
+  mu = computeMu(young, nu);
 }
 
 @Predictor{
@@ -53,6 +50,7 @@ pb.setEntryName("pb");
   // Drucker-Prager
   const auto prel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
+  sigeeqtrial = qel;
   bpl[0] = (qel + prel * tg - d > 0) && (prel > pa);
   // Cap
   const auto seq_c = sqrt(power<2>(prel - pa) +  //

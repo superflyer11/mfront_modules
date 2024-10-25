@@ -1,0 +1,112 @@
+@DSL Implicit;
+@Behaviour DruckerPragerSimple;
+@Date 15 / 10 / 2024;
+@Algorithm NewtonRaphson_NumericalJacobian;
+@PerturbationValueForNumericalJacobianComputation 1.e-8;
+@ModellingHypotheses{".+"};
+@Description{
+  Simple Drucker Prager with normal plastic flow
+  Yield surface defined by:
+  "\["
+  "  f(p, q) = - M_JP * p + \frac{q}{\sqrt{3}} - \frac{M_JP * c'}{\tan(\phi)}"
+  "\]"
+  Compared to gallery implementation,
+  a more elaborate form based on material properties.
+  the von Mises norm q is corrected back to a textbook sqrtJ2 for convenience
+  Definition of M_JP in triaxial compression:
+  "\["
+  "  M_{JP} = \frac{2 \sqrt{3} \sin(\phi')}{3 - \sin(\phi')}"
+  "\]"
+  Definition of M_JP in triaxial extension:
+  "\["
+  "  M_{JP} = \frac{2 \sqrt{3} \sin(\phi')}{3 + \sin(\phi')}"
+  "\]"
+}
+
+
+@Epsilon 1.e-10;
+@Theta 1.;
+
+@Brick StandardElasticity;
+// phi is the internal friction angle
+@MaterialProperty real phi;
+phi.setEntryName("phi");
+// c is cohesion
+@MaterialProperty real c;
+c.setEntryName("c");
+
+@LocalVariable real lambda;
+@LocalVariable real mu;
+@LocalVariable bool bpl;
+@LocalVariable real MJP;
+
+@StateVariable strain p;
+p.setGlossaryName("EquivalentPlasticStrain");
+@AuxiliaryStateVariable stress sigeeqtrial;
+sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
+@AuxiliaryStateVariable StrainStensor epl;
+epl.setGlossaryName("PlasticStrain");
+@AuxiliaryStateVariable real test;
+test.setEntryName("test");
+
+
+
+@InitLocalVariables {
+  lambda = computeLambda(young, nu);
+  mu = computeMu(young, nu);
+  MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
+}
+
+// computed at t + theta * dt
+@Predictor{
+  const auto sigel = computeElasticPrediction();
+  const auto pel = trace(sigel) / 3;
+  const auto qel = sigmaeq(sigel);
+  sigeeqtrial = qel;
+  bpl = (- MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
+  test = - MJP * pel + qel / sqrt(3) - MJP * c / tan(phi);
+}
+
+// each iteration at t + theta * dp
+@Integrator {
+  const auto id = Stensor::Id();
+  const auto seps =  real(1.e-12) * young;
+  if (bpl) {
+    const auto pr = trace(sig) / 3;
+    const auto q = sigmaeq(sig);
+    // nq is the derivative of the equivalent von Mises stress
+    const auto iq = 1 / max(q, seps);
+    const auto nq = eval(3 * deviator(sig) *  (iq / 2));
+    // const auto nq = eval(3 * deviator(sig) / (2 * max(q,seps)));
+
+    // df_dsig here is based on the yield function
+    // const auto df_dsig   = eval(nq+(tg/3)*id); // this is the form from the mfront gallery
+    const auto df_dsig   = eval((- MJP/3) * id + (nq /sqrt(3)));
+    feel += dp * df_dsig; // clearer for learning purpose
+    fp =  (- MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
+  }
+} // end of @Integrator
+
+@UpdateAuxiliaryStateVariables
+{
+  epl += deto-deel;
+}
+
+// not needed for a single surface (?)
+// @AdditionalConvergenceChecks {
+//   if (converged){
+//     if (bpl) {
+//       if (dp < 0) {
+//         // desactivating this system
+//         converged = bpl = false;
+//       }
+//     } else {
+//       const auto pr = trace(sig) / 3;
+//       const auto q = sigmaeq(sig);
+//       if (q + pr * tg > d) {
+//         converged = false;
+//         bpl = true;
+//       }
+//     }
+//   }
+// }
