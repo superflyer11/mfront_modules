@@ -23,15 +23,12 @@
   "\]"
 }
 
-
 @Epsilon 1.e-10;
 @Theta 1.;
 
 @Brick StandardElasticity;
-// phi is the internal friction angle
 @MaterialProperty real phi;
 phi.setEntryName("phi");
-// c is cohesion
 @MaterialProperty real c;
 c.setEntryName("c");
 
@@ -49,15 +46,12 @@ epl.setGlossaryName("PlasticStrain");
 @AuxiliaryStateVariable real test;
 test.setEntryName("test");
 
-
-
 @InitLocalVariables {
   lambda = computeLambda(young, nu);
   mu = computeMu(young, nu);
   MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
 }
 
-// computed at t + theta * dt
 @Predictor{
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
@@ -67,7 +61,6 @@ test.setEntryName("test");
   test = - MJP * pel + qel / sqrt(3) - MJP * c / tan(phi);
 }
 
-// each iteration at t + theta * dp
 @Integrator {
   const auto id = Stensor::Id();
   const auto seps =  real(1.e-12) * young;
@@ -77,12 +70,9 @@ test.setEntryName("test");
     // nq is the derivative of the equivalent von Mises stress
     const auto iq = 1 / max(q, seps);
     const auto nq = eval(3 * deviator(sig) *  (iq / 2));
-    // const auto nq = eval(3 * deviator(sig) / (2 * max(q,seps)));
 
-    // df_dsig here is based on the yield function
-    // const auto df_dsig   = eval(nq+(tg/3)*id); // this is the form from the mfront gallery
     const auto df_dsig   = eval((- MJP/3) * id + (nq /sqrt(3)));
-    feel += dp * df_dsig; // clearer for learning purpose
+    feel += dp * df_dsig; 
     fp =  (- MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
   }
 } // end of @Integrator
@@ -91,22 +81,3 @@ test.setEntryName("test");
 {
   epl += deto-deel;
 }
-
-// not needed for a single surface (?)
-// @AdditionalConvergenceChecks {
-//   if (converged){
-//     if (bpl) {
-//       if (dp < 0) {
-//         // desactivating this system
-//         converged = bpl = false;
-//       }
-//     } else {
-//       const auto pr = trace(sig) / 3;
-//       const auto q = sigmaeq(sig);
-//       if (q + pr * tg > d) {
-//         converged = false;
-//         bpl = true;
-//       }
-//     }
-//   }
-// }
