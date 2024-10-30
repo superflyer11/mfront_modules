@@ -18,6 +18,10 @@
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
 
+@MaterialProperty stress s0;
+s0.setGlossaryName("YieldStress");
+@MaterialProperty stress H;
+H.setEntryName("HardeningSlope");
 
 @StateVariable strain p; 
 p.setGlossaryName("EquivalentPlasticStrain");
@@ -25,11 +29,6 @@ p.setGlossaryName("EquivalentPlasticStrain");
 epl.setGlossaryName("PlasticStrain");
 @AuxiliaryStateVariable stress sigeeqtrial;
 sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
-
-@MaterialProperty stress s0;
-s0.setGlossaryName("YieldStress");
-@MaterialProperty stress H;
-H.setEntryName("HardeningSlope");
 
 // local variables
 @LocalVariable bool integration;

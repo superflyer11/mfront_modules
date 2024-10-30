@@ -13,6 +13,15 @@
   "\]"
 }
 
+@MaterialProperty real young;
+young.setGlossaryName("YoungModulus");
+@MaterialProperty real nu;
+nu.setGlossaryName("PoissonRatio");
+@MaterialProperty real H;
+H.setEntryName("HardeningSlope");
+@MaterialProperty real s0;
+s0.setGlossaryName("YieldStress");
+
 @StateVariable StrainStensor eel;
 eel.setGlossaryName("ElasticStrain");
 @StateVariable StrainStensor epl;
@@ -22,14 +31,6 @@ p.setGlossaryName("EquivalentPlasticStrain");
 @AuxiliaryStateVariable stress sigeeqtrial;
 sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
 
-@MaterialProperty real young;
-young.setGlossaryName("YoungModulus");
-@MaterialProperty real nu;
-nu.setGlossaryName("PoissonRatio");
-@MaterialProperty real H;
-H.setEntryName("HardeningSlope");
-@MaterialProperty real s0;
-s0.setGlossaryName("YieldStress");
 /*!
  * computation of the prediction operator: we only provide the elastic
  * operator.
