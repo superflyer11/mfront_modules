@@ -1,18 +1,14 @@
 @DSL Implicit;
-@Behaviour DruckerPragerSimple;
-@Date 15 / 10 / 2024;
+@Behaviour DruckerPragerHyperboloidal;
+@Date 08 / 11 / 2024;
 @Algorithm NewtonRaphson_NumericalJacobian;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
 @Description{
-  Simple Drucker Prager with normal plastic flow
+  Derived a Drucker Prager with parabolodial form with normal plastic flow
   Yield surface defined by:
-  "\["
-  "  f(p, q) = - M_JP * p + \frac{q}{\sqrt{3}} - \frac{M_JP * c'}{\tan(\phi)}"
-  "\]"
-  Compared to gallery implementation,
-  a more elaborate form based on material properties.
-  the von Mises norm q is corrected back to a textbook sqrtJ2 for convenience
+
+  Compared to cone implemention, this paraboloid fit overestimates the yield surface
   Definition of M_JP in triaxial compression:
   "\["
   "  M_{JP} = \frac{2 \sqrt{3} \sin(\phi')}{3 - \sin(\phi')}"
@@ -31,6 +27,8 @@
 phi.setEntryName("phi");
 @MaterialProperty real c;
 c.setEntryName("c");
+@MaterialProperty real a;
+a.setEntryName("proximity");
 
 @LocalVariable real lambda;
 @LocalVariable real mu;
@@ -42,6 +40,7 @@ p.setGlossaryName("EquivalentPlasticStrain");
 @AuxiliaryStateVariable StrainStensor epl;
 epl.setGlossaryName("PlasticStrain");
 
+
 @InitLocalVariables {
   lambda = computeLambda(young, nu);
   mu = computeMu(young, nu);
@@ -52,21 +51,27 @@ epl.setGlossaryName("PlasticStrain");
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
-  bpl = (- MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
+  bpl = (- MJP * pel - MJP * c / tan(phi) + sqrt(a*power<2>(MJP) + power<2>(qel/sqrt(3))) > 0);
 }
 
 @Integrator {
   const auto id = Stensor::Id();
-  const auto seps =  real(1.e-12) * young;
+  // const auto seps =  real(1.e-12) * young;
   if (bpl) {
     const auto pr = trace(sig) / 3;
     const auto q = sigmaeq(sig);
     // nq is the derivative of the equivalent von Mises stress
-    const auto iq = 1 / max(q, seps);
-    const auto nq = eval(3 * deviator(sig) *  (iq / 2));
-    const auto df_dsig   = eval((- MJP/3) * id + (nq /sqrt(3)));
+    // const auto iq = 1 / max(q, seps);
+    // const auto nq = eval(3 * deviator(sig) * (iq / 2));
+    // const auto a = -3 * MJP;
+    // const auto a = -3 * MJP;
+    // const auto b = - 6 * power<2>(MJP) * c / tan(phi);
+    // const auto df_dsig   = eval((- (2 * a * pr + b)/3) * id + 3* deviator(sig));
+    const auto df_dsig   = eval((-MJP/3) * id + deviator(sig)/(2*sqrt(a*power<2>(MJP)+power<2>(q)/3)));
+    // const auto df_dsig   = eval((- MJP/3) * id + (nq /sqrt(3)));
     feel += dp * df_dsig; 
-    fp =  (- MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
+    fp =  (- MJP * pr - MJP * c / tan(phi) + sqrt(a*power<2>(MJP) + power<2>(q/sqrt(3))))/young;
+    // fp =  (- MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
   }
 } // end of @Integrator
 

@@ -1,5 +1,5 @@
 @DSL Implicit;
-@Behaviour DruckerPrager;
+@Behaviour DruckerPragerNonAssociated;
 @Date 21 / 10 / 2024;
 @Algorithm NewtonRaphson_NumericalJacobian;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
@@ -50,9 +50,6 @@ p.setGlossaryName("EquivalentPlasticStrain");
 sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
 @AuxiliaryStateVariable StrainStensor epl;
 epl.setGlossaryName("PlasticStrain");
-@AuxiliaryStateVariable real test;
-test.setEntryName("test");
-
 
 
 @InitLocalVariables {
@@ -69,8 +66,7 @@ test.setEntryName("test");
   const auto qel = sigmaeq(sigel);
   sigeeqtrial = qel;
   bpl = (- MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
-  test = - MJP * pel + qel / sqrt(3) - MJP * c / tan(phi);
-} $%
+}
 
 // each iteration at t + theta * dp
 @Integrator {
@@ -85,10 +81,9 @@ test.setEntryName("test");
     // const auto nq = eval(3 * deviator(sig) / (2 * max(q,seps)));
 
     // df_dsig here is based on the yield function
-    // const auto df_dsig   = eval(nq+(tg/3)*id); // this is the form from the mfront gallery
-    // in non-associated, there are no changes to the derivatives that composes df_dsig
-    const auto df_dsig   = eval((- MJP/3) * id + (nq /sqrt(3)));
-    feel += dp * df_dsig;
+    // const auto df_dsig  = eval(nq+(tg/3)*id); // this is the form from the mfront gallery
+    const auto n   = eval((- MPP_JP/3) * id + (nq /sqrt(3)));
+    feel += dp * n;
     // but there are change to the plastic flow, but cant figure out yets
     fp =  (- MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
     // fp =  (- MPP_JP * pr + q / sqrt(3) - MPP_JP * c / tan(phi))/young;
