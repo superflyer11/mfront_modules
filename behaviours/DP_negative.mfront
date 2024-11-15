@@ -1,11 +1,11 @@
 @DSL Implicit;
-@Behaviour DruckerPragerNonAssociated;
-@Date 21 / 10 / 2024;
+@Behaviour DruckerPragerSimple;
+@Date 15 / 10 / 2024;
 @Algorithm NewtonRaphson_NumericalJacobian;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
 @Description{
-  Simple Drucker Prager with option to choose associated or non-associated plastic flow
+  Simple Drucker Prager with normal plastic flow
   Yield surface defined by:
   "\["
   "  f(p, q) = - M_JP * p + \frac{q}{\sqrt{3}} - \frac{M_JP * c'}{\tan(\phi)}"
@@ -23,41 +23,31 @@
   "\]"
 }
 
-
 @Epsilon 1.e-10;
 @Theta 1.;
 
 @Brick StandardElasticity;
-// phi is the internal friction angle
 @MaterialProperty real phi;
 phi.setEntryName("phi");
-// c is cohesion
 @MaterialProperty real c;
 c.setEntryName("c");
-// v is angle of dilation
-@MaterialProperty real v;
-v.setEntryName("v");
 
 @LocalVariable real lambda;
 @LocalVariable real mu;
 @LocalVariable bool bpl;
 @LocalVariable real MJP;
-@LocalVariable real MPP_JP;
 
 @StateVariable strain p;
 p.setGlossaryName("EquivalentPlasticStrain");
 @AuxiliaryStateVariable StrainStensor epl;
 epl.setGlossaryName("PlasticStrain");
 
-
 @InitLocalVariables {
   lambda = computeLambda(young, nu);
   mu = computeMu(young, nu);
   MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
-  MPP_JP = 2 * sqrt(3) * sin(v) / (3 - sin(v));
 }
 
-// computed at t + theta * dt
 @Predictor{
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
@@ -65,7 +55,6 @@ epl.setGlossaryName("PlasticStrain");
   bpl = (MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
 }
 
-// each iteration at p + theta * dp
 @Integrator {
   const auto id = Stensor::Id();
   const auto seps =  real(1.e-12) * young;
@@ -74,8 +63,8 @@ epl.setGlossaryName("PlasticStrain");
     const auto q = sigmaeq(sig);
     const auto iq = 1 / max(q, seps);
     const auto nq = eval(3 * deviator(sig) *  (iq / 2));
-    const auto dg_dsig  = eval((MPP_JP/3) * id + (nq /sqrt(3)));
-    feel += dp * dg_dsig;
+    const auto df_dsig   = eval((MJP/3) * id + (nq /sqrt(3)));
+    feel += dp * df_dsig; 
     fp =  (MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
   }
 } // end of @Integrator
@@ -84,22 +73,3 @@ epl.setGlossaryName("PlasticStrain");
 {
   epl += deto-deel;
 }
-
-// not needed for a single surface (?)
-// @AdditionalConvergenceChecks {
-//   if (converged){
-//     if (bpl) {
-//       if (dp < 0) {
-//         // desactivating this system
-//         converged = bpl = false;
-//       }
-//     } else {
-//       const auto pr = trace(sig) / 3;
-//       const auto q = sigmaeq(sig);
-//       if (q + pr * tg > d) {
-//         converged = false;
-//         bpl = true;
-//       }
-//     }
-//   }
-// }

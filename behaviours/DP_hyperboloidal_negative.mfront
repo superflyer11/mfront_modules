@@ -1,5 +1,5 @@
 @DSL Implicit;
-@Behaviour DruckerPragerHyperboloidalHardening;
+@Behaviour DruckerPragerHyperboloidal;
 @Date 08 / 11 / 2024;
 @Algorithm NewtonRaphson_NumericalJacobian;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
@@ -29,8 +29,6 @@ phi.setEntryName("phi");
 c.setEntryName("c");
 @MaterialProperty real a;
 a.setEntryName("proximity");
-@MaterialProperty stress H;
-H.setEntryName("HardeningSlope");
 
 @LocalVariable real lambda;
 @LocalVariable real mu;
@@ -53,7 +51,7 @@ epl.setGlossaryName("PlasticStrain");
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
-  bpl = ( MJP * pel - MJP * c / tan(phi) + sqrt(a*power<2>(MJP) + power<2>(qel/sqrt(3)) - H * p) > 0);
+  bpl = ( MJP * pel + sqrt(a*power<2>(MJP) + power<2>(qel/sqrt(3)) - MJP * c / tan(phi)) > 0);
 }
 
 @Integrator {
@@ -64,7 +62,7 @@ epl.setGlossaryName("PlasticStrain");
     const auto q = sigmaeq(sig);
     const auto df_dsig   = eval((MJP/3) * id + deviator(sig)/(2*sqrt(a*power<2>(MJP)+power<2>(max(q, seps))/3)));
     feel += dp * df_dsig; 
-    fp =  ( MJP * pr + sqrt(a*power<2>(MJP) + power<2>(max(q, seps)/sqrt(3))) - MJP * c / tan(phi) - H * (p + theta * dp))/young;
+    fp =  (+ MJP * pr + sqrt(a*power<2>(MJP) + power<2>(max(q, seps)/sqrt(3)))  - MJP * c / tan(phi))/young;
   }
 } // end of @Integrator
 
