@@ -37,10 +37,13 @@ c.setEntryName("c");
 @LocalVariable bool bpl;
 @LocalVariable real MJP;
 
+
 @StateVariable strain p;
 p.setGlossaryName("EquivalentPlasticStrain");
 @AuxiliaryStateVariable StrainStensor epl;
 epl.setGlossaryName("PlasticStrain");
+@AuxiliaryStateVariable real test;
+test.setEntryName("yielding");
 
 @InitLocalVariables {
   lambda = computeLambda(young, nu);
@@ -53,6 +56,7 @@ epl.setGlossaryName("PlasticStrain");
   const auto pel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
   bpl = (MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
+  test = MJP * pel + qel / sqrt(3) - MJP * c / tan(phi);
 }
 
 @Integrator {
