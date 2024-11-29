@@ -53,8 +53,8 @@ test.setEntryName("yielding");
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
-  bpl = ( MJP * pel + sqrt(a * power<2>(MJP) + power<2>(qel / sqrt(3))) - MJP * c / tan(phi) > 0);
-  test = MJP * pel + sqrt(a * power<2>(MJP) + power<2>(qel / sqrt(3))) - MJP * c / tan(phi);
+  bpl = ( MJP * pel + sqrt(power<2>(a) * power<2>(MJP) + power<2>(qel / sqrt(3))) - MJP * c / tan(phi) > 0);
+  test = MJP * pel + sqrt(power<2>(a) * power<2>(MJP) + power<2>(qel / sqrt(3))) - MJP * c / tan(phi);
 }
 
 @Integrator {
@@ -63,7 +63,7 @@ test.setEntryName("yielding");
   if (bpl) {
     const auto pr = trace(sig) / 3;
     const auto q = sigmaeq(sig);
-    const auto hypterm = sqrt(a*power<2>(MJP) + power<2>(max(q, seps)/sqrt(3)));
+    const auto hypterm = sqrt(power<2>(a)*power<2>(MJP) + power<2>(max(q, seps)/sqrt(3)));
     const auto df_dsig   = eval((MJP/3) * id + sqrt(3) * deviator(sig) / (2*hypterm));
     feel += dp * df_dsig; 
     fp =  ( MJP * pr + hypterm - MJP * c / tan(phi))/young;

@@ -2,7 +2,7 @@
 @Behaviour DruckerPragerSimple;
 @Date 15 / 10 / 2024;
 @Algorithm NewtonRaphson_NumericalJacobian;
-@PerturbationValueForNumericalJacobianComputation 1.e-8;
+@PerturbationValueForNumericalJacobianComputation 1e-12;
 @ModellingHypotheses{".+"};
 @Description{
   Simple Drucker Prager with normal plastic flow
@@ -75,5 +75,5 @@ test.setEntryName("yielding");
 
 @UpdateAuxiliaryStateVariables
 {
-  epl += deto-deel;
+  // epl += deto-deel;
 }

@@ -62,7 +62,7 @@ epl.setGlossaryName("PlasticStrain");
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
-  bpl = (-MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
+  bpl = (MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
 }
 
 // each iteration at p + theta * dp
@@ -74,9 +74,9 @@ epl.setGlossaryName("PlasticStrain");
     const auto q = sigmaeq(sig);
     const auto iq = 1 / max(q, seps);
     const auto nq = eval(3 * deviator(sig) *  (iq / 2));
-    const auto dg_dsig  = eval((-MPP_JP/3) * id + (nq /sqrt(3)));
+    const auto dg_dsig  = eval((MPP_JP/3) * id + (nq /sqrt(3)));
     feel += dp * dg_dsig;
-    fp =  (-MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
+    fp =  (MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
   }
 } // end of @Integrator
 
