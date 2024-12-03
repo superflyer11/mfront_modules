@@ -1,5 +1,5 @@
 @DSL Implicit;
-@Behaviour VMSimo;
+@Behaviour vM;
 @Author Eric Simo;
 @Date 07 / 03 / 2022;
 @Description {
@@ -14,7 +14,8 @@
 @Algorithm NewtonRaphson_NumericalJacobian;
 @Brick StandardElasticity;
 @Theta 1.0;
-@Epsilon 1.e-14;
+@Epsilon 1e-14;
+@MaximumNumberOfIterations 20;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
 
@@ -27,41 +28,30 @@ H.setEntryName("HardeningSlope");
 p.setGlossaryName("EquivalentPlasticStrain");
 @AuxiliaryStateVariable StrainStensor epl;
 epl.setGlossaryName("PlasticStrain");
-@AuxiliaryStateVariable stress sigeeqtrial;
-sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
 
-// local variables
 @LocalVariable bool integration;
 
 // elastic predictor and verification of the yield criterion
 @InitLocalVariables {
-
   // elastic preditor
-  const auto sig_el = computeElasticPrediction();
-  const auto q = sigmaeq(sig_el); // elastic trial von Mises effective stress
-  sigeeqtrial = q;
-  // von Mises yield function
+  const auto sigel = computeElasticPrediction();
+  const auto q = sigmaeq(sigel); 
   const auto f = q - s0 - H * p;
   integration = f > stress{0};
 }
 
-// integration of constitutive equations
 @Integrator {
-  const auto seps = strain{1.e-14} * young;
 
   if (!integration) {
     return true;
   }
   const auto seq = sigmaeq(sig);
-  // normal
+  const auto seps = real(1.e-12) * young;
   const auto iseq = 1 / max(seq, seps); 
+
   const auto df_dsig = 3 * deviator(sig) * (iseq / 2);
   feel += dp * df_dsig;
   fp = (seq - s0 - H * (p + theta * dp)) / young;
-
-  // is there a way here or in another block to extract the plastic strain?
-  // const auto n = df_dsig;
-  // epl = p * n;
 }
 
 @UpdateAuxiliaryStateVariables

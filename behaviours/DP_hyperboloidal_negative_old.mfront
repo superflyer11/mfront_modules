@@ -1,0 +1,106 @@
+@DSL Implicit;
+@Behaviour DruckerPragerHyperboloidalOld;
+@Date 08 / 11 / 2024;
+@Description{
+  Derived a Drucker Prager with parabolodial form with normal plastic flow
+  Yield surface defined by:
+  "  f(p, q) = M_JP * p + \sqrt{a^2 M^2 + J^2} - \frac{M_JP * c'}{\tan(\phi)}"
+  Hyperboloid is fitted inside the cone
+  Definition of M_JP in triaxial compression:
+  "\["
+  "  M_{JP} = \frac{2 \sqrt{3} \sin(\phi')}{3 - \sin(\phi')}"
+  "\]"
+  Definition of M_JP in triaxial extension:
+  "\["
+  "  M_{JP} = \frac{2 \sqrt{3} \sin(\phi')}{3 + \sin(\phi')}"
+  "\]"
+}
+
+@Algorithm NewtonRaphson_NumericalJacobian;
+@Brick StandardElasticity;
+@Epsilon 1.e-16;
+@Theta 1.0;
+@MaximumNumberOfIterations 20;
+@PerturbationValueForNumericalJacobianComputation 1.e-8;
+@ModellingHypotheses{".+"};
+
+
+@MaterialProperty real phi;
+phi.setEntryName("phi");
+@MaterialProperty real c;
+c.setEntryName("c");
+@MaterialProperty real a;
+a.setEntryName("proximity");
+
+@StateVariable strain p;
+p.setGlossaryName("EquivalentPlasticStrain");
+@AuxiliaryStateVariable StrainStensor epl;
+epl.setGlossaryName("PlasticStrain");
+
+@LocalVariable bool bpl;
+@LocalVariable real MJP;
+@LocalVariable real K;
+
+@InitLocalVariables {
+  MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
+}
+
+@Predictor{
+  const auto sigel = computeElasticPrediction();
+  const auto pel = trace(sigel) / 3;
+  const auto qel = sigmaeq(sigel);
+  bpl = (MJP * pel +   sqrt(power<2>(a) * power<2>(MJP) + power<2>(qel / sqrt(3))) - MJP * c / tan(phi) > 0);
+}
+
+@Integrator {
+  const auto id = Stensor::Id();
+  const auto seps =  real(1.e-12) * young;
+  if (bpl) {
+    const auto pr = trace(sig) / 3;
+    const auto q = sigmaeq(sig);
+    const auto hypterm = sqrt(power<2>(a)*power<2>(MJP) + power<2>(max(q, seps)/sqrt(3)));
+    const auto df_dsig   = eval((MJP/3) * id + sqrt(3) * deviator(sig) / (2*hypterm));
+    feel += dp * df_dsig; 
+    fp =  (MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
+  }
+}
+
+@UpdateAuxiliaryStateVariables
+{
+  epl += deto-deel;
+}
+
+// @InitLocalVariables {
+//   MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
+//   K = MJP * c / tan(phi);
+// }
+
+// @Predictor{
+//   const auto sigel = computeElasticPrediction();
+//   const auto pel = trace(sigel) / 3;
+//   const auto sel = deviator(sigel);
+//   const auto Jel = sqrt((sel | sel) / 2);
+//   const auto f = MJP * pel + sqrt(power<2>(a) * power<2>(MJP) + power<2>(Jel)) - K;
+//   bpl =  f > stress{0};
+// }
+
+// @Integrator {
+//   const auto id = Stensor::Id();
+//   if (!bpl) {
+//     return true;
+//   }
+//   const auto pr = trace(sig) / 3;
+//   const auto sr = deviator(sig);
+//   const auto Jr = sqrt((sr | sr) / 2);
+//   const auto hypterm = sqrt(power<2>(a)*power<2>(MJP) + power<2>(max(Jr, real(1.e-12) * young)));
+//   const auto fr = MJP * pr + hypterm - K;
+
+//   const auto df_dsig = (MJP/3) * id +  sr / (2 * hypterm);
+//   feel += dp * df_dsig; 
+//   fp =  fr / young;
+// }
+
+// @UpdateAuxiliaryStateVariables
+// {
+//   epl += deto-deel;
+// }

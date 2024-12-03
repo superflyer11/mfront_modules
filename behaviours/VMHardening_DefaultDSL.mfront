@@ -1,5 +1,5 @@
 @DSL DefaultDSL;
-@Behaviour VonMisesIsotropicLinearHardening;
+@Behaviour vMDefault;
 @Author Thomas Helfer;
 @Date   14/10/2016;
 @Description{
@@ -13,14 +13,14 @@
   "\]"
 }
 
+@MaterialProperty real s0;
+s0.setGlossaryName("YieldStress");
+@MaterialProperty real H;
+H.setEntryName("HardeningSlope");
 @MaterialProperty real young;
 young.setGlossaryName("YoungModulus");
 @MaterialProperty real nu;
 nu.setGlossaryName("PoissonRatio");
-@MaterialProperty real H;
-H.setEntryName("HardeningSlope");
-@MaterialProperty real s0;
-s0.setGlossaryName("YieldStress");
 
 @StateVariable StrainStensor eel;
 eel.setGlossaryName("ElasticStrain");
