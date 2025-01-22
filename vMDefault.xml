@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<testsuite name="MTest/vMDefault">
+<testcase classname="MTest" name="unit behaviour test" time="0.00504299">
+<success>
+</success>
+</testcase>
+</testsuite>

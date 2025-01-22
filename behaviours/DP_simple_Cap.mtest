@@ -1,0 +1,14 @@
+@Behaviour<generic> '/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so' 'DruckerPragerCapOriginal';
+@ExternalStateVariable 'Temperature' 293.15;
+@ImposedStrain 'EXX' {0: 0, 1: 0.275};
+@ImposedStrain 'EYY' {0: 0, 1: -0.10};
+@ImposedStrain 'EZZ' {0: 0, 1: -0.10};
+//@ImposedStrain<function> 'EXY' '1.e-3*t';
+@Times{0., 1 in 1000};
+
+@MaterialProperty<constant> 'YoungModulus' 150;
+@MaterialProperty<constant> 'PoissonRatio' 0.3;
+@MaterialProperty<constant> 'beta' 0.26;
+@MaterialProperty<constant> 'd' 0.3;
+@MaterialProperty<constant> 'pa' -100e12;
+@MaterialProperty<constant> 'pb' -110e12;

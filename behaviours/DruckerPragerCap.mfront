@@ -34,8 +34,6 @@ pb.setEntryName("pb");
 @LocalVariable real Re;
 @LocalVariable bool bpl[2];
 
-@AuxiliaryStateVariable stress sigeeqtrial;
-sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing data when running in mtest
 
 
 @InitLocalVariables {
@@ -50,7 +48,6 @@ sigeeqtrial.setEntryName("TrialEquivalentStress"); // purely for visualizing dat
   // Drucker-Prager
   const auto prel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
-  sigeeqtrial = qel;
   bpl[0] = (qel + prel * tg - d > 0) && (prel > pa);
   // Cap
   const auto seq_c = sqrt(power<2>(prel - pa) +  //

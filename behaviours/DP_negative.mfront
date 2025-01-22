@@ -23,13 +23,15 @@
 @Algorithm NewtonRaphson_NumericalJacobian;
 @Brick StandardElasticity;
 @Theta 1.0;
-@Epsilon 1e-14;
+@Epsilon 1e-16;
 @MaximumNumberOfIterations 20;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
 
+// phi is the internal friction angle
 @MaterialProperty real phi;
 phi.setEntryName("phi");
+// c is effective cohesion
 @MaterialProperty stress c;
 c.setEntryName("c");
 
@@ -41,36 +43,6 @@ epl.setGlossaryName("PlasticStrain");
 @LocalVariable bool bpl;
 @LocalVariable real MJP;
 @LocalVariable real K;
-
-// @InitLocalVariables {
-//   MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
-// }
-
-// @Predictor{
-//   const auto sigel = computeElasticPrediction();
-//   const auto pel = trace(sigel) / 3;
-//   const auto qel = sigmaeq(sigel);
-//   bpl = (MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > 0);
-// }
-
-// @Integrator {
-//   const auto id = Stensor::Id();
-//   const auto seps =  real(1.e-12) * young;
-//   if (bpl) {
-//     const auto pr = trace(sig) / 3;
-//     const auto q = sigmaeq(sig);
-//     const auto iq = 1 / max(q, seps);
-//     const auto nq = eval(3 * deviator(sig) *  (iq / 2));
-//     const auto df_dsig   = eval((MJP/3) * id + (nq /sqrt(3)));
-//     feel += dp * df_dsig; 
-//     fp =  (MJP * pr + q / sqrt(3) - MJP * c / tan(phi))/young;
-//   }
-// }
-
-// @UpdateAuxiliaryStateVariables
-// {
-//   epl += deto-deel;
-// }
 
 @InitLocalVariables {
   MJP = 2 * sqrt(3) * sin(phi) / (3 - sin(phi));
@@ -96,7 +68,7 @@ epl.setGlossaryName("PlasticStrain");
   const auto sr = deviator(sig);
   const auto Jr = sqrt((sr | sr) / 2);
   const auto fr = MJP * pr + Jr - K;
-  const auto seps = real(1.e-12) * young;
+  const auto seps = strain(1.e-12) * young;
   const auto nJ = sqrt(3) * sr / (2 * max(qr, seps));
 
   const auto df_dsig   = (MJP/3) * id + nJ;

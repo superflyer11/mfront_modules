@@ -14,8 +14,7 @@
 @Algorithm NewtonRaphson_NumericalJacobian;
 @Brick StandardElasticity;
 @Theta 1.0;
-@Epsilon 1e-14;
-@MaximumNumberOfIterations 20;
+@Epsilon 1e-16;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
 
@@ -37,21 +36,20 @@ epl.setGlossaryName("PlasticStrain");
   const auto sigel = computeElasticPrediction();
   const auto q = sigmaeq(sigel); 
   const auto f = q - s0 - H * p;
-  integration = f > stress{0};
+  integration = f > 0;
 }
 
 @Integrator {
 
-  if (!integration) {
-    return true;
-  }
-  const auto seq = sigmaeq(sig);
-  const auto seps = real(1.e-12) * young;
-  const auto iseq = 1 / max(seq, seps); 
+  if (integration) {
+    const auto seq = sigmaeq(sig);
+    const auto seps = strain(1.e-12) * young;
+    const auto iseq = 1 / max(seq, seps); 
 
-  const auto df_dsig = 3 * deviator(sig) * (iseq / 2);
-  feel += dp * df_dsig;
-  fp = (seq - s0 - H * (p + theta * dp)) / young;
+    const auto df_dsig = 3 * deviator(sig) * (iseq / 2);
+    feel += dp * df_dsig;
+    fp = (seq - s0 - H * (p + theta * dp)) / young;
+  }
 }
 
 @UpdateAuxiliaryStateVariables

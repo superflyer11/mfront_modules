@@ -1,0 +1,1158 @@
+/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so vM
+No hypothesis defined, using default
+
+Beginning of test suite 'MTest/vM'
+** no prediction
+resolution from 0 to 0.005
+iteration 1 : 0.001075 0 (-0.001075 0.0005 0.0005 0 0 0)
+iteration 2 : 1.57772e-30 1.71346e-12 (-0.001075 0.0005 0.0005 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.005 to 0.01
+iteration 1 : 0.001075 0 (-0.00215 0.001 0.001 0 0 0)
+iteration 2 : 2.1684e-19 0.0419442 (-0.00215 0.001 0.001 0 0 0)
+iteration 3 : 2.1684e-19 2.77556e-17 (-0.00215 0.001 0.001 0 0 0)
+convergence, after 3 iterations, order -0
+
+resolution from 0.01 to 0.015
+iteration 1 : 0.001075 4.16334e-17 (-0.003225 0.0015 0.0015 0 0 0)
+iteration 2 : 1.57772e-30 3.22825e-13 (-0.003225 0.0015 0.0015 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.015 to 0.02
+iteration 1 : 0.001075 0 (-0.0043 0.002 0.002 0 0 0)
+iteration 2 : 7.39557e-32 1.87628e-14 (-0.0043 0.002 0.002 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.02 to 0.025
+iteration 1 : 0.001075 2.77556e-17 (-0.005375 0.0025 0.0025 0 0 0)
+iteration 2 : 9.86076e-31 8.81517e-14 (-0.005375 0.0025 0.0025 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.025 to 0.03
+iteration 1 : 0.001075 5.55112e-17 (-0.00645 0.003 0.003 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.00645 0.003 0.003 0 0 0)
+iteration 3 : 4.33681e-19 9.02056e-17 (-0.00645 0.003 0.003 0 0 0)
+convergence, after 3 iterations, order -0.0080506
+
+resolution from 0.03 to 0.035
+iteration 1 : 0.001075 6.93889e-17 (-0.007525 0.0035 0.0035 0 0 0)
+iteration 2 : 1.40946e-18 0.120113 (-0.007525 0.0035 0.0035 0 0 0)
+iteration 3 : 1.73472e-18 1.66533e-16 (-0.007525 0.0035 0.0035 0 0 0)
+convergence, after 3 iterations, order -0.0060593
+
+resolution from 0.035 to 0.04
+iteration 1 : 0.001075 1.66533e-16 (-0.0086 0.004 0.004 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.0086 0.004 0.004 0 0 0)
+iteration 3 : 8.67362e-19 2.08167e-17 (-0.0086 0.004 0.004 0 0 0)
+convergence, after 3 iterations, order -0.00820985
+
+resolution from 0.04 to 0.045
+iteration 1 : 0.001075 1.38778e-16 (-0.009675 0.0045 0.0045 0 0 0)
+iteration 2 : 2.95823e-31 5.07372e-14 (-0.009675 0.0045 0.0045 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.045 to 0.05
+iteration 1 : 0.001075 3.46945e-18 (-0.01075 0.005 0.005 0 0 0)
+iteration 2 : 1.47911e-31 2.58682e-14 (-0.01075 0.005 0.005 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.05 to 0.055
+iteration 1 : 0.001075 0 (-0.011825 0.0055 0.0055 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.011825 0.0055 0.0055 0 0 0)
+iteration 3 : 8.67362e-19 1.11022e-16 (-0.011825 0.0055 0.0055 0 0 0)
+convergence, after 3 iterations, order -0.0195547
+
+resolution from 0.055 to 0.06
+iteration 1 : 0.001075 1.40296e-16 (-0.0129 0.006 0.006 0 0 0)
+iteration 2 : 5.91646e-31 1.13132e-13 (-0.0129 0.006 0.006 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.06 to 0.065
+iteration 1 : 0.001075 8.67362e-19 (-0.013975 0.0065 0.0065 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.013975 0.0065 0.0065 0 0 0)
+iteration 3 : 1.73472e-18 5.89806e-17 (-0.013975 0.0065 0.0065 0 0 0)
+convergence, after 3 iterations, order -0.0199447
+
+resolution from 0.065 to 0.07
+iteration 1 : 0.001075 1.38778e-16 (-0.01505 0.007 0.007 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.01505 0.007 0.007 0 0 0)
+iteration 3 : 7.70372e-34 1.66533e-16 (-0.01505 0.007 0.007 0 0 0)
+convergence, after 3 iterations, order 0.970586
+
+resolution from 0.07 to 0.075
+iteration 1 : 0.001075 5.55112e-17 (-0.016125 0.0075 0.0075 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.016125 0.0075 0.0075 0 0 0)
+iteration 3 : 9.62965e-35 5.55112e-17 (-0.016125 0.0075 0.0075 0 0 0)
+convergence, after 3 iterations, order 0.978163
+
+resolution from 0.075 to 0.08
+iteration 1 : 0.001075 0 (-0.0172 0.008 0.008 0 0 0)
+iteration 2 : 1.30104e-18 0.120113 (-0.0172 0.008 0.008 0 0 0)
+iteration 3 : 1.73472e-18 2.22045e-16 (-0.0172 0.008 0.008 0 0 0)
+convergence, after 3 iterations, order -0.00837553
+
+resolution from 0.08 to 0.085
+iteration 1 : 0.001075 2.84495e-16 (-0.018275 0.0085 0.0085 0 0 0)
+iteration 2 : 7.39557e-32 2.57017e-14 (-0.018275 0.0085 0.0085 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.085 to 0.09
+iteration 1 : 0.001075 6.93889e-18 (-0.01935 0.009 0.009 0 0 0)
+iteration 2 : 1.97215e-31 8.83182e-14 (-0.01935 0.009 0.009 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.09 to 0.095
+iteration 1 : 0.001075 5.55112e-17 (-0.020425 0.0095 0.0095 0 0 0)
+iteration 2 : 3.9443e-31 1.67366e-13 (-0.020425 0.0095 0.0095 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.095 to 0.1
+iteration 1 : 0.001075 5.55112e-17 (-0.0215 0.01 0.01 0 0 0)
+iteration 2 : 7.88861e-31 2.67286e-13 (-0.0215 0.01 0.01 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.1 to 0.105
+iteration 1 : 0.001075 5.55112e-17 (-0.022575 0.0105 0.0105 0 0 0)
+iteration 2 : 9.86076e-31 1.04805e-13 (-0.022575 0.0105 0.0105 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.105 to 0.11
+iteration 1 : 0.001075 0 (-0.02365 0.011 0.011 0 0 0)
+iteration 2 : 9.86076e-31 1.67311e-13 (-0.02365 0.011 0.011 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.11 to 0.115
+iteration 1 : 0.001075 0 (-0.024725 0.0115 0.0115 0 0 0)
+iteration 2 : 1.38051e-30 1.29674e-13 (-0.024725 0.0115 0.0115 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.115 to 0.12
+iteration 1 : 0.001075 1.38778e-17 (-0.0258 0.012 0.012 0 0 0)
+iteration 2 : 7.88861e-31 1.672e-13 (-0.0258 0.012 0.012 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.12 to 0.125
+iteration 1 : 0.001075 1.38778e-17 (-0.026875 0.0125 0.0125 0 0 0)
+iteration 2 : 7.88861e-31 2.29761e-13 (-0.026875 0.0125 0.0125 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.125 to 0.13
+iteration 1 : 0.001075 0 (-0.02795 0.013 0.013 0 0 0)
+iteration 2 : 1.57772e-30 1.92069e-13 (-0.02795 0.013 0.013 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.13 to 0.135
+iteration 1 : 0.001075 0 (-0.029025 0.0135 0.0135 0 0 0)
+iteration 2 : 1.18329e-30 2.42473e-13 (-0.029025 0.0135 0.0135 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.135 to 0.14
+iteration 1 : 0.001075 2.77556e-17 (-0.0301 0.014 0.014 0 0 0)
+iteration 2 : 1.57772e-30 2.29761e-13 (-0.0301 0.014 0.014 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.14 to 0.145
+iteration 1 : 0.001075 2.77556e-17 (-0.031175 0.0145 0.0145 0 0 0)
+iteration 2 : 7.88861e-31 2.29705e-13 (-0.031175 0.0145 0.0145 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.145 to 0.15
+iteration 1 : 0.001075 2.77556e-17 (-0.03225 0.015 0.015 0 0 0)
+iteration 2 : 7.88861e-31 1.67311e-13 (-0.03225 0.015 0.015 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.15 to 0.155
+iteration 1 : 0.001075 1.11022e-16 (-0.033325 0.0155 0.0155 0 0 0)
+iteration 2 : 2.46519e-31 2.9754e-14 (-0.033325 0.0155 0.0155 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.155 to 0.16
+iteration 1 : 0.001075 2.77556e-17 (-0.0344 0.016 0.016 0 0 0)
+iteration 2 : 1.97215e-30 3.29736e-13 (-0.0344 0.016 0.016 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.16 to 0.165
+iteration 1 : 0.001075 2.77556e-17 (-0.035475 0.0165 0.0165 0 0 0)
+iteration 2 : 0 2.29705e-13 (-0.035475 0.0165 0.0165 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.165 to 0.17
+iteration 1 : 0.001075 0 (-0.03655 0.017 0.017 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.03655 0.017 0.017 0 0 0)
+iteration 3 : 0 8.32667e-17 (-0.03655 0.017 0.017 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.17 to 0.175
+iteration 1 : 0.001075 0 (-0.037625 0.0175 0.0175 0 0 0)
+iteration 2 : 3.9443e-31 1.672e-13 (-0.037625 0.0175 0.0175 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.175 to 0.18
+iteration 1 : 0.001075 1.11022e-16 (-0.0387 0.018 0.018 0 0 0)
+iteration 2 : 7.88861e-31 2.42473e-13 (-0.0387 0.018 0.018 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.18 to 0.185
+iteration 1 : 0.001075 2.77556e-17 (-0.039775 0.0185 0.0185 0 0 0)
+iteration 2 : 7.88861e-31 1.91958e-13 (-0.039775 0.0185 0.0185 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.185 to 0.19
+iteration 1 : 0.001075 2.77556e-17 (-0.04085 0.019 0.019 0 0 0)
+iteration 2 : 2.36658e-30 2.29705e-13 (-0.04085 0.019 0.019 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.19 to 0.195
+iteration 1 : 0.001075 2.77556e-17 (-0.041925 0.0195 0.0195 0 0 0)
+iteration 2 : 1.97215e-31 5.4623e-14 (-0.041925 0.0195 0.0195 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.195 to 0.2
+iteration 1 : 0.001075 2.77556e-17 (-0.043 0.02 0.02 0 0 0)
+iteration 2 : 2.76101e-30 3.67151e-13 (-0.043 0.02 0.02 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.2 to 0.205
+iteration 1 : 0.001075 1.11022e-16 (-0.044075 0.0205 0.0205 0 0 0)
+iteration 2 : 7.88861e-31 2.29816e-13 (-0.044075 0.0205 0.0205 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.205 to 0.21
+iteration 1 : 0.001075 0 (-0.04515 0.021 0.021 0 0 0)
+iteration 2 : 2.95823e-31 6.73905e-14 (-0.04515 0.021 0.021 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.21 to 0.215
+iteration 1 : 0.001075 1.11022e-16 (-0.046225 0.0215 0.0215 0 0 0)
+iteration 2 : 1.57772e-30 2.42473e-13 (-0.046225 0.0215 0.0215 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.215 to 0.22
+iteration 1 : 0.001075 5.55112e-17 (-0.0473 0.022 0.022 0 0 0)
+iteration 2 : 7.88861e-31 2.67231e-13 (-0.0473 0.022 0.022 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.22 to 0.225
+iteration 1 : 0.001075 5.55112e-17 (-0.048375 0.0225 0.0225 0 0 0)
+iteration 2 : 1.97215e-30 3.04978e-13 (-0.048375 0.0225 0.0225 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.225 to 0.23
+iteration 1 : 0.001075 0 (-0.04945 0.023 0.023 0 0 0)
+iteration 2 : 9.86076e-31 1.04805e-13 (-0.04945 0.023 0.023 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.23 to 0.235
+iteration 1 : 0.001075 0 (-0.050525 0.0235 0.0235 0 0 0)
+iteration 2 : 9.86076e-31 1.67311e-13 (-0.050525 0.0235 0.0235 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.235 to 0.24
+iteration 1 : 0.001075 0 (-0.0516 0.024 0.024 0 0 0)
+iteration 2 : 1.57772e-30 3.04645e-13 (-0.0516 0.024 0.024 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.24 to 0.245
+iteration 1 : 0.001075 5.55112e-17 (-0.052675 0.0245 0.0245 0 0 0)
+iteration 2 : 9.86076e-31 1.67422e-13 (-0.052675 0.0245 0.0245 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.245 to 0.25
+iteration 1 : 0.001075 5.55112e-17 (-0.05375 0.025 0.025 0 0 0)
+iteration 2 : 1.18329e-30 2.67009e-13 (-0.05375 0.025 0.025 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.25 to 0.255
+iteration 1 : 0.001075 5.55112e-17 (-0.054825 0.0255 0.0255 0 0 0)
+iteration 2 : 3.9443e-31 1.42664e-13 (-0.054825 0.0255 0.0255 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.255 to 0.26
+iteration 1 : 0.001075 5.55112e-17 (-0.0559 0.026 0.026 0 0 0)
+iteration 2 : 3.9443e-31 3.04534e-13 (-0.0559 0.026 0.026 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.26 to 0.265
+iteration 1 : 0.001075 0 (-0.056975 0.0265 0.0265 0 0 0)
+iteration 2 : 9.86076e-31 1.67533e-13 (-0.056975 0.0265 0.0265 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.265 to 0.27
+iteration 1 : 0.001075 5.55112e-17 (-0.05805 0.027 0.027 0 0 0)
+iteration 2 : 7.88861e-31 3.42282e-13 (-0.05805 0.027 0.027 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.27 to 0.275
+iteration 1 : 0.001075 1.11022e-16 (-0.059125 0.0275 0.0275 0 0 0)
+iteration 2 : 7.88861e-31 2.05058e-13 (-0.059125 0.0275 0.0275 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.275 to 0.28
+iteration 1 : 0.001075 0 (-0.0602 0.028 0.028 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.0602 0.028 0.028 0 0 0)
+iteration 3 : 6.18522e-35 5.55112e-17 (-0.0602 0.028 0.028 0 0 0)
+convergence, after 3 iterations, order 0.990412
+
+resolution from 0.28 to 0.285
+iteration 1 : 0.001075 5.55112e-17 (-0.061275 0.0285 0.0285 0 0 0)
+iteration 2 : 1.18329e-30 1.67311e-13 (-0.061275 0.0285 0.0285 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.285 to 0.29
+iteration 1 : 0.001075 1.11022e-16 (-0.06235 0.029 0.029 0 0 0)
+iteration 2 : 1.97215e-30 4.42424e-13 (-0.06235 0.029 0.029 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.29 to 0.295
+iteration 1 : 0.001075 5.55112e-17 (-0.063425 0.0295 0.0295 0 0 0)
+iteration 2 : 9.86076e-32 2.9754e-14 (-0.063425 0.0295 0.0295 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.295 to 0.3
+iteration 1 : 0.001075 5.55112e-17 (-0.0645 0.03 0.03 0 0 0)
+iteration 2 : 1.18329e-30 1.66978e-13 (-0.0645 0.03 0.03 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.3 to 0.305
+iteration 1 : 0.001075 1.11022e-16 (-0.065575 0.0305 0.0305 0 0 0)
+iteration 2 : 1.97215e-31 6.75016e-14 (-0.065575 0.0305 0.0305 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.305 to 0.31
+iteration 1 : 0.001075 0 (-0.06665 0.031 0.031 0 0 0)
+iteration 2 : 7.88861e-31 1.67311e-13 (-0.06665 0.031 0.031 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.31 to 0.315
+iteration 1 : 0.001075 1.11022e-16 (-0.067725 0.0315 0.0315 0 0 0)
+iteration 2 : 9.86076e-31 9.19265e-14 (-0.067725 0.0315 0.0315 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.315 to 0.32
+iteration 1 : 0.001075 0 (-0.0688 0.032 0.032 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.0688 0.032 0.032 0 0 0)
+iteration 3 : 0 0 (-0.0688 0.032 0.032 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.32 to 0.325
+iteration 1 : 0.001075 0 (-0.069875 0.0325 0.0325 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.069875 0.0325 0.0325 0 0 0)
+iteration 3 : 3.85186e-34 1.11022e-16 (-0.069875 0.0325 0.0325 0 0 0)
+convergence, after 3 iterations, order 1.01718
+
+resolution from 0.325 to 0.33
+iteration 1 : 0.001075 1.11022e-16 (-0.07095 0.033 0.033 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.07095 0.033 0.033 0 0 0)
+iteration 3 : 1.99535e-35 5.55112e-17 (-0.07095 0.033 0.033 0 0 0)
+convergence, after 3 iterations, order 1.06125
+
+resolution from 0.33 to 0.335
+iteration 1 : 0.001075 0 (-0.072025 0.0335 0.0335 0 0 0)
+iteration 2 : 1.19262e-18 0.120113 (-0.072025 0.0335 0.0335 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.072025 0.0335 0.0335 0 0 0)
+convergence, after 3 iterations, order 1.01571
+
+resolution from 0.335 to 0.34
+iteration 1 : 0.001075 5.55112e-17 (-0.0731 0.034 0.034 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.0731 0.034 0.034 0 0 0)
+iteration 3 : 3.85186e-34 1.11022e-16 (-0.0731 0.034 0.034 0 0 0)
+convergence, after 3 iterations, order 0.977736
+
+resolution from 0.34 to 0.345
+iteration 1 : 0.001075 0 (-0.074175 0.0345 0.0345 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.074175 0.0345 0.0345 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.074175 0.0345 0.0345 0 0 0)
+convergence, after 3 iterations, order 1.00946
+
+resolution from 0.345 to 0.35
+iteration 1 : 0.001075 1.11022e-16 (-0.07525 0.035 0.035 0 0 0)
+iteration 2 : 1.0842e-18 0.120113 (-0.07525 0.035 0.035 0 0 0)
+iteration 3 : 5.77779e-34 3.33067e-16 (-0.07525 0.035 0.035 0 0 0)
+convergence, after 3 iterations, order 1.01847
+
+resolution from 0.35 to 0.355
+iteration 1 : 0.001075 1.11022e-16 (-0.076325 0.0355 0.0355 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.076325 0.0355 0.0355 0 0 0)
+iteration 3 : 0 0 (-0.076325 0.0355 0.0355 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.355 to 0.36
+iteration 1 : 0.001075 0 (-0.0774 0.036 0.036 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.0774 0.036 0.036 0 0 0)
+iteration 3 : 1.92593e-34 1.11022e-16 (-0.0774 0.036 0.036 0 0 0)
+convergence, after 3 iterations, order 0.997291
+
+resolution from 0.36 to 0.365
+iteration 1 : 0.001075 0 (-0.078475 0.0365 0.0365 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.078475 0.0365 0.0365 0 0 0)
+iteration 3 : 5.77779e-34 1.11022e-16 (-0.078475 0.0365 0.0365 0 0 0)
+convergence, after 3 iterations, order 1.00551
+
+resolution from 0.365 to 0.37
+iteration 1 : 0.001075 1.11022e-16 (-0.07955 0.037 0.037 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.07955 0.037 0.037 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.07955 0.037 0.037 0 0 0)
+convergence, after 3 iterations, order 0.997237
+
+resolution from 0.37 to 0.375
+iteration 1 : 0.001075 1.11022e-16 (-0.080625 0.0375 0.0375 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.080625 0.0375 0.0375 0 0 0)
+iteration 3 : 0 0 (-0.080625 0.0375 0.0375 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.375 to 0.38
+iteration 1 : 0.001075 0 (-0.0817 0.038 0.038 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.0817 0.038 0.038 0 0 0)
+iteration 3 : 4.00204e-35 1.11022e-16 (-0.0817 0.038 0.038 0 0 0)
+convergence, after 3 iterations, order 1.02518
+
+resolution from 0.38 to 0.385
+iteration 1 : 0.001075 0 (-0.082775 0.0385 0.0385 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.082775 0.0385 0.0385 0 0 0)
+iteration 3 : 0 0 (-0.082775 0.0385 0.0385 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.385 to 0.39
+iteration 1 : 0.001075 0 (-0.08385 0.039 0.039 0 0 0)
+iteration 2 : 1.0842e-18 0.120113 (-0.08385 0.039 0.039 0 0 0)
+iteration 3 : 1.15556e-33 2.22045e-16 (-0.08385 0.039 0.039 0 0 0)
+convergence, after 3 iterations, order 0.998401
+
+resolution from 0.39 to 0.395
+iteration 1 : 0.001075 0 (-0.084925 0.0395 0.0395 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.084925 0.0395 0.0395 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.084925 0.0395 0.0395 0 0 0)
+convergence, after 3 iterations, order 0.98084
+
+resolution from 0.395 to 0.4
+iteration 1 : 0.001075 0 (-0.086 0.04 0.04 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.086 0.04 0.04 0 0 0)
+iteration 3 : 0 0 (-0.086 0.04 0.04 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.4 to 0.405
+iteration 1 : 0.001075 0 (-0.087075 0.0405 0.0405 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.087075 0.0405 0.0405 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.087075 0.0405 0.0405 0 0 0)
+convergence, after 3 iterations, order 1.00946
+
+resolution from 0.405 to 0.41
+iteration 1 : 0.001075 1.11022e-16 (-0.08815 0.041 0.041 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.08815 0.041 0.041 0 0 0)
+iteration 3 : 4.2318e-34 1.11022e-16 (-0.08815 0.041 0.041 0 0 0)
+convergence, after 3 iterations, order 0.987594
+
+resolution from 0.41 to 0.415
+iteration 1 : 0.001075 0 (-0.089225 0.0415 0.0415 0 0 0)
+iteration 2 : 9.75782e-19 0.120113 (-0.089225 0.0415 0.0415 0 0 0)
+iteration 3 : 1.38794e-33 2.22045e-16 (-0.089225 0.0415 0.0415 0 0 0)
+convergence, after 3 iterations, order 0.987031
+
+resolution from 0.415 to 0.42
+iteration 1 : 0.001075 1.11022e-16 (-0.0903 0.042 0.042 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.0903 0.042 0.042 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.0903 0.042 0.042 0 0 0)
+convergence, after 3 iterations, order 0.997237
+
+resolution from 0.42 to 0.425
+iteration 1 : 0.001075 0 (-0.091375 0.0425 0.0425 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.091375 0.0425 0.0425 0 0 0)
+iteration 3 : 5.77779e-34 2.22045e-16 (-0.091375 0.0425 0.0425 0 0 0)
+convergence, after 3 iterations, order 0.950467
+
+resolution from 0.425 to 0.43
+iteration 1 : 0.001075 0 (-0.09245 0.043 0.043 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.09245 0.043 0.043 0 0 0)
+iteration 3 : 2.32107e-34 1.11022e-16 (-0.09245 0.043 0.043 0 0 0)
+convergence, after 3 iterations, order 0.975989
+
+resolution from 0.43 to 0.435
+iteration 1 : 0.001075 0 (-0.093525 0.0435 0.0435 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.093525 0.0435 0.0435 0 0 0)
+iteration 3 : 1.94876e-34 1.11022e-16 (-0.093525 0.0435 0.0435 0 0 0)
+convergence, after 3 iterations, order 1.02007
+
+resolution from 0.435 to 0.44
+iteration 1 : 0.001075 0 (-0.0946 0.044 0.044 0 0 0)
+iteration 2 : 1.0842e-18 0.120113 (-0.0946 0.044 0.044 0 0 0)
+iteration 3 : 3.85186e-34 1.11022e-16 (-0.0946 0.044 0.044 0 0 0)
+convergence, after 3 iterations, order 1.03022
+
+resolution from 0.44 to 0.445
+iteration 1 : 0.001075 0 (-0.095675 0.0445 0.0445 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.095675 0.0445 0.0445 0 0 0)
+iteration 3 : 4.73062e-34 1.11022e-16 (-0.095675 0.0445 0.0445 0 0 0)
+convergence, after 3 iterations, order 1.01127
+
+resolution from 0.445 to 0.45
+iteration 1 : 0.001075 0 (-0.09675 0.045 0.045 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.09675 0.045 0.045 0 0 0)
+iteration 3 : 6.9632e-34 1.11022e-16 (-0.09675 0.045 0.045 0 0 0)
+convergence, after 3 iterations, order 0.992489
+
+resolution from 0.45 to 0.455
+iteration 1 : 0.001075 0 (-0.097825 0.0455 0.0455 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.097825 0.0455 0.0455 0 0 0)
+iteration 3 : 6.18951e-34 1.11022e-16 (-0.097825 0.0455 0.0455 0 0 0)
+convergence, after 3 iterations, order 0.948541
+
+resolution from 0.455 to 0.46
+iteration 1 : 0.001075 0 (-0.0989 0.046 0.046 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.0989 0.046 0.046 0 0 0)
+iteration 3 : 4.2318e-34 1.11022e-16 (-0.0989 0.046 0.046 0 0 0)
+convergence, after 3 iterations, order 0.975082
+
+resolution from 0.46 to 0.465
+iteration 1 : 0.001075 0 (-0.099975 0.0465 0.0465 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.099975 0.0465 0.0465 0 0 0)
+iteration 3 : 0 0 (-0.099975 0.0465 0.0465 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.465 to 0.47
+iteration 1 : 0.001075 0 (-0.10105 0.047 0.047 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.10105 0.047 0.047 0 0 0)
+iteration 3 : 1.18435e-34 1.11022e-16 (-0.10105 0.047 0.047 0 0 0)
+convergence, after 3 iterations, order 1.04327
+
+resolution from 0.47 to 0.475
+iteration 1 : 0.001075 0 (-0.102125 0.0475 0.0475 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.102125 0.0475 0.0475 0 0 0)
+iteration 3 : 5.77779e-34 2.22045e-16 (-0.102125 0.0475 0.0475 0 0 0)
+convergence, after 3 iterations, order 0.978754
+
+resolution from 0.475 to 0.48
+iteration 1 : 0.001075 0 (-0.1032 0.048 0.048 0 0 0)
+iteration 2 : 1.40946e-18 0.120113 (-0.1032 0.048 0.048 0 0 0)
+iteration 3 : 7.8924e-35 2.22045e-16 (-0.1032 0.048 0.048 0 0 0)
+convergence, after 3 iterations, order 1.09202
+
+resolution from 0.48 to 0.485
+iteration 1 : 0.001075 0 (-0.104275 0.0485 0.0485 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.104275 0.0485 0.0485 0 0 0)
+iteration 3 : 0 1.11022e-16 (-0.104275 0.0485 0.0485 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.485 to 0.49
+iteration 1 : 0.001075 0 (-0.10535 0.049 0.049 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.10535 0.049 0.049 0 0 0)
+iteration 3 : 4.2318e-34 1.11022e-16 (-0.10535 0.049 0.049 0 0 0)
+convergence, after 3 iterations, order 0.937201
+
+resolution from 0.49 to 0.495
+iteration 1 : 0.001075 0 (-0.106425 0.0495 0.0495 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.106425 0.0495 0.0495 0 0 0)
+iteration 3 : 0 0 (-0.106425 0.0495 0.0495 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.495 to 0.5
+iteration 1 : 0.001075 0 (-0.1075 0.05 0.05 0 0 0)
+iteration 2 : 1.0842e-19 0.120113 (-0.1075 0.05 0.05 0 0 0)
+iteration 3 : 1.17729e-34 1.11022e-16 (-0.1075 0.05 0.05 0 0 0)
+convergence, after 3 iterations, order 0.935481
+
+resolution from 0.5 to 0.505
+iteration 1 : 0.001075 0 (-0.108575 0.0505 0.0505 0 0 0)
+iteration 2 : 1.19262e-18 0.120113 (-0.108575 0.0505 0.0505 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.108575 0.0505 0.0505 0 0 0)
+convergence, after 3 iterations, order 1.01571
+
+resolution from 0.505 to 0.51
+iteration 1 : 0.001075 1.11022e-16 (-0.10965 0.051 0.051 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.10965 0.051 0.051 0 0 0)
+iteration 3 : 1.54074e-33 2.22045e-16 (-0.10965 0.051 0.051 0 0 0)
+convergence, after 3 iterations, order 0.969724
+
+resolution from 0.51 to 0.515
+iteration 1 : 0.001075 1.11022e-16 (-0.110725 0.0515 0.0515 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.110725 0.0515 0.0515 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.110725 0.0515 0.0515 0 0 0)
+convergence, after 3 iterations, order 0.990265
+
+resolution from 0.515 to 0.52
+iteration 1 : 0.001075 1.11022e-16 (-0.1118 0.052 0.052 0 0 0)
+iteration 2 : 1.30104e-18 0.120113 (-0.1118 0.052 0.052 0 0 0)
+iteration 3 : 1.15556e-33 2.22045e-16 (-0.1118 0.052 0.052 0 0 0)
+convergence, after 3 iterations, order 1.00901
+
+resolution from 0.52 to 0.525
+iteration 1 : 0.001075 1.11022e-16 (-0.112875 0.0525 0.0525 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.112875 0.0525 0.0525 0 0 0)
+iteration 3 : 1.07847e-33 2.22045e-16 (-0.112875 0.0525 0.0525 0 0 0)
+convergence, after 3 iterations, order 0.987556
+
+resolution from 0.525 to 0.53
+iteration 1 : 0.001075 1.11022e-16 (-0.11395 0.053 0.053 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.11395 0.053 0.053 0 0 0)
+iteration 3 : 0 1.11022e-16 (-0.11395 0.053 0.053 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.53 to 0.535
+iteration 1 : 0.001075 1.11022e-16 (-0.115025 0.0535 0.0535 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.115025 0.0535 0.0535 0 0 0)
+iteration 3 : 3.9457e-35 1.11022e-16 (-0.115025 0.0535 0.0535 0 0 0)
+convergence, after 3 iterations, order 1.04202
+
+resolution from 0.535 to 0.54
+iteration 1 : 0.001075 0 (-0.1161 0.054 0.054 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.1161 0.054 0.054 0 0 0)
+iteration 3 : 0 1.11022e-16 (-0.1161 0.054 0.054 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.54 to 0.545
+iteration 1 : 0.001075 1.11022e-16 (-0.117175 0.0545 0.0545 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.117175 0.0545 0.0545 0 0 0)
+iteration 3 : 3.85186e-34 1.11022e-16 (-0.117175 0.0545 0.0545 0 0 0)
+convergence, after 3 iterations, order 0.977736
+
+resolution from 0.545 to 0.55
+iteration 1 : 0.001075 1.11022e-16 (-0.11825 0.055 0.055 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.11825 0.055 0.055 0 0 0)
+iteration 3 : 3.85186e-34 1.11022e-16 (-0.11825 0.055 0.055 0 0 0)
+convergence, after 3 iterations, order 0.977736
+
+resolution from 0.55 to 0.555
+iteration 1 : 0.001075 1.11022e-16 (-0.119325 0.0555 0.0555 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.119325 0.0555 0.0555 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.119325 0.0555 0.0555 0 0 0)
+convergence, after 3 iterations, order 0.989592
+
+resolution from 0.555 to 0.56
+iteration 1 : 0.001075 0 (-0.1204 0.056 0.056 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.1204 0.056 0.056 0 0 0)
+iteration 3 : 1.54738e-34 1.11022e-16 (-0.1204 0.056 0.056 0 0 0)
+convergence, after 3 iterations, order 0.965039
+
+resolution from 0.56 to 0.565
+iteration 1 : 0.001075 1.11022e-16 (-0.121475 0.0565 0.0565 0 0 0)
+iteration 2 : 9.75782e-19 0.120113 (-0.121475 0.0565 0.0565 0 0 0)
+iteration 3 : 1.15556e-33 2.22045e-16 (-0.121475 0.0565 0.0565 0 0 0)
+convergence, after 3 iterations, order 0.992322
+
+resolution from 0.565 to 0.57
+iteration 1 : 0.001075 1.11022e-16 (-0.12255 0.057 0.057 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.12255 0.057 0.057 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.12255 0.057 0.057 0 0 0)
+convergence, after 3 iterations, order 0.989592
+
+resolution from 0.57 to 0.575
+iteration 1 : 0.001075 1.11022e-16 (-0.123625 0.0575 0.0575 0 0 0)
+iteration 2 : 1.30104e-18 0.120113 (-0.123625 0.0575 0.0575 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.123625 0.0575 0.0575 0 0 0)
+convergence, after 3 iterations, order 1.02081
+
+resolution from 0.575 to 0.58
+iteration 1 : 0.001075 1.11022e-16 (-0.1247 0.058 0.058 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1247 0.058 0.058 0 0 0)
+iteration 3 : 0 0 (-0.1247 0.058 0.058 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.58 to 0.585
+iteration 1 : 0.001075 0 (-0.125775 0.0585 0.0585 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.125775 0.0585 0.0585 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.125775 0.0585 0.0585 0 0 0)
+convergence, after 3 iterations, order 0.990265
+
+resolution from 0.585 to 0.59
+iteration 1 : 0.001075 1.11022e-16 (-0.12685 0.059 0.059 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.12685 0.059 0.059 0 0 0)
+iteration 3 : 0 1.11022e-16 (-0.12685 0.059 0.059 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.59 to 0.595
+iteration 1 : 0.001075 0 (-0.127925 0.0595 0.0595 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.127925 0.0595 0.0595 0 0 0)
+iteration 3 : 3.85186e-34 1.11022e-16 (-0.127925 0.0595 0.0595 0 0 0)
+convergence, after 3 iterations, order 0.990265
+
+resolution from 0.595 to 0.6
+iteration 1 : 0.001075 1.11022e-16 (-0.129 0.06 0.06 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.129 0.06 0.06 0 0 0)
+iteration 3 : 0 0 (-0.129 0.06 0.06 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.6 to 0.605
+iteration 1 : 0.001075 0 (-0.130075 0.0605 0.0605 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.130075 0.0605 0.0605 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.130075 0.0605 0.0605 0 0 0)
+convergence, after 3 iterations, order 1.00946
+
+resolution from 0.605 to 0.61
+iteration 1 : 0.001075 0 (-0.13115 0.061 0.061 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.13115 0.061 0.061 0 0 0)
+iteration 3 : 0 1.11022e-16 (-0.13115 0.061 0.061 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.61 to 0.615
+iteration 1 : 0.001075 1.11022e-16 (-0.132225 0.0615 0.0615 0 0 0)
+iteration 2 : 1.51788e-18 0.120113 (-0.132225 0.0615 0.0615 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.132225 0.0615 0.0615 0 0 0)
+convergence, after 3 iterations, order 1.02992
+
+resolution from 0.615 to 0.62
+iteration 1 : 0.001075 1.11022e-16 (-0.1333 0.062 0.062 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1333 0.062 0.062 0 0 0)
+iteration 3 : 0 1.11022e-16 (-0.1333 0.062 0.062 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.62 to 0.625
+iteration 1 : 0.001075 0 (-0.134375 0.0625 0.0625 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.134375 0.0625 0.0625 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.134375 0.0625 0.0625 0 0 0)
+convergence, after 3 iterations, order 1.00946
+
+resolution from 0.625 to 0.63
+iteration 1 : 0.001075 0 (-0.13545 0.063 0.063 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.13545 0.063 0.063 0 0 0)
+iteration 3 : 7.88985e-35 2.22045e-16 (-0.13545 0.063 0.063 0 0 0)
+convergence, after 3 iterations, order 1.03528
+
+resolution from 0.63 to 0.635
+iteration 1 : 0.001075 0 (-0.136525 0.0635 0.0635 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.136525 0.0635 0.0635 0 0 0)
+iteration 3 : 0 0 (-0.136525 0.0635 0.0635 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.635 to 0.64
+iteration 1 : 0.001075 0 (-0.1376 0.064 0.064 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.1376 0.064 0.064 0 0 0)
+iteration 3 : 0 0 (-0.1376 0.064 0.064 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.64 to 0.645
+iteration 1 : 0.001075 0 (-0.138675 0.0645 0.0645 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.138675 0.0645 0.0645 0 0 0)
+iteration 3 : 0 0 (-0.138675 0.0645 0.0645 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.645 to 0.65
+iteration 1 : 0.001075 0 (-0.13975 0.065 0.065 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.13975 0.065 0.065 0 0 0)
+iteration 3 : 0 0 (-0.13975 0.065 0.065 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.65 to 0.655
+iteration 1 : 0.001075 0 (-0.140825 0.0655 0.0655 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.140825 0.0655 0.0655 0 0 0)
+iteration 3 : 0 0 (-0.140825 0.0655 0.0655 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.655 to 0.66
+iteration 1 : 0.001075 0 (-0.1419 0.066 0.066 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.1419 0.066 0.066 0 0 0)
+iteration 3 : 0 0 (-0.1419 0.066 0.066 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.66 to 0.665
+iteration 1 : 0.001075 0 (-0.142975 0.0665 0.0665 0 0 0)
+iteration 2 : 1.0842e-19 0.120113 (-0.142975 0.0665 0.0665 0 0 0)
+iteration 3 : 1.09062e-33 2.22045e-16 (-0.142975 0.0665 0.0665 0 0 0)
+convergence, after 3 iterations, order 0.875042
+
+resolution from 0.665 to 0.67
+iteration 1 : 0.001075 2.22045e-16 (-0.14405 0.067 0.067 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.14405 0.067 0.067 0 0 0)
+iteration 3 : 8.53929e-34 2.22045e-16 (-0.14405 0.067 0.067 0 0 0)
+convergence, after 3 iterations, order 0.917775
+
+resolution from 0.67 to 0.675
+iteration 1 : 0.001075 0 (-0.145125 0.0675 0.0675 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.145125 0.0675 0.0675 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.145125 0.0675 0.0675 0 0 0)
+convergence, after 3 iterations, order 0.970586
+
+resolution from 0.675 to 0.68
+iteration 1 : 0.001075 2.22045e-16 (-0.1462 0.068 0.068 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1462 0.068 0.068 0 0 0)
+iteration 3 : 0 0 (-0.1462 0.068 0.068 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.68 to 0.685
+iteration 1 : 0.001075 0 (-0.147275 0.0685 0.0685 0 0 0)
+iteration 2 : 1.19262e-18 0.120113 (-0.147275 0.0685 0.0685 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.147275 0.0685 0.0685 0 0 0)
+convergence, after 3 iterations, order 1.03584
+
+resolution from 0.685 to 0.69
+iteration 1 : 0.001075 2.22045e-16 (-0.14835 0.069 0.069 0 0 0)
+iteration 2 : 1.19262e-18 0.120113 (-0.14835 0.069 0.069 0 0 0)
+iteration 3 : 0 0 (-0.14835 0.069 0.069 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.69 to 0.695
+iteration 1 : 0.001075 0 (-0.149425 0.0695 0.0695 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.149425 0.0695 0.0695 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.149425 0.0695 0.0695 0 0 0)
+convergence, after 3 iterations, order 0.958181
+
+resolution from 0.695 to 0.7
+iteration 1 : 0.001075 0 (-0.1505 0.07 0.07 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1505 0.07 0.07 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.1505 0.07 0.07 0 0 0)
+convergence, after 3 iterations, order 0.942417
+
+resolution from 0.7 to 0.705
+iteration 1 : 0.001075 0 (-0.151575 0.0705 0.0705 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.151575 0.0705 0.0705 0 0 0)
+iteration 3 : 1.15556e-33 2.22045e-16 (-0.151575 0.0705 0.0705 0 0 0)
+convergence, after 3 iterations, order 0.969268
+
+resolution from 0.705 to 0.71
+iteration 1 : 0.001075 2.22045e-16 (-0.15265 0.071 0.071 0 0 0)
+iteration 2 : 1.0842e-18 0.120113 (-0.15265 0.071 0.071 0 0 0)
+iteration 3 : 3.85186e-34 2.22045e-16 (-0.15265 0.071 0.071 0 0 0)
+convergence, after 3 iterations, order 1.03022
+
+resolution from 0.71 to 0.715
+iteration 1 : 0.001075 2.22045e-16 (-0.153725 0.0715 0.0715 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.153725 0.0715 0.0715 0 0 0)
+iteration 3 : 0 0 (-0.153725 0.0715 0.0715 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.715 to 0.72
+iteration 1 : 0.001075 0 (-0.1548 0.072 0.072 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.1548 0.072 0.072 0 0 0)
+iteration 3 : 1.54074e-33 2.22045e-16 (-0.1548 0.072 0.072 0 0 0)
+convergence, after 3 iterations, order 0.938626
+
+resolution from 0.72 to 0.725
+iteration 1 : 0.001075 2.22045e-16 (-0.155875 0.0725 0.0725 0 0 0)
+iteration 2 : 1.0842e-18 0.120113 (-0.155875 0.0725 0.0725 0 0 0)
+iteration 3 : 6.48608e-34 2.22045e-16 (-0.155875 0.0725 0.0725 0 0 0)
+convergence, after 3 iterations, order 1.01513
+
+resolution from 0.725 to 0.73
+iteration 1 : 0.001075 2.22045e-16 (-0.15695 0.073 0.073 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.15695 0.073 0.073 0 0 0)
+iteration 3 : 0 0 (-0.15695 0.073 0.073 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.73 to 0.735
+iteration 1 : 0.001075 0 (-0.158025 0.0735 0.0735 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.158025 0.0735 0.0735 0 0 0)
+iteration 3 : 1.62727e-34 2.22045e-16 (-0.158025 0.0735 0.0735 0 0 0)
+convergence, after 3 iterations, order 1.03416
+
+resolution from 0.735 to 0.74
+iteration 1 : 0.001075 0 (-0.1591 0.074 0.074 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1591 0.074 0.074 0 0 0)
+iteration 3 : 0 0 (-0.1591 0.074 0.074 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.74 to 0.745
+iteration 1 : 0.001075 0 (-0.160175 0.0745 0.0745 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.160175 0.0745 0.0745 0 0 0)
+iteration 3 : 1.54074e-33 2.22045e-16 (-0.160175 0.0745 0.0745 0 0 0)
+convergence, after 3 iterations, order 0.901444
+
+resolution from 0.745 to 0.75
+iteration 1 : 0.001075 2.22045e-16 (-0.16125 0.075 0.075 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.16125 0.075 0.075 0 0 0)
+iteration 3 : 2.31112e-33 2.22045e-16 (-0.16125 0.075 0.075 0 0 0)
+convergence, after 3 iterations, order 0.890225
+
+resolution from 0.75 to 0.755
+iteration 1 : 0.001075 2.22045e-16 (-0.162325 0.0755 0.0755 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.162325 0.0755 0.0755 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.162325 0.0755 0.0755 0 0 0)
+convergence, after 3 iterations, order 0.920624
+
+resolution from 0.755 to 0.76
+iteration 1 : 0.001075 2.22045e-16 (-0.1634 0.076 0.076 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1634 0.076 0.076 0 0 0)
+iteration 3 : 0 2.22045e-16 (-0.1634 0.076 0.076 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.76 to 0.765
+iteration 1 : 0.001075 0 (-0.164475 0.0765 0.0765 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.164475 0.0765 0.0765 0 0 0)
+iteration 3 : 0 0 (-0.164475 0.0765 0.0765 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.765 to 0.77
+iteration 1 : 0.001075 0 (-0.16555 0.077 0.077 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.16555 0.077 0.077 0 0 0)
+iteration 3 : 0 0 (-0.16555 0.077 0.077 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.77 to 0.775
+iteration 1 : 0.001075 0 (-0.166625 0.0775 0.0775 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.166625 0.0775 0.0775 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.166625 0.0775 0.0775 0 0 0)
+convergence, after 3 iterations, order 0.989592
+
+resolution from 0.775 to 0.78
+iteration 1 : 0.001075 2.22045e-16 (-0.1677 0.078 0.078 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.1677 0.078 0.078 0 0 0)
+iteration 3 : 0 0 (-0.1677 0.078 0.078 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.78 to 0.785
+iteration 1 : 0.001075 0 (-0.168775 0.0785 0.0785 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.168775 0.0785 0.0785 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.168775 0.0785 0.0785 0 0 0)
+convergence, after 3 iterations, order 0.920624
+
+resolution from 0.785 to 0.79
+iteration 1 : 0.001075 0 (-0.16985 0.079 0.079 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.16985 0.079 0.079 0 0 0)
+iteration 3 : 8.36966e-34 2.22045e-16 (-0.16985 0.079 0.079 0 0 0)
+convergence, after 3 iterations, order 0.940096
+
+resolution from 0.79 to 0.795
+iteration 1 : 0.001075 0 (-0.170925 0.0795 0.0795 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.170925 0.0795 0.0795 0 0 0)
+iteration 3 : 0 0 (-0.170925 0.0795 0.0795 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.795 to 0.8
+iteration 1 : 0.001075 0 (-0.172 0.08 0.08 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.172 0.08 0.08 0 0 0)
+iteration 3 : 1.09943e-33 2.22045e-16 (-0.172 0.08 0.08 0 0 0)
+convergence, after 3 iterations, order 0.910782
+
+resolution from 0.8 to 0.805
+iteration 1 : 0.001075 0 (-0.173075 0.0805 0.0805 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.173075 0.0805 0.0805 0 0 0)
+iteration 3 : 0 0 (-0.173075 0.0805 0.0805 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.805 to 0.81
+iteration 1 : 0.001075 0 (-0.17415 0.081 0.081 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.17415 0.081 0.081 0 0 0)
+iteration 3 : 0 0 (-0.17415 0.081 0.081 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.81 to 0.815
+iteration 1 : 0.001075 0 (-0.175225 0.0815 0.0815 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.175225 0.0815 0.0815 0 0 0)
+iteration 3 : 7.88729e-35 2.22045e-16 (-0.175225 0.0815 0.0815 0 0 0)
+convergence, after 3 iterations, order 1.03529
+
+resolution from 0.815 to 0.82
+iteration 1 : 0.001075 0 (-0.1763 0.082 0.082 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.1763 0.082 0.082 0 0 0)
+iteration 3 : 2.31112e-33 4.44089e-16 (-0.1763 0.082 0.082 0 0 0)
+convergence, after 3 iterations, order 0.958101
+
+resolution from 0.82 to 0.825
+iteration 1 : 0.001075 0 (-0.177375 0.0825 0.0825 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.177375 0.0825 0.0825 0 0 0)
+iteration 3 : 0 0 (-0.177375 0.0825 0.0825 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.825 to 0.83
+iteration 1 : 0.001075 0 (-0.17845 0.083 0.083 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.17845 0.083 0.083 0 0 0)
+iteration 3 : 3.08149e-33 4.44089e-16 (-0.17845 0.083 0.083 0 0 0)
+convergence, after 3 iterations, order 0.919072
+
+resolution from 0.83 to 0.835
+iteration 1 : 0.001075 0 (-0.179525 0.0835 0.0835 0 0 0)
+iteration 2 : 2.1684e-19 0.120113 (-0.179525 0.0835 0.0835 0 0 0)
+iteration 3 : 0 0 (-0.179525 0.0835 0.0835 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.835 to 0.84
+iteration 1 : 0.001075 0 (-0.1806 0.084 0.084 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.1806 0.084 0.084 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.1806 0.084 0.084 0 0 0)
+convergence, after 3 iterations, order 0.958181
+
+resolution from 0.84 to 0.845
+iteration 1 : 0.001075 2.22045e-16 (-0.181675 0.0845 0.0845 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.181675 0.0845 0.0845 0 0 0)
+iteration 3 : 0 0 (-0.181675 0.0845 0.0845 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.845 to 0.85
+iteration 1 : 0.001075 0 (-0.18275 0.085 0.085 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.18275 0.085 0.085 0 0 0)
+iteration 3 : 0 2.22045e-16 (-0.18275 0.085 0.085 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.85 to 0.855
+iteration 1 : 0.001075 2.22045e-16 (-0.183825 0.0855 0.0855 0 0 0)
+iteration 2 : 1.30104e-18 0.120113 (-0.183825 0.0855 0.0855 0 0 0)
+iteration 3 : 7.70372e-34 4.44089e-16 (-0.183825 0.0855 0.0855 0 0 0)
+convergence, after 3 iterations, order 1.02081
+
+resolution from 0.855 to 0.86
+iteration 1 : 0.001075 2.22045e-16 (-0.1849 0.086 0.086 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.1849 0.086 0.086 0 0 0)
+iteration 3 : 7.87447e-34 2.22045e-16 (-0.1849 0.086 0.086 0 0 0)
+convergence, after 3 iterations, order 0.941803
+
+resolution from 0.86 to 0.865
+iteration 1 : 0.001075 2.22045e-16 (-0.185975 0.0865 0.0865 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.185975 0.0865 0.0865 0 0 0)
+iteration 3 : 6.69639e-35 4.44089e-16 (-0.185975 0.0865 0.0865 0 0 0)
+convergence, after 3 iterations, order 1.05961
+
+resolution from 0.865 to 0.87
+iteration 1 : 0.001075 0 (-0.18705 0.087 0.087 0 0 0)
+iteration 2 : 9.75782e-19 0.120113 (-0.18705 0.087 0.087 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.18705 0.087 0.087 0 0 0)
+convergence, after 3 iterations, order 1.00403
+
+resolution from 0.87 to 0.875
+iteration 1 : 0.001075 0 (-0.188125 0.0875 0.0875 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.188125 0.0875 0.0875 0 0 0)
+iteration 3 : 0 0 (-0.188125 0.0875 0.0875 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.875 to 0.88
+iteration 1 : 0.001075 0 (-0.1892 0.088 0.088 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.1892 0.088 0.088 0 0 0)
+iteration 3 : 7.88651e-35 2.22045e-16 (-0.1892 0.088 0.088 0 0 0)
+convergence, after 3 iterations, order 1.02248
+
+resolution from 0.88 to 0.885
+iteration 1 : 0.001075 0 (-0.190275 0.0885 0.0885 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.190275 0.0885 0.0885 0 0 0)
+iteration 3 : 8.18052e-35 2.22045e-16 (-0.190275 0.0885 0.0885 0 0 0)
+convergence, after 3 iterations, order 1.00517
+
+resolution from 0.885 to 0.89
+iteration 1 : 0.001075 0 (-0.19135 0.089 0.089 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.19135 0.089 0.089 0 0 0)
+iteration 3 : 0 0 (-0.19135 0.089 0.089 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.89 to 0.895
+iteration 1 : 0.001075 0 (-0.192425 0.0895 0.0895 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.192425 0.0895 0.0895 0 0 0)
+iteration 3 : 0 2.22045e-16 (-0.192425 0.0895 0.0895 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.895 to 0.9
+iteration 1 : 0.001075 0 (-0.1935 0.09 0.09 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.1935 0.09 0.09 0 0 0)
+iteration 3 : 3.08149e-33 4.44089e-16 (-0.1935 0.09 0.09 0 0 0)
+convergence, after 3 iterations, order 0.957347
+
+resolution from 0.9 to 0.905
+iteration 1 : 0.001075 0 (-0.194575 0.0905 0.0905 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.194575 0.0905 0.0905 0 0 0)
+iteration 3 : 0 0 (-0.194575 0.0905 0.0905 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.905 to 0.91
+iteration 1 : 0.001075 0 (-0.19565 0.091 0.091 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.19565 0.091 0.091 0 0 0)
+iteration 3 : 1.07651e-33 4.44089e-16 (-0.19565 0.091 0.091 0 0 0)
+convergence, after 3 iterations, order 0.948741
+
+resolution from 0.91 to 0.915
+iteration 1 : 0.001075 0 (-0.196725 0.0915 0.0915 0 0 0)
+iteration 2 : 1.0842e-18 0.120113 (-0.196725 0.0915 0.0915 0 0 0)
+iteration 3 : 1.1869e-33 4.44089e-16 (-0.196725 0.0915 0.0915 0 0 0)
+convergence, after 3 iterations, order 0.997626
+
+resolution from 0.915 to 0.92
+iteration 1 : 0.001075 0 (-0.1978 0.092 0.092 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.1978 0.092 0.092 0 0 0)
+iteration 3 : 1.54074e-33 4.44089e-16 (-0.1978 0.092 0.092 0 0 0)
+convergence, after 3 iterations, order 0.950908
+
+resolution from 0.92 to 0.925
+iteration 1 : 0.001075 0 (-0.198875 0.0925 0.0925 0 0 0)
+iteration 2 : 1.19262e-18 0.120113 (-0.198875 0.0925 0.0925 0 0 0)
+iteration 3 : 0 4.44089e-16 (-0.198875 0.0925 0.0925 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.925 to 0.93
+iteration 1 : 0.001075 0 (-0.19995 0.093 0.093 0 0 0)
+iteration 2 : 1.18329e-30 1.76748e-13 (-0.19995 0.093 0.093 0 0 0)
+convergence, after 2 iterations, order undefined
+
+resolution from 0.93 to 0.935
+iteration 1 : 0.001075 0 (-0.201025 0.0935 0.0935 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.201025 0.0935 0.0935 0 0 0)
+iteration 3 : 0 0 (-0.201025 0.0935 0.0935 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.935 to 0.94
+iteration 1 : 0.001075 0 (-0.2021 0.094 0.094 0 0 0)
+iteration 2 : 7.58942e-19 0.120113 (-0.2021 0.094 0.094 0 0 0)
+iteration 3 : 0 0 (-0.2021 0.094 0.094 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.94 to 0.945
+iteration 1 : 0.001075 0 (-0.203175 0.0945 0.0945 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.203175 0.0945 0.0945 0 0 0)
+iteration 3 : 0 0 (-0.203175 0.0945 0.0945 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.945 to 0.95
+iteration 1 : 0.001075 0 (-0.20425 0.095 0.095 0 0 0)
+iteration 2 : 4.33681e-19 0.120113 (-0.20425 0.095 0.095 0 0 0)
+iteration 3 : 1.10152e-33 2.22045e-16 (-0.20425 0.095 0.095 0 0 0)
+convergence, after 3 iterations, order 0.948093
+
+resolution from 0.95 to 0.955
+iteration 1 : 0.001075 0 (-0.205325 0.0955 0.0955 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.205325 0.0955 0.0955 0 0 0)
+iteration 3 : 0 0 (-0.205325 0.0955 0.0955 0 0 0)
+convergence, after 3 iterations, order undefined
+
+resolution from 0.955 to 0.96
+iteration 1 : 0.001075 0 (-0.2064 0.096 0.096 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.2064 0.096 0.096 0 0 0)
+iteration 3 : 5.46159e-34 2.22045e-16 (-0.2064 0.096 0.096 0 0 0)
+convergence, after 3 iterations, order 0.952042
+
+resolution from 0.96 to 0.965
+iteration 1 : 0.001075 2.22045e-16 (-0.207475 0.0965 0.0965 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.207475 0.0965 0.0965 0 0 0)
+iteration 3 : 1.64038e-34 4.44089e-16 (-0.207475 0.0965 0.0965 0 0 0)
+convergence, after 3 iterations, order 1.04174
+
+resolution from 0.965 to 0.97
+iteration 1 : 0.001075 0 (-0.20855 0.097 0.097 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.20855 0.097 0.097 0 0 0)
+iteration 3 : 1.48393e-33 2.22045e-16 (-0.20855 0.097 0.097 0 0 0)
+convergence, after 3 iterations, order 0.924071
+
+resolution from 0.97 to 0.975
+iteration 1 : 0.001075 2.22045e-16 (-0.209625 0.0975 0.0975 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.209625 0.0975 0.0975 0 0 0)
+iteration 3 : 2.31112e-33 4.44089e-16 (-0.209625 0.0975 0.0975 0 0 0)
+convergence, after 3 iterations, order 0.965625
+
+resolution from 0.975 to 0.98
+iteration 1 : 0.001075 2.22045e-16 (-0.2107 0.098 0.098 0 0 0)
+iteration 2 : 3.25261e-19 0.120113 (-0.2107 0.098 0.098 0 0 0)
+iteration 3 : 1.54074e-33 4.44089e-16 (-0.2107 0.098 0.098 0 0 0)
+convergence, after 3 iterations, order 0.923019
+
+resolution from 0.98 to 0.985
+iteration 1 : 0.001075 2.22045e-16 (-0.211775 0.0985 0.0985 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.211775 0.0985 0.0985 0 0 0)
+iteration 3 : 4.64213e-34 2.22045e-16 (-0.211775 0.0985 0.0985 0 0 0)
+convergence, after 3 iterations, order 0.984967
+
+resolution from 0.985 to 0.99
+iteration 1 : 0.001075 2.22045e-16 (-0.21285 0.099 0.099 0 0 0)
+iteration 2 : 5.42101e-19 0.120113 (-0.21285 0.099 0.099 0 0 0)
+iteration 3 : 2.31112e-33 4.44089e-16 (-0.21285 0.099 0.099 0 0 0)
+convergence, after 3 iterations, order 0.939397
+
+resolution from 0.99 to 0.995
+iteration 1 : 0.001075 2.22045e-16 (-0.213925 0.0995 0.0995 0 0 0)
+iteration 2 : 8.67362e-19 0.120113 (-0.213925 0.0995 0.0995 0 0 0)
+iteration 3 : 7.70372e-34 2.22045e-16 (-0.213925 0.0995 0.0995 0 0 0)
+convergence, after 3 iterations, order 0.997237
+
+resolution from 0.995 to 1
+iteration 1 : 0.001075 2.22045e-16 (-0.215 0.1 0.1 0 0 0)
+iteration 2 : 6.50521e-19 0.120113 (-0.215 0.1 0.1 0 0 0)
+iteration 3 : 1.57704e-34 4.44089e-16 (-0.215 0.1 0.1 0 0 0)
+convergence, after 3 iterations, order 1.02611
+
+Execution succeeded
+-number of period:     200
+-number of iterations: 547
+-number of sub-steps:  0
+Result of test 'unit behaviour test' of group 'MTest'            : SUCCESS
+End of Test Suite                                                : SUCCESS

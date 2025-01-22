@@ -39,14 +39,13 @@ c.setEntryName("c");
 @MaterialProperty real v;
 v.setEntryName("v");
 
-@LocalVariable real lambda;
 @LocalVariable real mu;
-@LocalVariable bool bpl;
+@LocalVariable bool integration;
 @LocalVariable real MJP;
 @LocalVariable real MPP_JP;
 
-@StateVariable strain p;
-p.setGlossaryName("EquivalentPlasticStrain");
+@StateVariable strain lambda;
+p.setGlossaryName("PlasticMultiplier");
 @AuxiliaryStateVariable StrainStensor epl;
 epl.setGlossaryName("PlasticStrain");
 
@@ -63,14 +62,15 @@ epl.setGlossaryName("PlasticStrain");
   const auto sigel = computeElasticPrediction();
   const auto pel = trace(sigel) / 3;
   const auto qel = sigmaeq(sigel);
-  bpl = (MJP * pel + qel / sqrt(3) - MJP * c / tan(phi) > stress{0});
+  const auto bpl = MJP * pel + qel / sqrt(3) - MJP * c / tan(phi);
+  integration = bpl > 0;
 }
 
 // each iteration at p + theta * dp
 @Integrator {
   const auto id = Stensor::Id();
   const auto seps =  real(1.e-12) * young;
-  if (bpl) {
+  if (integration) {
     const auto pr = trace(sig) / 3;
     const auto qr = sigmaeq(sig);
     const auto iq = 1 / max(qr, seps);
@@ -78,7 +78,7 @@ epl.setGlossaryName("PlasticStrain");
 
     const auto dg_dsig  = eval((MPP_JP/3) * id + (nq /sqrt(3)));
     feel += dp * dg_dsig;
-    fp =  (MJP * pr + qr / sqrt(3) - MJP * c / tan(phi))/young;
+    fp =  (MJP * pr + qr / sqrt(3) - MJP * c * () / tan(phi))/young;
   }
 } // end of @Integrator
 

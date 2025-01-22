@@ -1,4 +1,4 @@
-@Behaviour<generic> '/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so' 'DruckerPragerSimple';
+@Behaviour<generic> '/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so' 'vMDefault';
 @ExternalStateVariable 'Temperature' 293.15;
 @ImposedStrain 'EXX' {0: 0, 1: -0.215};
 @ImposedStrain 'EYY' {0: 0, 1: 0.10};
@@ -8,5 +8,5 @@
 
 @MaterialProperty<constant> 'YoungModulus' 150;
 @MaterialProperty<constant> 'PoissonRatio' 0.3;
-@MaterialProperty<constant> 'phi' 0.26;
-@MaterialProperty<constant> 'c' 0.3;
+@MaterialProperty<constant> 'HardeningSlope' 1.5;
+@MaterialProperty<constant> 'YieldStrength' 0.3;

@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <testsuite name="MTest/DP_hyperboloidal">
-<testcase classname="MTest" name="unit behaviour test" time="0.00803659">
+<testcase classname="MTest" name="unit behaviour test" time="0.0074545">
 <success>
 </success>
 </testcase>

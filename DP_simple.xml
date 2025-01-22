@@ -1,8 +1,7 @@
 <?xml version="1.0" ?>
 <testsuite name="MTest/DP_simple">
-<testcase classname="MTest" name="unit behaviour test" time="0.00189861">
-<failure>
-test &apos;unit behaviour test&apos; has thrown an exception (GenericSolver::execute: maximum number of sub stepping reached)
-</failure>
+<testcase classname="MTest" name="unit behaviour test" time="0.00707321">
+<success>
+</success>
 </testcase>
 </testsuite>

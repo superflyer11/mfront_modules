@@ -19,7 +19,7 @@
 @Algorithm NewtonRaphson_NumericalJacobian;
 @Brick StandardElasticity;
 @Theta 1.0;
-@Epsilon 1e-14;
+@Epsilon 1e-16;
 @MaximumNumberOfIterations 20;
 @PerturbationValueForNumericalJacobianComputation 1.e-8;
 @ModellingHypotheses{".+"};
@@ -63,7 +63,7 @@ epl.setGlossaryName("PlasticStrain");
   const auto pr = trace(sig) / 3;
   const auto sr = deviator(sig);
   const auto Jr = sqrt((sr | sr) / 2);
-  const auto seps = real(1.e-12) * young;
+  const auto seps = strain(1.e-12) * young;
   const auto hypterm = sqrt(power<2>(a)*power<2>(MJP) + power<2>(max(Jr, seps)));
   const auto fr = MJP * pr + hypterm - K;
 
