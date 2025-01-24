@@ -1,9 +1,10 @@
 # %%
 import os
 import sys
+from pathlib import Path
 sys.path.append("/mofem_install/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/tfel-4.0.0-jjcwdu6cbil5dzqzjhjekn3jdzo3e6gc/lib/python3.11/site-packages")
-import pandas as pd
 import numpy as np
+import pandas as pd
 import mtest
 from pydantic import BaseModel
 
@@ -68,7 +69,7 @@ m.setModellingHypothesis("Tridimensional")
 model = "DruckerPragerNonAssociated"
 # model = "DruckerPragerHyperboloidal"
 
-lib_path = "/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so"
+lib_path = "/mofem_install/jupyter/thomas/mfront_modules/src/libBehaviour.so"
 
 b = mtest.Behaviour('generic', lib_path, model,'Tridimensional')
 print(f"Material Properties: {b.getMaterialPropertiesNames()}")
@@ -88,15 +89,15 @@ m.setBehaviour("generic", lib_path, model)
 E = 500
 nu = 0.3
 phi = np.radians(10)
-v = np.radians(0)
+v = np.radians(10)
 c = 0.125
-a = 1e-3
+a = 1e-2
 # fitting at triaxial compression: lode angle = -30
 M_JP = 2 * np.sqrt(3) * np.sin(phi) / (3 -  np.sin(phi))
 
 # Loading programme
 tMax = 1.0  # s , total time
-nTime = 400
+nTime = 20
 ltime = np.linspace(0.0, tMax, nTime)
 # Environment parameters
 m.setExternalStateVariable("Temperature", 293.15)
@@ -178,7 +179,6 @@ if control == "strain":
 # %%
 s = mtest.MTestCurrentState()
 wk = mtest.MTestWorkSpace()
-m.setOutputFileName(f"/mofem_install/jupyter/thomas/mfront_interface/{model}.log")
 
 m.completeInitialisation()
 m.initializeCurrentState(s)
@@ -389,7 +389,7 @@ data = {
 df = pd.DataFrame(data)
 
 # Save the DataFrame to a CSV file
-csv_filepath = f'/mofem_install/jupyter/thomas/mfront_interface/{model}.csv'
+csv_filepath = f'/mofem_install/jupyter/thomas/mfront_modules/{model}.csv'
 df.to_csv(csv_filepath, index=False)
 
 print(f"Data saved to {csv_filepath}")
@@ -409,8 +409,12 @@ import matplotlib
 import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation
 
-PLOT_DIR = f"/mofem_install/jupyter/thomas/mfront_interface/mtest_plots/{model}"
+PLOT_DIR = f"/mofem_install/jupyter/thomas/mfront_modules/mtest_plots/{model}_ts_{tMax/nTime}_v_{v}"
 os.makedirs(PLOT_DIR, exist_ok=True)
+
+df =  pd.DataFrame({"sig_zz": sig_zz, "e_zz": e_zz})
+df.to_csv(f"{PLOT_DIR}/log.csv",index=False)
+
 plt.rcParams['animation.ffmpeg_path'] ='/mofem_install/jupyter/thomas/ffmpeg-7.0.2-amd64-static/ffmpeg'
 
 matplotlib.rc('figure', figsize=(6, 6))

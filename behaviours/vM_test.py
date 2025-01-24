@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 sys.path.append("/mofem_install/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/tfel-4.0.0-jjcwdu6cbil5dzqzjhjekn3jdzo3e6gc/lib/python3.11/site-packages")
 import numpy as np
+import pandas as pd
 import mtest
 from pydantic import BaseModel
 
@@ -47,9 +48,9 @@ mtest.setVerboseMode(mtest.VerboseLevel.VERBOSE_QUIET)
 m.setMaximumNumberOfSubSteps(20)
 m.setModellingHypothesis("Tridimensional")
 
-# model = "vMDefault"
-model = "vM"
-lib_path = "/mofem_install/jupyter/thomas/mfront_interface/src/libBehaviour.so"
+model = "vMDefault"
+# model = "vM"
+lib_path = "/mofem_install/jupyter/thomas/mfront_modules/src/libBehaviour.so"
 
 b = mtest.Behaviour('generic', lib_path, model,'Tridimensional')
 print(f"Material Properties: {b.getMaterialPropertiesNames()}")
@@ -63,7 +64,7 @@ sig_y = 0.25
 tau_oct_0 = np.sqrt(2/3) * sig_y
 # Loading programme
 tMax = 1.0  # s , total time
-nTime = 200
+nTime = 10
 ltime = np.linspace(0.0, tMax, nTime)
 
 # Environment parameters
@@ -638,8 +639,11 @@ def plot_sig_vs_time(t, sig_1, sig_2, sig_3, save_as: str = None):
 
 # %%
 # image_files = []
-PLOT_DIR = Path(f"/mofem_install/jupyter/thomas/mfront_interface/mtest_plots/{model}")
+PLOT_DIR = Path(f"/mofem_install/jupyter/thomas/mfront_modules/mtest_plots/{model}_ts_{tMax/nTime}")
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
+
+df =  pd.DataFrame({"sig_zz": sig_zz, "e_zz": e_zz})
+df.to_csv(f"{PLOT_DIR}/log.csv",index=False)
 
 print(f"exx: {e_xx[-1]}")
 print(f"eyy: {e_yy[-1]}")
